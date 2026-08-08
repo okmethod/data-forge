@@ -1,0 +1,36 @@
+[project]
+name = "data-forge-pipeline"
+version = "0.1.0"
+description = "日本の公的データを取得・クレンジングし Parquet / CSV / SQLite へ精製するパイプライン"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = ["polars>=1.0", "httpx>=0.27", "python-dotenv>=1.0"]
+
+[project.scripts]
+data-forge = "data_forge.cli:main"
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "ruff>=0.6", "poethepoet>=0.29"]
+
+[tool.poe.tasks]
+test = "pytest"
+lint = "ruff check ."
+format = "ruff format ."
+fetch = "data-forge fetch"
+clean = "data-forge clean"
+export = "data-forge export"
+run = "data-forge run"
+check = ["lint", "test"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/data_forge"]
+
+[tool.ruff]
+line-length = 100
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
