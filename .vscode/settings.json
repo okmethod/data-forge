@@ -1,4 +1,9 @@
 {
+  "files.exclude": {
+    "docs": true,
+    "apps": true,
+    "data": true
+  },
   "python.defaultInterpreterPath": "${workspaceFolder}/apps/pipeline/.venv/bin/python",
   "python.analysis.extraPaths": ["${workspaceFolder}/apps/pipeline/src"]
 }

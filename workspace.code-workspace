@@ -4,6 +4,17 @@
       "name": "root",
       "path": ".",
     },
+    {
+      "path": "docs",
+    },
+    {
+      "name": "pipeline",
+      "path": "apps/pipeline",
+    },
+    {
+      "name": "data",
+      "path": "data",
+    },
   ],
   "settings": {
     "editor.tabSize": 2,
