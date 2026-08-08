@@ -20,7 +20,8 @@
 ```
 data-forge/
 ├── apps/
-│   ├── pipeline/   # Pythonパイプライン
+│   ├── pipeline/   # Python パイプライン
+│   ├── dashboard/  # Evidence ダッシュボード
 │   └── server/     # Cloudflare Workers（将来）
 ├── data/           # .gitignore 対象（raw/ / processed/）
 └── docs/

@@ -37,6 +37,7 @@
 data-forge/
 ├── apps/
 │   ├── pipeline/    # データ精製パイプライン
+│   ├── dashboard/   # データ可視化ダッシュボード
 │   └── server/      # データ配信サーバー（将来）
 ├── data/            # .gitignore 対象
 │   ├── raw/         # 取得した生データ
