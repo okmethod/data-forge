@@ -1,0 +1,48 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls *)",
+      "Bash(find *)",
+      "Bash(tree *)",
+      "Bash(grep *)",
+      "Bash(head *)",
+      "Bash(tail *)",
+      "Bash(wc *)",
+      "Bash(mkdir *)",
+      "Bash(rm *)",
+      "Bash(rm -rf *)",
+      "Bash(mv *)",
+      "Bash(awk *)",
+      "Bash(curl *)",
+      "Bash(git *)",
+      "Bash(gh *)",
+      "Bash(* --version)",
+      "Bash(* --help *)",
+      "Bash(npm *)",
+      "Bash(npx *)",
+      "Bash(prettier *)",
+      "Bash(uv *)",
+      "Bash(mypy *)",
+      "Bash(ruff *)",
+      "Bash(pytest *)",
+      "SlashCommand(*)",
+      "Skill(*)"
+    ],
+    "deny": [
+      "Bash(sudo *)",
+      "Bash(git reset *)",
+      "Bash(git rebase *)",
+      "Bash(* --force *)",
+      "Read(.env)",
+      "Write(.env)",
+      "Read(id_rsa)",
+      "Read(id_ed25519)"
+    ]
+  },
+  "hooks": {},
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": ["playwright"],
+  "enabledPlugins": {
+    "pyright-lsp@claude-plugins-official": true
+  }
+}
