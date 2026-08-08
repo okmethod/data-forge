@@ -30,3 +30,21 @@ class SourceMeta:
         }
         base.update(self.attributes)
         return base
+
+
+def combine_meta(metas: list[SourceMeta], *, title: str) -> SourceMeta:
+    """複数データセットの出典メタを1つに束ねる（派生データセット用）。
+
+    結合表は全ての元表を出典に明記する必要があるため、dataset_id と citation を
+    連結する。source / provider は先頭を採用（同一ソース内の結合を想定）。
+    """
+    if not metas:
+        raise ValueError("combine_meta: metas が空です")
+    return SourceMeta(
+        source=metas[0].source,
+        dataset_id=", ".join(m.dataset_id for m in metas),
+        title=title,
+        provider=metas[0].provider,
+        citation=" / ".join(m.citation for m in metas),
+        attributes={"combined_from": ", ".join(m.dataset_id for m in metas)},
+    )

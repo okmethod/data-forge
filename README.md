@@ -19,7 +19,7 @@
 
 ### 対応データソース
 
-商用利用可否を含むデータソース詳細は [docs/sources/catalog.md](docs/sources/catalog.md) を参照。
+商用利用可否を含むデータソース詳細は [docs/data_catalog.md](docs/data_catalog.md) を参照。
 
 ### 出力と活用方法
 

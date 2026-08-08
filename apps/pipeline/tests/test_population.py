@@ -46,7 +46,7 @@ def test_to_tidy_resolves_names():
 
 def test_clean_from_fixture():
     tidy = transform.to_tidy(_load_raw())
-    df = population.clean(tidy)
+    df = population.clean_2020(tidy)
 
     assert df.columns == [
         "area_code",
@@ -85,7 +85,7 @@ def test_clean_handles_levels_and_missing():
             "value": ["17456", "-"],  # 2件目は欠損記号
         }
     )
-    df = population.clean(tidy).sort("area_code")
+    df = population.clean_2020(tidy).sort("area_code")
 
     current = df.filter(pl.col("area_code") == "01303").row(0, named=True)
     assert current["is_current"] is True
@@ -94,3 +94,44 @@ def test_clean_handles_levels_and_missing():
     obsolete = df.filter(pl.col("area_code") == "0120B").row(0, named=True)
     assert obsolete["is_current"] is False  # level7 は旧自治体
     assert obsolete["population"] is None  # "-" は null
+
+
+def test_clean_2015_maps_to_shared_schema():
+    """2015年表（cat01=全域/DID・cat02=表章事項＋男女統合）を共通8列へ写像する。"""
+    tidy = pl.DataFrame(
+        {
+            "cat01_code": ["00710", "00710", "00710", "00710", "00711"],
+            "cat01_name": ["全域", "全域", "全域", "全域", "人口集中地区"],
+            "cat02_code": ["010", "020", "030", "040", "010"],
+            "cat02_name": [
+                "（人口）総数",
+                "（人口）男",
+                "（人口）女",
+                "（人口）人口性比",
+                "（人口）総数",
+            ],
+            "area_code": ["00000", "00000", "00000", "00000", "00000"],
+            "area_name": ["全国", "全国", "全国", "全国", "全国"],
+            "area_level": ["1", "1", "1", "1", "1"],
+            "time_code": ["2015000000"] * 5,
+            "value": ["127094745", "61841738", "65253007", "94.8", "116137232"],
+        }
+    )
+    df = population.clean_2015(tidy)
+
+    # 人口性比(040)・人口集中地区(00711)は除外され、全域の総数/男/女の3行だけ
+    assert df.columns == [
+        "area_code",
+        "area_name",
+        "area_level",
+        "sex_code",
+        "sex",
+        "year",
+        "population",
+        "is_current",
+    ]
+    assert df.height == 3
+    assert set(zip(df["sex_code"], df["sex"])) == {("0", "総数"), ("1", "男"), ("2", "女")}
+    total = df.filter(pl.col("sex_code") == "0").row(0, named=True)
+    assert total["population"] == 127_094_745  # DID・人口性比を拾っていない
+    assert total["year"] == 2015
