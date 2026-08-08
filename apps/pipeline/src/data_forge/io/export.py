@@ -1,8 +1,15 @@
 """精製済み DataFrame を Parquet / CSV / SQLite の3形式で出力する共通層。
 
 ソースに依存しない。出典メタ（`SourceMeta`）は各ソースが組み立て済みの状態で
-受け取り、SQLite の `_source_meta` テーブルと、Parquet/CSV 併設の
-`<stem>.meta.json` サイドカーの両方へ書き出す。
+受け取り、各成果物へ出典表記（citation）を必ず同梱する:
+
+- Parquet … フッターの key-value メタデータに埋め込み（ファイル単体で出典が残る）
+- SQLite  … `_source_meta` テーブル
+- CSV     … 形式上メタを持てないため、併設の `<stem>.meta.json` サイドカーで担保
+- meta.json … Parquet/CSV 併設のサイドカー
+
+出力の最後に `_verify_attribution` で全成果物に citation が入ったか検証し、
+欠けていれば例外にする。これにより「出典未記載の成果物は出荷できない」を保証する。
 """
 
 import json
@@ -29,7 +36,8 @@ def export_all(
     outputs: list[Path] = []
 
     parquet_path = PROCESSED_DIR / f"{stem}.parquet"
-    df.write_parquet(parquet_path)
+    # 出典メタをフッターの key-value に埋め込む（ファイル単体で出典が残る）。
+    df.write_parquet(parquet_path, metadata=meta.flat())
     outputs.append(parquet_path)
 
     csv_path = PROCESSED_DIR / f"{stem}.csv"
@@ -43,6 +51,8 @@ def export_all(
     meta_path = PROCESSED_DIR / f"{stem}.meta.json"
     meta_path.write_text(json.dumps(asdict(meta), ensure_ascii=False, indent=2), encoding="utf-8")
     outputs.append(meta_path)
+
+    _verify_attribution(parquet_path=parquet_path, sqlite_path=sqlite_path, meta_path=meta_path)
 
     return outputs
 
@@ -98,3 +108,36 @@ def _create_meta_table(conn: sqlite3.Connection, meta: SourceMeta) -> None:
         "INSERT INTO _source_meta VALUES (?, ?)",
         list(meta.flat().items()),
     )
+
+
+def _verify_attribution(
+    *,
+    parquet_path: Path,
+    sqlite_path: Path,
+    meta_path: Path,
+) -> None:
+    """全成果物に出典表記（citation）が同梱されたか検証し、欠けていれば例外にする。
+
+    出荷物から出典が失われることを防ぐ最終ゲート。CSV は形式上メタを持てないため、
+    併設の meta.json サイドカーが citation を持つことで担保する。
+    """
+    problems: list[str] = []
+
+    parquet_meta = pl.read_parquet_metadata(parquet_path)
+    if not parquet_meta.get("citation"):
+        problems.append(f"{parquet_path.name}: フッターメタに citation が無い")
+
+    conn = sqlite3.connect(sqlite_path)
+    try:
+        row = conn.execute("SELECT value FROM _source_meta WHERE key = 'citation'").fetchone()
+    finally:
+        conn.close()
+    if not (row and row[0]):
+        problems.append(f"{sqlite_path.name}: _source_meta に citation が無い")
+
+    meta_json = json.loads(meta_path.read_text(encoding="utf-8"))
+    if not meta_json.get("citation"):
+        problems.append(f"{meta_path.name}: citation が無い（CSV の出典担保も兼ねる）")
+
+    if problems:
+        raise RuntimeError("出典表記（citation）の担保に失敗:\n  - " + "\n  - ".join(problems))
