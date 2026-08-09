@@ -103,28 +103,29 @@ def _year_cleaner(
     return _clean
 
 
-def _prepend_national_from_prefectures(fact: pl.DataFrame) -> pl.DataFrame:
+def _prepend_national_from_prefectures(
+    fact: pl.DataFrame, *, group_cols: Sequence[str] = ("sex_code", "sex", "year")
+) -> pl.DataFrame:
     """全国(00000)行を持たない表向けに、47都道府県(level2)合計から全国行を復元して先頭に付ける。
 
     他年（全国行あり。cli の人口保存チェックは fact の area_code=="00000" を national とみなす）と
     出力を揃えるための復元。平成2/7年の「年齢3区分,男女別人口」表がこれに該当する。
+    `group_cols` は全国合計を取る分類軸（既定＝男女×年。年齢区分を持つ表なら age_class を足す）。
     """
     national = (
         fact.filter(pl.col("area_level") == 2)
-        .group_by("sex_code", "sex", "year")
+        .group_by(list(group_cols))
         .agg(pl.col("population").sum())
-        .select(
+        .with_columns(
             pl.lit("00000").alias("area_code"),
             pl.lit("全国").alias("area_name"),
             pl.lit(1).cast(pl.Int8).alias("area_level"),
-            pl.col("sex_code"),
-            pl.col("sex"),
-            pl.col("year"),
-            pl.col("population"),
             pl.lit(True).alias("is_current"),
         )
+        .select(fact.columns)  # 元の列順・列集合へ揃える
     )
-    return pl.concat([national, fact]).sort("area_code", "sex_code")
+    sort_keys = ["area_code", *(c for c in ("sex_code", "age_class_code") if c in fact.columns)]
+    return pl.concat([national, fact]).sort(sort_keys)
 
 
 def _clean_age3class_table(tidy: pl.DataFrame) -> pl.DataFrame:
@@ -156,3 +157,73 @@ clean_2005 = _year_cleaner(sex_axis="cat01", sex_by_code=SEX_2005)  # cat01に�
 clean_2010 = _year_cleaner(sex_axis="cat02", sex_by_code=SEX_2010, filters=[_DID_WHOLE])
 clean_2015 = _year_cleaner(sex_axis="cat02", sex_by_code=SEX_2015, filters=[_DID_WHOLE])
 clean_2020 = _year_cleaner(sex_axis="cat01", sex_by_code=SEX_2020)  # 令和型
+
+
+# --- population_by_age（年齢3区分×男女別人口）------------------------------------
+# 「年齢（3区分），男女別人口及び年齢別割合」時系列ファミリー（statsDataId 0003412413〜420 /
+# 0003448299）は全年同型: tab=020(人口)/105(割合)・cat01=年齢3区分・cat02=男女・全国行なし。
+# population 用の各年 cleaner が cat01=100 で捨てていた年齢軸を保持し、grain に age_class を足す。
+AGE_TS: SexMap = {
+    "100": ("0", "総数"),
+    "110": ("1", "年少人口(0-14)"),
+    "120": ("2", "生産年齢人口(15-64)"),
+    "130": ("3", "老年人口(65+)"),
+}
+_AGE_UNKNOWN = ("9", "年齢不詳")
+
+
+def clean_population_by_age(tidy: pl.DataFrame) -> pl.DataFrame:
+    """時系列ファミリー表の tidy → 年齢3区分×男女別人口（10列）へ写像する（全年共通）。
+
+    population.clean_* が cat01=100 で落としていた年齢軸を保持する拡張版。手順:
+        1. tab=020（人口。割合 105 は導出可能なので捨てる）で絞る。
+        2. cat02（男女, コード体系は SEX_2005 と同じ 100/110/120）→ sex_code / sex。
+        3. cat01（年齢, 100/110/120/130）→ age_class_code / age_class（100 も残す）。
+        4. 全国(00000)行を 47都道府県合計から復元（age_class × sex 別に集計）。
+        5. 年齢不詳（age_class_code=9）を 総数−(年少+生産+老年) で導出注入。
+           時系列ファミリーの cat01 に不詳コードは無く、近年は不詳が無視できないため。
+           これにより「年少+生産+老年+不詳 == 総数」が全地域・全年で恒等的に成立する。
+
+    出力スキーマは population の8列に age_class_code / age_class を足した10列。
+    """
+    fact = (
+        tidy.filter(pl.col("tab_code") == "020")
+        .filter(pl.col("cat02_code").is_in(list(AGE_TS)))  # 男女（コード体系は同じ）
+        .filter(pl.col("cat01_code").is_in(list(AGE_TS)))  # 年齢3区分＋総数
+        .select(
+            pl.col("area_code"),
+            pl.col("area_name"),
+            pl.col("area_level").cast(pl.Int8, strict=False).alias("area_level"),
+            pl.col("cat02_code").replace_strict({k: v[0] for k, v in SEX_2005.items()}).alias("sex_code"),
+            pl.col("cat02_code").replace_strict({k: v[1] for k, v in SEX_2005.items()}).alias("sex"),
+            pl.col("cat01_code").replace_strict({k: v[0] for k, v in AGE_TS.items()}).alias("age_class_code"),
+            pl.col("cat01_code").replace_strict({k: v[1] for k, v in AGE_TS.items()}).alias("age_class"),
+            pl.col("time_code").str.slice(0, 4).cast(pl.Int16).alias("year"),
+            pl.col("value").str.replace_all(r"[^0-9-]", "").cast(pl.Int64, strict=False).alias("population"),
+        )
+        .with_columns((pl.col("area_level") != _OBSOLETE_AREA_LEVEL).alias("is_current"))
+    )
+    fact = _prepend_national_from_prefectures(
+        fact, group_cols=("sex_code", "sex", "age_class_code", "age_class", "year")
+    )
+    return _inject_age_unknown(fact)
+
+
+def _inject_age_unknown(fact: pl.DataFrame) -> pl.DataFrame:
+    """年齢不詳行（age_class_code=9）= 総数 − (年少+生産+老年) を area×sex×year 毎に導出注入する。"""
+    parts = (
+        fact.filter(pl.col("age_class_code").is_in(["1", "2", "3"]))
+        .group_by("area_code", "sex_code", "year")
+        .agg(pl.col("population").sum().alias("_part"))
+    )
+    unknown = (
+        fact.filter(pl.col("age_class_code") == "0")
+        .join(parts, on=["area_code", "sex_code", "year"], how="left")
+        .with_columns(
+            pl.lit(_AGE_UNKNOWN[0]).alias("age_class_code"),
+            pl.lit(_AGE_UNKNOWN[1]).alias("age_class"),
+            (pl.col("population") - pl.col("_part").fill_null(0)).alias("population"),
+        )
+        .select(fact.columns)
+    )
+    return pl.concat([fact, unknown]).sort("area_code", "sex_code", "age_class_code")

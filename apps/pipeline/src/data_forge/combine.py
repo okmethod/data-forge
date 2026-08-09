@@ -13,20 +13,35 @@ area コード正規化の方針は年をまたぐ地域集合の差（市町村
                    データが無い (area, year) は population=null の行として明示する。
 """
 
+from collections.abc import Sequence
 from typing import Literal
 
 import polars as pl
 
 Mode = Literal["union", "intersection", "grid"]
 
-# 時系列テーブルの粒度（この3列で一意でなければ二重計上を疑う）
+# 時系列テーブルの既定の粒度（この列群で一意でなければ二重計上を疑う）。
+# fact 毎に軸が増える場合（例: population_by_age は age_class_code を足す）は
+# combine_years(..., grain=[...]) で後方互換に上書きする。
 GRAIN = ["area_code", "sex_code", "year"]
 
+# grid モードで「地域×年」と直交させる分類軸を成す、area/年/値でない属性列。
+# code とその名称（sex_code↔sex, age_class_code↔age_class 等）が 1:1 で対になるため、
+# grain を明示しなくても DF の列構成から自動判別できる。
+_NON_CATEGORY_COLS = {"area_code", "area_name", "area_level", "year", "population", "is_current"}
 
-def combine_years(frames: list[pl.DataFrame], *, mode: Mode = "union") -> pl.DataFrame:
-    """同一スキーマの年次フレーム群を時系列テーブルへ結合する。"""
+
+def combine_years(
+    frames: list[pl.DataFrame], *, mode: Mode = "union", grain: Sequence[str] = GRAIN
+) -> pl.DataFrame:
+    """同一スキーマの年次フレーム群を時系列テーブルへ結合する。
+
+    `grain` はこの結合表を一意に定める列群（既定＝area×sex×year）。fact 毎に
+    分類軸が増える場合だけ明示的に渡す（例: 年齢区分を持つ表なら age_class_code を追加）。
+    """
+    grain = list(grain)
     df = pl.concat(frames, how="vertical")
-    _assert_grain(df)
+    _assert_grain(df, grain)
 
     if mode == "union":
         out = df
@@ -37,20 +52,21 @@ def combine_years(frames: list[pl.DataFrame], *, mode: Mode = "union") -> pl.Dat
     else:  # pragma: no cover - Literal で型的には到達しない
         raise ValueError(f"未知の結合モード: {mode!r}")
 
-    return out.sort("area_code", "year", "sex_code")
+    sort_keys = ["area_code", "year", *(c for c in grain if c not in ("area_code", "year"))]
+    return out.sort(sort_keys)
 
 
-def _assert_grain(df: pl.DataFrame) -> None:
-    """(area_code, sex_code, year) の重複が無いことを保証する。
+def _assert_grain(df: pl.DataFrame, grain: list[str]) -> None:
+    """grain 列群の組で重複が無いことを保証する。
 
     年ごとの cleaner が別の分類軸を取りこぼすと行が多重化するため、
     二重計上を静かに通さずここで明確に失敗させる。
     """
-    dup = df.group_by(GRAIN).len().filter(pl.col("len") > 1)
+    dup = df.group_by(grain).len().filter(pl.col("len") > 1)
     if dup.height:
         sample = dup.head(3).to_dicts()
         raise ValueError(
-            f"粒度違反: (area_code, sex_code, year) が重複 {dup.height} 件（例: {sample}）。"
+            f"粒度違反: {tuple(grain)} が重複 {dup.height} 件（例: {sample}）。"
             "年次 cleaner が想定外の分類軸を残していないか確認すること。"
         )
 
@@ -68,14 +84,16 @@ def _intersection(df: pl.DataFrame) -> pl.DataFrame:
 
 
 def _grid(df: pl.DataFrame) -> pl.DataFrame:
-    """area_code × year × sex の全格子を作り、欠損 (area, year) を null 行で明示する。
+    """area_code × year × 分類軸 の全格子を作り、欠損 (area, year) を null 行で明示する。
 
-    地域属性（area_name / area_level / is_current）はその地域が存在した年の値のみ
-    埋まり、存在しない年は null になる（＝その年に無かったことを表す）。
+    分類軸（sex、表によっては age_class など）は area/年/値でない列として自動判別し、
+    その全組み合わせと直交させる。地域属性（area_name / area_level / is_current）は
+    その地域が存在した年の値のみ埋まり、存在しない年は null になる。
     """
+    cat_cols = [c for c in df.columns if c not in _NON_CATEGORY_COLS]
     areas = df.select("area_code").unique()
     years = df.select("year").unique()
-    sexes = df.select("sex_code", "sex").unique()
-    keys = areas.join(years, how="cross").join(sexes, how="cross")
-    out = keys.join(df, on=["area_code", "year", "sex_code", "sex"], how="left")
+    cats = df.select(cat_cols).unique()
+    keys = areas.join(years, how="cross").join(cats, how="cross")
+    out = keys.join(df, on=["area_code", "year", *cat_cols], how="left")
     return out.select(df.columns)  # 入力の列順（共通スキーマ順）へ揃える

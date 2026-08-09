@@ -27,17 +27,16 @@ from data_forge.area.mapping import rollup
 
 _OBSOLETE_AREA_LEVEL = 7  # 旧市区町村（現存でない）
 
-# 出力スキーマ（単年 fact と揃える）
-_OUT_COLS = [
-    "area_code",
-    "area_name",
-    "area_level",
-    "sex_code",
-    "sex",
-    "year",
-    "population",
-    "is_current",
-]
+
+def _cat_code_cols(df: pl.DataFrame) -> list[str]:
+    """分類軸のコード列（area_code / base_code 以外の `*_code`）を返す。
+
+    例: population → `["sex_code"]` ／ population_by_age → `["sex_code", "age_class_code"]`。
+    集約の group キー・ソートキーはこの軸で構成し、名称列（`sex` / `age_class`）は畳み込み時に
+    `.first()` で運ぶ（各群内で一定）。出力スキーマは固定表を持たず入力 `atom_fact` の列構成を
+    そのまま踏襲するので、population(8列) と population_by_age(10列) を同じコードで畳める。
+    """
+    return [c for c in df.columns if c.endswith("_code") and c not in ("area_code", "base_code")]
 
 
 def _base_year(atom_fact: pl.DataFrame, base_year: int | None) -> int:
@@ -47,17 +46,17 @@ def _base_year(atom_fact: pl.DataFrame, base_year: int | None) -> int:
 def attach_crosswalk(
     atom_fact: pl.DataFrame, events: pl.DataFrame, *, base_year: int | None = None
 ) -> pl.DataFrame:
-    """各年アトムを畳まず、後継コード列 base_code・base_name を同梱して返す（10列）。
+    """各年アトムを畳まず、後継コード列 base_code・base_name を同梱して返す（入力列＋2列）。
 
     畳む/畳まないを配布時に固定しない「非固定」ビュー。利用者は area_code のまま使えば
     原境界（合併前の実態保持）、`GROUP BY base_code` すれば前方 rollup 相当（連続時系列）。
 
     引数:
-        atom_fact … 各年アトムを union 結合した時系列 DF（8列）。
+        atom_fact … 各年アトムを union 結合した時系列 DF（入力スキーマは fact 依存）。
         events    … 実効合併イベント（area.events.load_events の出力）。
         base_year … 後継先の基準年（既定=atom_fact の最新年）。
 
-    返り値の列 = 入力8列 ＋ base_code（後継先コード。未合併/未整備は area_code と同値）
+    返り値の列 = 入力列 ＋ base_code（後継先コード。未合併/未整備は area_code と同値）
     ＋ base_name（base_year 時点の後継先名称。幽霊 base ユニットでは null）。
     """
     base = _base_year(atom_fact, base_year)
@@ -67,33 +66,38 @@ def attach_crosswalk(
         .select(pl.col("area_code").alias("base_code"), pl.col("area_name").alias("base_name"))
         .unique(subset="base_code")
     )
+    sort_keys = ["area_code", "year", *_cat_code_cols(atom_fact)]
     return (
         atom_fact.join(roll, left_on="area_code", right_on="code", how="left")
         .with_columns(pl.coalesce("base_code", "area_code").alias("base_code"))
         .join(base_names, on="base_code", how="left")
-        .select(*_OUT_COLS, "base_code", "base_name")
-        .sort("area_code", "year", "sex_code")
+        .select(*atom_fact.columns, "base_code", "base_name")
+        .sort(sort_keys)
     )
 
 
 def aggregate_to_base(
     atom_fact: pl.DataFrame, events: pl.DataFrame, *, base_year: int | None = None
 ) -> pl.DataFrame:
-    """アトム時系列を base_year 境界の自治体時系列へ畳む（8列スキーマで返す）。
+    """アトム時系列を base_year 境界の自治体時系列へ畳む（入力と同じスキーマで返す）。
 
     = attach_crosswalk を base_code で実際に合算した確定ビュー。
 
     引数:
-        atom_fact … 各年アトムを union 結合した時系列 DF（8列）。
+        atom_fact … 各年アトムを union 結合した時系列 DF（入力スキーマは fact 依存）。
         events    … 実効合併イベント（area.events.load_events の出力）。
         base_year … 集約の基準年（既定=atom_fact の最新年）。
     """
     base = _base_year(atom_fact, base_year)
     cw = attach_crosswalk(atom_fact, events, base_year=base)
 
-    agg = cw.group_by(["base_code", "year", "sex_code"]).agg(
+    cat_codes = _cat_code_cols(atom_fact)
+    cat_labels = [
+        c.removesuffix("_code") for c in cat_codes
+    ]  # sex_code→sex / age_class_code→age_class
+    agg = cw.group_by(["base_code", "year", *cat_codes]).agg(
         pl.col("population").sum().alias("population"),
-        pl.col("sex").first().alias("sex"),
+        *(pl.col(lbl).first().alias(lbl) for lbl in cat_labels),
     )
 
     # name/level は base_year 時点のアトム（＝基準年に現存する自治体）から与える
@@ -111,6 +115,6 @@ def aggregate_to_base(
         agg.join(base_attrs, on="base_code", how="left")
         .rename({"base_code": "area_code"})
         .with_columns((pl.col("area_level") != _OBSOLETE_AREA_LEVEL).alias("is_current"))
-        .select(_OUT_COLS)
-        .sort("area_code", "year", "sex_code")
+        .select(atom_fact.columns)
+        .sort(["area_code", "year", *cat_codes])
     )

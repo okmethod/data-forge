@@ -135,3 +135,124 @@ def test_clean_2015_maps_to_shared_schema():
     total = df.filter(pl.col("sex_code") == "0").row(0, named=True)
     assert total["population"] == 127_094_745  # DID・人口性比を拾っていない
     assert total["year"] == 2015
+
+
+# --- population_by_age（年齢3区分×男女別人口）------------------------------------
+
+# 時系列ファミリー表の手組み tidy。県 01/02（level2, 全国行なし）× 男女(cat02) × 年齢(cat01)。
+# 各 (県,性) で 総数 ≠ 年少+生産+老年 とし、不詳が非ゼロで導出されることを確かめる。
+_AGE_ROWS = {
+    # area: {sex: {age: value}}  age 100=総数/110=年少/120=生産/130=老年
+    "01000": {
+        "100": {"100": 100, "110": 10, "120": 60, "130": 25},  # 不詳=5
+        "110": {"100": 48, "110": 5, "120": 30, "130": 12},  # 不詳=1
+        "120": {"100": 52, "110": 5, "120": 30, "130": 13},  # 不詳=4
+    },
+    "02000": {
+        "100": {"100": 200, "110": 20, "120": 120, "130": 50},  # 不詳=10
+        "110": {"100": 98, "110": 10, "120": 60, "130": 24},  # 不詳=4
+        "120": {"100": 102, "110": 10, "120": 60, "130": 26},  # 不詳=6
+    },
+}
+
+
+def _age_tidy() -> pl.DataFrame:
+    rows: list[dict] = []
+    for area, by_sex in _AGE_ROWS.items():
+        for sex, by_age in by_sex.items():
+            for age, val in by_age.items():
+                rows.append(
+                    {
+                        "tab_code": "020",
+                        "cat01_code": age,
+                        "cat02_code": sex,
+                        "area_code": area,
+                        "area_name": f"県{area}",
+                        "area_level": "2",
+                        "time_code": "2020000000",
+                        "value": str(val),
+                    }
+                )
+    # 割合(tab=105)の混入行 → 捨てられることの確認用
+    rows.append(
+        {
+            "tab_code": "105",
+            "cat01_code": "130",
+            "cat02_code": "100",
+            "area_code": "01000",
+            "area_name": "県01000",
+            "area_level": "2",
+            "time_code": "2020000000",
+            "value": "25.0",
+        }
+    )
+    return pl.DataFrame(rows)
+
+
+def test_clean_population_by_age_schema_and_national_restore():
+    df = population.clean_population_by_age(_age_tidy())
+    assert df.columns == [
+        "area_code",
+        "area_name",
+        "area_level",
+        "sex_code",
+        "sex",
+        "age_class_code",
+        "age_class",
+        "year",
+        "population",
+        "is_current",
+    ]
+    # 全国行(00000)が県合計から復元されている（総数・総数 = 100+200 = 300）
+    nat = df.filter(
+        (pl.col("area_code") == "00000")
+        & (pl.col("sex_code") == "0")
+        & (pl.col("age_class_code") == "0")
+    ).row(0, named=True)
+    assert nat["population"] == 300
+    assert nat["area_name"] == "全国"
+    # 割合(105)は採られない（総数(age=0,sex=0)は人口 100 のまま）
+    p = df.filter(
+        (pl.col("area_code") == "01000")
+        & (pl.col("sex_code") == "0")
+        & (pl.col("age_class_code") == "0")
+    ).row(0, named=True)
+    assert p["population"] == 100
+    assert p["year"] == 2020
+
+
+def test_clean_population_by_age_conservation():
+    df = population.clean_population_by_age(_age_tidy())
+
+    # 年齢保存: 年少+生産+老年+不詳 == 総数（全 area×sex で恒等成立）
+    parts = (
+        df.filter(pl.col("age_class_code").is_in(["1", "2", "3", "9"]))
+        .group_by("area_code", "sex_code")
+        .agg(pl.col("population").sum().alias("sum_parts"))
+    )
+    totals = df.filter(pl.col("age_class_code") == "0").select(
+        "area_code", "sex_code", pl.col("population").alias("total")
+    )
+    merged = totals.join(parts, on=["area_code", "sex_code"])
+    assert (merged["sum_parts"] == merged["total"]).all()
+
+    # 不詳(9)が正の導出値として注入されている（県01000・総数 = 100-(10+60+25) = 5）
+    unknown = df.filter(
+        (pl.col("area_code") == "01000")
+        & (pl.col("sex_code") == "0")
+        & (pl.col("age_class_code") == "9")
+    ).row(0, named=True)
+    assert unknown["population"] == 5
+    assert unknown["age_class"] == "年齢不詳"
+
+    # 男女保存: 男+女 == 総数（各 area×age_class）
+    sexes = (
+        df.filter(pl.col("sex_code").is_in(["1", "2"]))
+        .group_by("area_code", "age_class_code")
+        .agg(pl.col("population").sum().alias("mf"))
+    )
+    stot = df.filter(pl.col("sex_code") == "0").select(
+        "area_code", "age_class_code", pl.col("population").alias("total")
+    )
+    smerged = stot.join(sexes, on=["area_code", "age_class_code"])
+    assert (smerged["mf"] == smerged["total"]).all()

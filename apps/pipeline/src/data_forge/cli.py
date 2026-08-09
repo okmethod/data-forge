@@ -77,9 +77,8 @@ def _atom_upstreams(
         hierarchy = transform.extract_area_hierarchy(raw)
         year = int(fact.get_column("year").unique().item())
         atom_frames.append(area_atoms.extract_atoms(fact, hierarchy, year=year))
-        nationals.append(
-            fact.filter(pl.col("area_code") == "00000").select("year", "sex_code", "population")
-        )
+        # 全国行はそのまま渡す（reconcile が分類軸コードで総数スライスを絞るため列を落とさない）。
+        nationals.append(fact.filter(pl.col("area_code") == "00000"))
         metas.append(transform.extract_meta(raw))
     return atom_frames, metas, pl.concat(nationals)
 
@@ -91,7 +90,7 @@ def _load_composite(
     if join in ("aggregate_to_base", "crosswalk"):
         # clean→atoms(年ごと)→combine(union)→area.aggregate と配線（集約は combine に埋め込まない）
         atom_frames, metas, _ = _atom_upstreams(ds, refresh=refresh)
-        atom_fact = combine_years(atom_frames, mode="union")
+        atom_fact = combine_years(atom_frames, mode="union", grain=ds.grain)
         events = area_events.load_events()
         if join == "crosswalk":
             # 畳まず後継コード列を同梱（利用者が GROUP BY base_code で任意集約）
@@ -100,7 +99,7 @@ def _load_composite(
             df = area_aggregate.aggregate_to_base(atom_fact, events, base_year=base_year)
     else:
         frames, metas = _upstream_frames(ds, refresh=refresh)
-        df = combine_years(frames, mode=join)  # type: ignore[arg-type]
+        df = combine_years(frames, mode=join, grain=ds.grain)  # type: ignore[arg-type]
     return df, combine_meta(metas, title=ds.title)
 
 
@@ -156,7 +155,7 @@ def _composite_atoms(
     if not isinstance(ds, CompositeDataset):
         raise SystemExit(f"{ds.key!r} は派生（時系列）データセットではありません")
     atom_frames, _, national = _atom_upstreams(ds, refresh=args.refresh)
-    atom_fact = combine_years(atom_frames, mode="union")
+    atom_fact = combine_years(atom_frames, mode="union", grain=ds.grain)
     return atom_fact, national, area_events.load_events()
 
 

@@ -22,23 +22,35 @@ KNOWN_DIFF_REASONS: dict[int, str] = {
 }
 
 
+def _total_mask(df: pl.DataFrame) -> pl.Expr:
+    """全分類軸が「総数」（コード=="0"）の行だけを選ぶ述語。
+
+    population は sex_code=="0" だけだが、population_by_age は sex_code=="0" かつ
+    age_class_code=="0"（総数×総数）で grand total 1 行に絞る（さもないと年少+生産+老年+不詳の
+    重複で二重計上になる）。`*_code` 列の増減に追従するので fact 非依存。
+    """
+    codes = [c for c in df.columns if c.endswith("_code") and c not in ("area_code", "base_code")]
+    return pl.all_horizontal([pl.col(c) == "0" for c in codes])
+
+
 def national_conservation(atom_fact: pl.DataFrame, national: pl.DataFrame) -> pl.DataFrame:
     """各年で「アトム合計（総数）== 全国total」を検査した表を返す。
 
     引数:
-        atom_fact … 各年アトムの時系列（8列）。
-        national  … 全国行のみ（area_code=='00000'）を含む DF（year/sex_code/population）。
+        atom_fact … 各年アトムの時系列（fact 依存スキーマ）。
+        national  … 全国行のみ（area_code=='00000'）を含む DF。総数スライスを絞るため
+                    分類軸コード列（sex_code・あれば age_class_code）を保持していること。
 
     列: year / national / atom_sum / diff / known_diff / known / ok。
     `known_diff` は既知差分の期待値（KNOWN_DIFFS、既定 0）。`ok` は diff が期待値に一致するか
     （0 一致だけでなく既知差分も許容）。`known` は「0 でない既知差分を受容した」行のフラグ。
     """
     atom_sum = (
-        atom_fact.filter(pl.col("sex_code") == "0")
+        atom_fact.filter(_total_mask(atom_fact))
         .group_by("year")
         .agg(pl.col("population").fill_null(0).sum().alias("atom_sum"))
     )
-    nat = national.filter(pl.col("sex_code") == "0").select(
+    nat = national.filter(_total_mask(national)).select(
         "year", pl.col("population").alias("national")
     )
     return (
@@ -73,7 +85,7 @@ def orphans(
 
     # 各アトムの最終出現年・その年の総数人口・名称
     last = (
-        atom_fact.filter(pl.col("sex_code") == "0")
+        atom_fact.filter(_total_mask(atom_fact))
         .sort("year")
         .group_by("area_code")
         .agg(

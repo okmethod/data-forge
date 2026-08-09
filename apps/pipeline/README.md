@@ -46,9 +46,11 @@ uv run poe check   # lint + test（CI相当）
 データセットごとの仕様（statsDataId・出力スキーマ・年ごとのスキーマ差・時系列の正規化モード等）は`docs/datasets/` に置く。  
 新規追加時は [src/data_forge/datasets.py](src/data_forge/datasets.py) にエントリを足し、対応する `docs/datasets/<name>.md` を用意する。
 
-| データセット群 | 内容                                            | ドキュメント                                                     |
-| -------------- | ----------------------------------------------- | ---------------------------------------------------------------- |
-| population     | 国勢調査 男女別人口（2005〜2020, 単年＋時系列） | [docs/datasets/population.md](../../docs/datasets/population.md) |
+| データセット群      | 内容                                               | ドキュメント                                                                   |
+| ------------------- | -------------------------------------------------- | ------------------------------------------------------------------------------ |
+| population          | 国勢調査 男女別人口（1980〜2020, 単年＋時系列）    | [docs/datasets/population.md](../../docs/datasets/population.md)               |
+| population_by_age   | 国勢調査 年齢3区分×男女別人口（1980〜2020）        | [docs/datasets/population_by_age.md](../../docs/datasets/population_by_age.md) |
+| （共有）area_master | 地域マスタ（アトム軸スタースキーマ・合併集約ハブ） | [docs/datasets/area_master.md](../../docs/datasets/area_master.md)             |
 
 ---
 
@@ -116,7 +118,7 @@ cli.py  ─ orchestration（fetch / clean / export / run、基底/派生を判�
 > これは新 Phase ではなく **Phase 4（データセット合成）の深化**——`combine` の正規化モードを
 > アトム fact＋合併 events＋`base_year` で一段賢くするもの。この表は「実例2つで抽象化する候補」を並べる場だが、
 > これは実需が確定済みのため表外に置く。**実装済み**（`area/` 層＋`--join aggregate_to_base`。
-> ただし廃置分合CSVの実物での列確定と events 投入は残作業。詳細: docs/datasets/population.md）。
+> ただし廃置分合CSVの実物での列確定と events 投入は残作業。詳細: docs/datasets/area_master.md）。
 
 **Phase 1 の実地知見:** 同名「男女別人口」でも 2015 と 2020 で e-Stat のスキーマ設計が全く異なった
 （tab軸の有無・男女軸の位置）。そのため「入力パースの共通化」ではなく **年ごとの cleaner が

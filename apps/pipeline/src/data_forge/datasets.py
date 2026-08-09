@@ -48,6 +48,9 @@ class CompositeDataset:
     table_name: str
     index_columns: list[str] = field(default_factory=list)
     default_join: str = "union"  # 既定の正規化モード（CLI --join で上書き可）
+    # 結合の粒度（combine_years の一意性ガード用）。既定＝area×sex×year。
+    # 分類軸が増える fact（例: 年齢区分）だけ明示的に上書きする。
+    grain: list[str] = field(default_factory=lambda: ["area_code", "sex_code", "year"])
 
 
 DATASETS: dict[str, Dataset | CompositeDataset] = {
@@ -161,6 +164,44 @@ DATASETS: dict[str, Dataset | CompositeDataset] = {
         stem="census_population_timeseries",
         table_name="population",
         index_columns=["area_code", "sex_code", "year"],
+    ),
+    # === population_by_age（年齢3区分×男女別人口）=============================
+    # 時系列ファミリー「年齢（3区分），男女別人口及び年齢別割合」(413〜420 / 0003448299)。
+    # 全年同型（tab=020/cat01=年齢/cat02=男女・全国行なし）なので cleaner は全年 1 個
+    # （population.clean_population_by_age）。年齢不詳は総数−3区分で導出注入する。
+    **{
+        f"population_by_age_{year}": Dataset(
+            key=f"population_by_age_{year}",
+            source="estat",
+            source_params={"stats_data_id": sid},
+            cleaner=population.clean_population_by_age,
+            stem=f"census_population_by_age_{year}",
+            table_name="population_by_age",
+            index_columns=["area_code", "sex_code", "age_class_code"],
+        )
+        for year, sid in {
+            1980: "0003412413",
+            1985: "0003412414",
+            1990: "0003412415",
+            1995: "0003412416",
+            2000: "0003412417",
+            2005: "0003412418",
+            2010: "0003412419",
+            2015: "0003412420",
+            2020: "0003448299",
+        }.items()
+    },
+    # 派生: 1980〜2020 を結合した年齢3区分×男女別人口の時系列テーブル。
+    "population_by_age_timeseries": CompositeDataset(
+        key="population_by_age_timeseries",
+        upstreams=[
+            f"population_by_age_{y}" for y in (1980, 1985, 1990, 1995, 2000, 2005, 2010, 2015, 2020)
+        ],
+        title="国勢調査 年齢3区分×男女別人口 時系列（1980年〜2020年 5年間隔）",
+        stem="census_population_by_age_timeseries",
+        table_name="population_by_age",
+        index_columns=["area_code", "sex_code", "age_class_code", "year"],
+        grain=["area_code", "sex_code", "age_class_code", "year"],
     ),
 }
 

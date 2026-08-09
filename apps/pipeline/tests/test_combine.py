@@ -63,3 +63,51 @@ def test_grain_guard_rejects_duplicates():
     dup = pl.concat([_2015, _2015])  # 同一年の重複で粒度違反
     with pytest.raises(ValueError, match="粒度違反"):
         combine_years([dup], mode="union")
+
+
+# --- 年齢区分を持つ fact（age_class を grain に足す）------------------------------
+_AGE_GRAIN = ["area_code", "sex_code", "age_class_code", "year"]
+
+
+def _age_frame(year: int, area: str, pop: int) -> pl.DataFrame:
+    # 1 地域 × 総数(sex=0) × 年齢2区分（総数0/年少1）の最小フレーム
+    return pl.DataFrame(
+        {
+            "area_code": [area, area],
+            "area_name": [area, area],
+            "area_level": [2, 2],
+            "sex_code": ["0", "0"],
+            "sex": ["総数", "総数"],
+            "age_class_code": ["0", "1"],
+            "age_class": ["総数", "年少人口(0-14)"],
+            "year": [year, year],
+            "population": [pop, pop // 10],
+            "is_current": [True, True],
+        }
+    )
+
+
+def test_age_grain_allows_multiple_age_classes():
+    # age を grain に入れれば同一 area×sex×year で複数 age 行が粒度違反にならない
+    df = combine_years([_age_frame(2020, "A", 100)], mode="union", grain=_AGE_GRAIN)
+    assert df.height == 2
+    assert set(df["age_class_code"]) == {"0", "1"}
+
+
+def test_age_grain_guard_still_rejects_true_duplicates():
+    dup = pl.concat([_age_frame(2020, "A", 100), _age_frame(2020, "A", 100)])
+    with pytest.raises(ValueError, match="粒度違反"):
+        combine_years([dup], mode="union", grain=_AGE_GRAIN)
+
+
+def test_grid_crosses_age_class():
+    # A は 2015 のみ、B は 2020 のみ → grid で全 (area×year×age) 格子が埋まり欠損は null
+    df = combine_years(
+        [_age_frame(2015, "A", 100), _age_frame(2020, "B", 200)], mode="grid", grain=_AGE_GRAIN
+    )
+    # 2 area × 2 year × 2 age × 1 sex = 8 行
+    assert df.height == 8
+    a2020 = df.filter(
+        (pl.col("area_code") == "A") & (pl.col("year") == 2020) & (pl.col("age_class_code") == "0")
+    ).row(0, named=True)
+    assert a2020["population"] is None
