@@ -13,6 +13,14 @@ import polars as pl
 
 from data_forge.area.mapping import rollup
 
+# 既知の人口保存差分（原資料特性で受容する年 → 期待差分）。
+# 孤児やロジック不整合とは別物で、override では解消しない「原資料の真実」。
+# 値が動いたら回帰＝別問題としてテストで固定する。
+KNOWN_DIFFS: dict[int, int] = {1980: 37}
+KNOWN_DIFF_REASONS: dict[int, str] = {
+    1980: "東京都特別区部の区未定分（23区に按分されない集計差）",
+}
+
 
 def national_conservation(atom_fact: pl.DataFrame, national: pl.DataFrame) -> pl.DataFrame:
     """各年で「アトム合計（総数）== 全国total」を検査した表を返す。
@@ -20,6 +28,10 @@ def national_conservation(atom_fact: pl.DataFrame, national: pl.DataFrame) -> pl
     引数:
         atom_fact … 各年アトムの時系列（8列）。
         national  … 全国行のみ（area_code=='00000'）を含む DF（year/sex_code/population）。
+
+    列: year / national / atom_sum / diff / known_diff / known / ok。
+    `known_diff` は既知差分の期待値（KNOWN_DIFFS、既定 0）。`ok` は diff が期待値に一致するか
+    （0 一致だけでなく既知差分も許容）。`known` は「0 でない既知差分を受容した」行のフラグ。
     """
     atom_sum = (
         atom_fact.filter(pl.col("sex_code") == "0")
@@ -32,7 +44,15 @@ def national_conservation(atom_fact: pl.DataFrame, national: pl.DataFrame) -> pl
     return (
         nat.join(atom_sum, on="year", how="left")
         .with_columns((pl.col("national") - pl.col("atom_sum")).alias("diff"))
-        .with_columns((pl.col("diff") == 0).alias("ok"))
+        .with_columns(
+            pl.col("year")
+            .replace_strict(KNOWN_DIFFS, default=0, return_dtype=pl.Int64)
+            .alias("known_diff")
+        )
+        .with_columns(
+            (pl.col("diff") == pl.col("known_diff")).alias("ok"),
+            ((pl.col("diff") != 0) & (pl.col("diff") == pl.col("known_diff"))).alias("known"),
+        )
         .sort("year")
     )
 

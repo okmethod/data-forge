@@ -174,6 +174,9 @@ def _cmd_area_check(ds: Dataset | CompositeDataset, args: argparse.Namespace) ->
     print(
         f"[area-check] {ds.key}: 人口保存 {'✅ 全年一致' if n_bad == 0 else f'⚠️ {n_bad} 年で不一致'}"
     )
+    for row in cons.filter(pl.col("known")).iter_rows(named=True):
+        reason = area_reconcile.KNOWN_DIFF_REASONS.get(row["year"], "")
+        print(f"  ⚠️ {row['year']} は既知差分 {row['diff']} 人を受容: {reason}")
     print(cons)
     orph = area_reconcile.orphans(atom_fact, events, base_year=args.base_year)
     if orph.height:
