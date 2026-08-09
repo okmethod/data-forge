@@ -54,9 +54,18 @@ DATASETS: dict[str, Dataset | CompositeDataset] = {
     # 単年（古い順）。同名でも e-Stat の軸設計は年（テーブル世代）で異なり、
     # 年ごとの cleaner が同一8列スキーマへ写像する。
     # （構造差の詳細は population.py / docs 参照）
-    # 1985/1990/1995（0003412414/415/416）は同型の「年齢3区分,男女別人口」ファミリー:
+    # 1980/1985/1990/1995（0003412413/414/415/416）は同型の「年齢3区分,男女別人口」ファミリー:
     # 男女=cat02・tab=020/cat01=100 で絞り、全国行が無いため 47都道府県合計から復元する。
     # （共通 cleaner _clean_age3class_table）
+    "population_1980": Dataset(
+        key="population_1980",
+        source="estat",
+        source_params={"stats_data_id": "0003412413"},
+        cleaner=population.clean_1980,
+        stem="census_population_1980",
+        table_name="population",
+        index_columns=["area_code", "sex_code"],
+    ),
     "population_1985": Dataset(
         key="population_1985",
         source="estat",
@@ -134,10 +143,11 @@ DATASETS: dict[str, Dataset | CompositeDataset] = {
         table_name="population",
         index_columns=["area_code", "sex_code"],
     ),
-    # 派生: 1985〜2020 を結合した男女別人口の時系列テーブル。
+    # 派生: 1980〜2020 を結合した男女別人口の時系列テーブル。
     "population_timeseries": CompositeDataset(
         key="population_timeseries",
         upstreams=[
+            "population_1980",
             "population_1985",
             "population_1990",
             "population_1995",
@@ -147,7 +157,7 @@ DATASETS: dict[str, Dataset | CompositeDataset] = {
             "population_2015",
             "population_2020",
         ],
-        title="国勢調査 男女別人口 時系列（1985年・1990年・1995年・2000年・2005年・2010年・2015年・2020年）",
+        title="国勢調査 男女別人口 時系列（1980年・1985年・1990年・1995年・2000年・2005年・2010年・2015年・2020年）",
         stem="census_population_timeseries",
         table_name="population",
         index_columns=["area_code", "sex_code", "year"],
