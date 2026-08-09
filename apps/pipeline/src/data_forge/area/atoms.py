@@ -22,9 +22,10 @@
 import polars as pl
 
 # 年ごとの「標準的な市区町村レベル」。level の意味が年（テーブル世代）で異なるため明示する。
-# 1995/2000/2005: level3=市区町村。2010/2015/2020(令和型): level4=市/特別区・level6=町村
+# 1990/1995/2000/2005: level3=市区町村。2010/2015/2020(令和型): level4=市/特別区・level6=町村
 # （level5=政令市の行政区は対象グレイン外なので採らない＝市に含める）。
 _MUNI_LEVELS: dict[int, frozenset[int]] = {
+    1990: frozenset({3}),
     1995: frozenset({3}),
     2000: frozenset({3}),
     2005: frozenset({3}),

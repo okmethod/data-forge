@@ -6,7 +6,8 @@ e-Stat のスキーマ設計は年（テーブル世代）で全く異なる。�
 コード対応・事前フィルタ）だけで吸収する（＝年関数を増やさない）。
 
 年ごとの構造の違い（すべて同一の出力スキーマへ写像する）:
-    - 1995(0003412416): area 構造は 2000/2005 と同型（level3=市区町村・level4=区）だが、男女は cat02。
+    - 1990(0003412415)/1995(0003412416): 同型の「年齢3区分,男女別人口及び年齢別割合」表。
+      area 構造は 2000/2005 と同型（level3=市区町村・level4=区）だが、男女は cat02。
       年齢3区分(cat01)・表章項目tab(020人口/105割合)を持つため tab=020・cat01=100(年齢総数) で絞る。
       本表は全国(00000)行を持たない（都道府県始まり）→ 他年と揃え 47都道府県合計から全国行を復元する。
     - 2000(0003391075): 2005表と同一ファミリー（平成12年版）。cat01=100/110/120・DID軸なし・area level3=市区町村。
@@ -102,20 +103,12 @@ def _year_cleaner(
     return _clean
 
 
-def clean_1995(tidy: pl.DataFrame) -> pl.DataFrame:
-    """平成7年（0003412416）: 年齢3区分×男女×(人口/割合) から男女別総人口を取り出す。
+def _prepend_national_from_prefectures(fact: pl.DataFrame) -> pl.DataFrame:
+    """全国(00000)行を持たない表向けに、47都道府県(level2)合計から全国行を復元して先頭に付ける。
 
-    男女は cat02（コード体系は 2005 の cat01 と同じ 100/110/120）。tab=020(人口)・
-    cat01=100(年齢総数) で絞る。本表は全国(00000)行が無い（都道府県始まり）ため、
-    他年（全国行あり）と揃えて 47都道府県(level2)合計から全国行を復元する
-    （＝公表値 125,570,246 と厳密一致）。
+    他年（全国行あり。cli の人口保存チェックは fact の area_code=="00000" を national とみなす）と
+    出力を揃えるための復元。平成2/7年の「年齢3区分,男女別人口」表がこれに該当する。
     """
-    fact = clean_population(
-        tidy,
-        sex_axis="cat02",
-        sex_by_code=SEX_2005,
-        filters=[("tab_code", "020"), ("cat01_code", "100")],
-    )
     national = (
         fact.filter(pl.col("area_level") == 2)
         .group_by("sex_code", "sex", "year")
@@ -134,7 +127,27 @@ def clean_1995(tidy: pl.DataFrame) -> pl.DataFrame:
     return pl.concat([national, fact]).sort("area_code", "sex_code")
 
 
+def _clean_age3class_table(tidy: pl.DataFrame) -> pl.DataFrame:
+    """平成2年(0003412415)/平成7年(0003412416) の同型表 → 男女別総人口。
+
+    「年齢3区分,男女別人口及び年齢別割合」表。男女は cat02（コード体系は 2005 の cat01 と
+    同じ 100/110/120）で、tab=020(人口)・cat01=100(年齢総数) で絞る。本表は全国(00000)行が
+    無い（都道府県始まり）ため、47都道府県(level2)合計から全国行を復元する。
+    公表値との一致: 1990=123,611,167 / 1995=125,570,246。
+    """
+    fact = clean_population(
+        tidy,
+        sex_axis="cat02",
+        sex_by_code=SEX_2005,
+        filters=[("tab_code", "020"), ("cat01_code", "100")],
+    )
+    return _prepend_national_from_prefectures(fact)
+
+
 # 年ごとの cleaner（構造の違いは設定のみ）。
+# 1990/1995 は同型（全国行なし・年齢3区分×男女）→ 共通 cleaner を流用。
+clean_1990 = _clean_age3class_table
+clean_1995 = _clean_age3class_table
 # 2000表(0003391075)は2005表と同一ファミリー（cat01=100/110/120）なので設定を流用。
 clean_2000 = _year_cleaner(sex_axis="cat01", sex_by_code=SEX_2005)
 clean_2005 = _year_cleaner(sex_axis="cat01", sex_by_code=SEX_2005)  # cat01に測定項目融合

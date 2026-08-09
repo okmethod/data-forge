@@ -92,6 +92,17 @@ DATASETS: dict[str, Dataset | CompositeDataset] = {
         table_name="population",
         index_columns=["area_code", "sex_code"],
     ),
+    # 別年（1990年, 0003412415）。1995表(0003412416)と同型の「年齢3区分,男女別人口」表。
+    # 全国行なし → clean_1990 で 47都道府県合計から復元（clean_1995 と同一 cleaner）。
+    "population_1990": Dataset(
+        key="population_1990",
+        source="estat",
+        source_params={"stats_data_id": "0003412415"},
+        cleaner=population.clean_1990,
+        stem="census_population_1990",
+        table_name="population",
+        index_columns=["area_code", "sex_code"],
+    ),
     # 別年（1995年, 0003412416）。area 構造は 2000/2005 と同型（level3=市区町村）だが男女は cat02、
     # 年齢3区分(cat01)・表章項目(tab)を持つ。clean_1995 で tab=020/cat01=100 に絞り全国行を復元。
     "population_1995": Dataset(
@@ -114,10 +125,11 @@ DATASETS: dict[str, Dataset | CompositeDataset] = {
         table_name="population",
         index_columns=["area_code", "sex_code"],
     ),
-    # 派生: 1995〜2020 を結合した男女別人口の時系列テーブル。
+    # 派生: 1990〜2020 を結合した男女別人口の時系列テーブル。
     "population_timeseries": CompositeDataset(
         key="population_timeseries",
         upstreams=[
+            "population_1990",
             "population_1995",
             "population_2000",
             "population_2005",
@@ -125,7 +137,7 @@ DATASETS: dict[str, Dataset | CompositeDataset] = {
             "population_2015",
             "population_2020",
         ],
-        title="国勢調査 男女別人口 時系列（1995年・2000年・2005年・2010年・2015年・2020年）",
+        title="国勢調査 男女別人口 時系列（1990年・1995年・2000年・2005年・2010年・2015年・2020年）",
         stem="census_population_timeseries",
         table_name="population",
         index_columns=["area_code", "sex_code", "year"],
