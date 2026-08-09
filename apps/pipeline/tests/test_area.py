@@ -98,6 +98,40 @@ def test_aggregate_folds_predecessor_and_conserves():
     assert tot["population"].to_list() == [140, 150]
 
 
+def test_crosswalk_keeps_atoms_and_groupby_equals_aggregate():
+    # 2005: A,B 別々 / 2010: B が A へ合併済み
+    fact = _fact(
+        [
+            ("01201", "A市", 2005, 100),
+            ("01202", "B市", 2005, 40),
+            ("01201", "A市", 2010, 150),
+        ]
+    )
+    ev = pl.DataFrame(
+        {"old_code": ["01202"], "successor_code": ["01201"], "year": [2008], "kind": [None]},
+        schema=events.EVENTS_SCHEMA,
+    )
+    cw = aggregate.attach_crosswalk(fact, ev, base_year=2010)
+    # 畳まない: 行数は原アトムと同じ（B も原境界で残る）
+    assert cw.height == fact.height
+    # base_code: B は後継 A、A は自分自身。base_name は base_year(=2010)の名称
+    b = cw.filter(pl.col("area_code") == "01202").row(0, named=True)
+    assert b["base_code"] == "01201" and b["base_name"] == "A市"
+    a = cw.filter((pl.col("area_code") == "01201") & (pl.col("year") == 2005)).row(0, named=True)
+    assert a["base_code"] == "01201"
+    # GROUP BY base_code は aggregate_to_base と一致（畳む/畳まないは同じ rollup の2ビュー）
+    grouped = (
+        cw.group_by(["base_code", "year", "sex_code"])
+        .agg(pl.col("population").sum())
+        .rename({"base_code": "area_code"})
+        .sort("area_code", "year", "sex_code")
+    )
+    agg = aggregate.aggregate_to_base(fact, ev, base_year=2010).select(
+        "area_code", "year", "sex_code", "population"
+    )
+    assert grouped.sort("area_code", "year", "sex_code").to_dicts() == agg.to_dicts()
+
+
 def test_events_override_wins_and_ignore(tmp_path):
     parsed = tmp_path / "p.csv"
     over = tmp_path / "o.csv"

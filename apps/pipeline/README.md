@@ -67,7 +67,7 @@ cli.py  ─ orchestration（fetch / clean / export / run、基底/派生を判�
   │     atoms.py    … 各年の area 階層 → 「標準的な市区町村」による最finest分割（アトム=fact 層）
   │     events.py   … 実効合併イベント＝parsed ⊕ overrides（old_code/successor_code/year/kind）
   │     mapping.py  … rollup: 施行年≤base_year のイベントを推移閉包で畳み code→base_code
-  │     aggregate.py… aggregate_to_base: 各年アトム＋events＋base_year → 基準年へ合併集約（8列）
+  │     aggregate.py… attach_crosswalk: 畳まず base_code/base_name 列を同梱（10列）／aggregate_to_base: それを base_code で合算＝基準年へ合併集約（8列）
   │     reconcile.py… 人口保存チェック＋孤児アトム検出＝ area-check / area-orphans（堀の駆動）
   │     history/ingest.py … 廃置分合CSV → 正規化イベント（events_parsed）。列仕様は実物CSVで確定（TODO）
   │     seeds/      … events_overrides の「ひな形」CSV（.example）。実データは data/area/（.gitignore＝堀）
@@ -91,14 +91,15 @@ cli.py  ─ orchestration（fetch / clean / export / run、基底/派生を判�
 
 **拡張の接ぎ目（seam）:**
 
-| やりたいこと                | 触る場所                                                                                            |
-| --------------------------- | --------------------------------------------------------------------------------------------------- |
-| e-Stat の別データセット追加 | `sources/estat/` に `cleaner` を1つ書き、`datasets.py` に1エントリ                                  |
-| データセット固有パラメータ  | `Dataset.source_params`（ソース語彙をここに閉じ込める）                                             |
-| 出典メタの項目追加          | `meta.py` の `SourceMeta` / 各ソースの `extract_meta`                                               |
-| 複数年/複数表の結合         | `datasets.py` に `CompositeDataset` を1エントリ（`combine` を再利用）                               |
-| 合併の後継対応を追加/修正   | `data/area/events_overrides.csv` に1行足す（`area-orphans`/`area-check` で支援。コード変更不要）    |
-| 地域正規化した時系列を出す  | `area.aggregate.aggregate_to_base` に `events`・`base_year` を渡す（既存 union 等は生モードで併存） |
+| やりたいこと                | 触る場所                                                                                                               |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| e-Stat の別データセット追加 | `sources/estat/` に `cleaner` を1つ書き、`datasets.py` に1エントリ                                                     |
+| データセット固有パラメータ  | `Dataset.source_params`（ソース語彙をここに閉じ込める）                                                                |
+| 出典メタの項目追加          | `meta.py` の `SourceMeta` / 各ソースの `extract_meta`                                                                  |
+| 複数年/複数表の結合         | `datasets.py` に `CompositeDataset` を1エントリ（`combine` を再利用）                                                  |
+| 合併の後継対応を追加/修正   | `data/area/events_overrides.csv` に1行足す（`area-orphans`/`area-check` で支援。コード変更不要）                       |
+| 地域正規化した時系列を出す  | `area.aggregate.aggregate_to_base` に `events`・`base_year` を渡す（既存 union 等は生モードで併存）                    |
+| 畳む/畳まないを固定せず出す | `--join crosswalk`＝`attach_crosswalk` で `base_code`/`base_name` 列を同梱（利用者が `GROUP BY base_code` で任意集約） |
 
 ### 拡張方針（ロードマップ）
 
@@ -124,4 +125,6 @@ crosswalk（合併の後継自治体への集約）は Phase 4 の深化とし�
 市区町村」による最finest分割（アトム）に固定し、外部データが要るのは合併の後継対応（events）のみ
 ——parsed（廃置分合CSV）で埋め、埋まらない箇所だけを人手 overrides（堀）に閉じ込める
 （`area/seeds/` にひな形）。集約は既存3モードと併存する第4の正規化
-（`--join aggregate_to_base`）として提供する。
+（`--join aggregate_to_base`）として提供する。さらに、畳む/畳まないを配布時に固定しない
+`--join crosswalk`（後継コード `base_code` を同梱し利用者の集約へ委譲）を第5モードとして併存させる
+（`aggregate_to_base` = crosswalk を `base_code` で `GROUP BY` した確定ビュー、と再定義）。

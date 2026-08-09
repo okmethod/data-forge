@@ -88,12 +88,16 @@ def _load_composite(
     ds: CompositeDataset, *, refresh: bool, join: str, base_year: int | None
 ) -> tuple[pl.DataFrame, SourceMeta]:
     """派生（複数年結合）データセットを upstream 合成して返す。"""
-    if join == "aggregate_to_base":
+    if join in ("aggregate_to_base", "crosswalk"):
         # clean→atoms(年ごと)→combine(union)→area.aggregate と配線（集約は combine に埋め込まない）
         atom_frames, metas, _ = _atom_upstreams(ds, refresh=refresh)
         atom_fact = combine_years(atom_frames, mode="union")
         events = area_events.load_events()
-        df = area_aggregate.aggregate_to_base(atom_fact, events, base_year=base_year)
+        if join == "crosswalk":
+            # 畳まず後継コード列を同梱（利用者が GROUP BY base_code で任意集約）
+            df = area_aggregate.attach_crosswalk(atom_fact, events, base_year=base_year)
+        else:
+            df = area_aggregate.aggregate_to_base(atom_fact, events, base_year=base_year)
     else:
         frames, metas = _upstream_frames(ds, refresh=refresh)
         df = combine_years(frames, mode=join)  # type: ignore[arg-type]
@@ -231,7 +235,7 @@ def build_parser() -> argparse.ArgumentParser:
         p.add_argument("--refresh", action="store_true", help="キャッシュを無視して再取得")
         p.add_argument(
             "--join",
-            choices=["union", "intersection", "grid", "aggregate_to_base"],
+            choices=["union", "intersection", "grid", "aggregate_to_base", "crosswalk"],
             default=None,
             help="派生（時系列）データセットの正規化モード。既定はデータセット定義に従う",
         )

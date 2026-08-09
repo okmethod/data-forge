@@ -177,6 +177,23 @@ uv run data-forge run population_timeseries --join aggregate_to_base --base-year
 > 各アトム→単一 `base_code` の関数だから。イベント未整備で消滅アトムが自分自身に留まる場合は
 > 「幽霊 base ユニット」として残る（reconcile が検出＝クッション候補）。
 
+### 非固定モード `crosswalk`（畳む/畳まないを配布時に決めない）
+
+`aggregate_to_base` は「畳んで確定した1ビュー」にすぎない。
+合併前の実態（原境界）を保持したい利用者もいるため、**畳まず後継コード列を同梱**する `attach_crosswalk(atom_fact, events, base_year=最新)` を用意する。
+出力は単年 fact の8列 ＋ `base_code`（後継先コード）＋ `base_name`（base_year 時点の後継先名称）の10列。
+**同じ rollup の2ビュー**であり、`aggregate_to_base` は「`attach_crosswalk` を `base_code` で `GROUP BY` したもの」に等しい。
+
+```bash
+uv run data-forge run population_timeseries --join crosswalk                 # 畳まず base_code 列を同梱
+uv run data-forge run population_timeseries --join crosswalk --base-year 2020 # 後継先の基準年を固定
+```
+
+- `area_code` のまま使う → **原境界**（合併前の自治体を各年そのまま。実態保持だが連続性なし）。
+- `GROUP BY base_code` → **前方 rollup 相当**（現行自治体で連続時系列＝`aggregate_to_base` と一致）。
+
+畳む/畳まないの選択を**配布時に固定せず利用者の集約クエリへ委譲**できるのが利点。
+
 **2025 投入時の耐性:** `base_year` は**集約パラメータに外出し**しているため、次の調査年（2025）投入時は
 現 partition に新年 fact を union し、新イベントを events に追記するだけで済む。過去に配布した時系列の
 基準年ビューは据え置ける（配布物の安定性を `base_year` で守る）。
