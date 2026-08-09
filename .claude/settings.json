@@ -26,7 +26,8 @@
       "Bash(ruff *)",
       "Bash(pytest *)",
       "SlashCommand(*)",
-      "Skill(*)"
+      "Skill(*)",
+      "mcp__playwright"
     ],
     "deny": [
       "Bash(sudo *)",
