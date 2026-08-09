@@ -57,6 +57,37 @@ def _build_lookups(raw: dict[str, Any]) -> dict[str, dict[str, dict[str, str]]]:
     return lookups
 
 
+def extract_area_hierarchy(raw: dict[str, Any]) -> pl.DataFrame:
+    """area 軸の階層（code/name/level/parent_code）を取り出す。
+
+    地域マスタ（アトム抽出）で「その年の標準的な市区町村」を判定するのに使う。
+    to_tidy は name/level しか運ばないため、集計行/上位コンテナの判定に要る
+    `@parentCode`（親コード）をここで別立てに取り出す（fact スキーマは 8 列のまま）。
+    """
+    class_objs = _as_list(raw["GET_STATS_DATA"]["STATISTICAL_DATA"]["CLASS_INF"]["CLASS_OBJ"])
+    area = next((o for o in class_objs if o["@id"] == "area"), None)
+    if area is None:
+        raise ValueError("area 軸が CLASS_INF に見つかりません")
+    rows = [
+        {
+            "code": it["@code"],
+            "name": it.get("@name", ""),
+            "level": int(it.get("@level", "0")),
+            "parent_code": it.get("@parentCode"),
+        }
+        for it in _as_list(area["CLASS"])
+    ]
+    return pl.DataFrame(
+        rows,
+        schema={
+            "code": pl.Utf8,
+            "name": pl.Utf8,
+            "level": pl.Int8,
+            "parent_code": pl.Utf8,
+        },
+    )
+
+
 def to_tidy(raw: dict[str, Any]) -> pl.DataFrame:
     """スタースキーマを名称解決済みのロング形式 DataFrame に変換する。"""
     lookups = _build_lookups(raw)

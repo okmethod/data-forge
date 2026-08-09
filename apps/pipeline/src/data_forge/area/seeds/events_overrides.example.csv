@@ -1,0 +1,25 @@
+# area 合併イベント overrides（ひな形＝クッション）— 「堀」本体
+#
+# ★これはコミット対象の「ひな形」。実データは data/area/events_overrides.csv（.gitignore）。
+#
+# 実効イベント = parsed（廃置分合CSVを ingest で正規化）⊕ overrides（この人手ファイル）。
+# overrides は parsed を上書き/補完する差分。parsed だけでは埋まらない箇所
+# （境界変更・政令市移行/区再編・改称・多段で中間コードがe-Statに無い・パース事故 等）を
+# ここで人手で正確に作り込む。
+#
+# 列:
+#   old_code        … 消滅/被合併側の JIS コード（アトム）
+#   successor_code  … 直接の後継コード（1段。多段は複数行）。空にすると parsed の該当行を無効化
+#   year            … 施行年（国勢調査5年刻みで近似可。rollup は 施行年 ≤ base_year を適用）
+#   kind            … 種別（任意。合体/新設・編入・境界変更・分割・改称 等のメモ）
+#
+# 運用（支援ツールあり）:
+#   1. uv run data-forge area-ingest                          … 廃置分合CSV→events_parsed.csv（大半はここで自動解決）
+#   2. uv run data-forge area-orphans population_timeseries   … parsed で埋まらない消滅アトムを人口降順で一覧
+#   3. 各コードの後継を確認し 1 行ずつ追記（下の例参照）
+#   4. uv run data-forge area-check population_timeseries      … 人口保存＋孤児 0 を検証
+# ★出所（e-Stat 廃置分合等情報）の商用可否は docs/data_catalog.md 参照。
+old_code,successor_code,year,kind
+# 例) 蒲原町/由比町は廃置分合上「清水区(22103)へ編入」だが、city-level アトムの後継は静岡市(22100)。
+#     行政区→政令市を1本補うと両町が連鎖解決する（parsed の 22382→22103, 22383→22103 を活かしたまま）:
+# 22103,22100,2005,行政区→政令市補正

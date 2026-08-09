@@ -16,6 +16,12 @@ REPO_ROOT = Path(__file__).resolve().parents[4]
 DATA_DIR = REPO_ROOT / "data"
 RAW_DIR = DATA_DIR / "raw"
 PROCESSED_DIR = DATA_DIR / "processed"
+# --- 地域マスタ（アトム軸スタースキーマ）---
+# 合併イベント = parsed（廃置分合CSVを ingest で正規化）⊕ overrides（人手クッション）。
+# raw 履歴CSVは再取得可・overrides は堀本体。いずれも data 側（.gitignore）。
+AREA_HISTORY_RAW = RAW_DIR / "history"  # 総務省/e-Stat 廃置分合 の生CSV置き場
+AREA_EVENTS_PARSED = DATA_DIR / "area" / "events_parsed.csv"  # ingest 出力（正規化イベント）
+AREA_EVENTS_OVERRIDES = DATA_DIR / "area" / "events_overrides.csv"  # 人手クッション
 
 
 def get_estat_app_id() -> str:
