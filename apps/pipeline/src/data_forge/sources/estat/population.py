@@ -6,6 +6,7 @@ e-Stat のスキーマ設計は年（テーブル世代）で全く異なる。�
 コード対応・事前フィルタ）だけで吸収する（＝年関数を増やさない）。
 
 年ごとの構造の違い（すべて同一の出力スキーマへ写像する）:
+    - 2000(0003391075): 2005表と同一ファミリー（平成12年版）。cat01=100/110/120・DID軸なし・area level3=市区町村。
     - 2005(0003408216): cat01に測定項目＋男女が融合（人口_総数/男/女=100/110/120）・DID軸なし。
     - 2010/2015(平成型, 0003038587/0003149040): tab軸なし・cat01=全域/人口集中地区(DID)・
       cat02に表章事項＋男女が統合（人口の総数/男/女コードは年で異なる）。全域のみ採用。
@@ -99,6 +100,8 @@ def _year_cleaner(
 
 
 # 年ごとの cleaner（構造の違いは設定のみ）。
+# 2000表(0003391075)は2005表と同一ファミリー（cat01=100/110/120）なので設定を流用。
+clean_2000 = _year_cleaner(sex_axis="cat01", sex_by_code=SEX_2005)
 clean_2005 = _year_cleaner(sex_axis="cat01", sex_by_code=SEX_2005)  # cat01に測定項目融合
 clean_2010 = _year_cleaner(sex_axis="cat02", sex_by_code=SEX_2010, filters=[_DID_WHOLE])
 clean_2015 = _year_cleaner(sex_axis="cat02", sex_by_code=SEX_2015, filters=[_DID_WHOLE])
