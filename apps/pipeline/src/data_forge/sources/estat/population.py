@@ -6,6 +6,9 @@ e-Stat のスキーマ設計は年（テーブル世代）で全く異なる。�
 コード対応・事前フィルタ）だけで吸収する（＝年関数を増やさない）。
 
 年ごとの構造の違い（すべて同一の出力スキーマへ写像する）:
+    - 1995(0003412416): area 構造は 2000/2005 と同型（level3=市区町村・level4=区）だが、男女は cat02。
+      年齢3区分(cat01)・表章項目tab(020人口/105割合)を持つため tab=020・cat01=100(年齢総数) で絞る。
+      本表は全国(00000)行を持たない（都道府県始まり）→ 他年と揃え 47都道府県合計から全国行を復元する。
     - 2000(0003391075): 2005表と同一ファミリー（平成12年版）。cat01=100/110/120・DID軸なし・area level3=市区町村。
     - 2005(0003408216): cat01に測定項目＋男女が融合（人口_総数/男/女=100/110/120）・DID軸なし。
     - 2010/2015(平成型, 0003038587/0003149040): tab軸なし・cat01=全域/人口集中地区(DID)・
@@ -97,6 +100,38 @@ def _year_cleaner(
         return clean_population(tidy, sex_axis=sex_axis, sex_by_code=sex_by_code, filters=filters)
 
     return _clean
+
+
+def clean_1995(tidy: pl.DataFrame) -> pl.DataFrame:
+    """平成7年（0003412416）: 年齢3区分×男女×(人口/割合) から男女別総人口を取り出す。
+
+    男女は cat02（コード体系は 2005 の cat01 と同じ 100/110/120）。tab=020(人口)・
+    cat01=100(年齢総数) で絞る。本表は全国(00000)行が無い（都道府県始まり）ため、
+    他年（全国行あり）と揃えて 47都道府県(level2)合計から全国行を復元する
+    （＝公表値 125,570,246 と厳密一致）。
+    """
+    fact = clean_population(
+        tidy,
+        sex_axis="cat02",
+        sex_by_code=SEX_2005,
+        filters=[("tab_code", "020"), ("cat01_code", "100")],
+    )
+    national = (
+        fact.filter(pl.col("area_level") == 2)
+        .group_by("sex_code", "sex", "year")
+        .agg(pl.col("population").sum())
+        .select(
+            pl.lit("00000").alias("area_code"),
+            pl.lit("全国").alias("area_name"),
+            pl.lit(1).cast(pl.Int8).alias("area_level"),
+            pl.col("sex_code"),
+            pl.col("sex"),
+            pl.col("year"),
+            pl.col("population"),
+            pl.lit(True).alias("is_current"),
+        )
+    )
+    return pl.concat([national, fact]).sort("area_code", "sex_code")
 
 
 # 年ごとの cleaner（構造の違いは設定のみ）。
