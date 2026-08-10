@@ -52,6 +52,7 @@ uv run poe run population_timeseries   # 1980〜2020 時系列
 | `.parquet`   | 分析・配布                                                  |
 | `.csv`       | 汎用共有                                                    |
 | `.sqlite`    | Cloudflare D1 配信（`population` テーブル＋`_source_meta`） |
+| `.duckdb`    | 分析用組込DB（`population` テーブル＋`_source_meta`）       |
 | `.meta.json` | 出典メタ（サイドカー）                                      |
 
 ---

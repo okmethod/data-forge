@@ -1,6 +1,6 @@
 # data-forge pipeline
 
-公的データを取得・クレンジングし、Parquet / CSV / SQLite へ精製する Python パイプライン（uv + Polars）。
+公的データを取得・クレンジングし、Parquet / CSV / SQLite / DuckDB へ精製する Python パイプイン（uv + Polars）。
 
 **ライセンス・出典:**
 

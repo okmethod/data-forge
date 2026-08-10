@@ -1,10 +1,15 @@
 [project]
 name = "data-forge-pipeline"
 version = "0.1.0"
-description = "日本の公的データを取得・クレンジングし Parquet / CSV / SQLite へ精製するパイプライン"
+description = "日本の公的データを取得・クレンジングし Parquet / CSV / SQLite / DuckDB へ精製するパイプライン"
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = ["polars>=1.0", "httpx>=0.27", "python-dotenv>=1.0"]
+dependencies = [
+  "polars>=1.0",
+  "httpx>=0.27",
+  "python-dotenv>=1.0",
+  "duckdb>=1.0",
+]
 
 [project.scripts]
 data-forge = "data_forge.cli:main"
