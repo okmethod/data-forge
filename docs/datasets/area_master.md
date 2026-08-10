@@ -118,7 +118,9 @@ uv run data-forge run population_timeseries --join crosswalk --base-year 2020 # 
 ### 上位集約 `prefecture` / `region`（行政階層 roll-up）
 
 合併 rollup（`aggregate_to_base`）が**時間方向**（合併後継で畳む）なのに対し、都道府県・地方ブロックへの
-集約は**空間方向の行政階層**を上る別軸。両者は直交する（`area/aggregate.py` の `aggregate_to_admin`）。
+集約は**空間方向の行政階層**を上る別軸。両者は直交するので、モジュールも分離する
+（時間軸＝`area/aggregate.py`、空間軸＝`area/spatial_rollup.py` の `aggregate_to_admin`。分類軸判別
+`_cat_code_cols` のみ共用）。
 
 - **events 非依存:** 市区町村は都道府県を跨がないため、各年アトムを `area_code` の県プレフィックス
   （先頭2桁）で group して合算するだけで県/地方合計になる。合併を畳もうが畳むまいが県内合計は不変

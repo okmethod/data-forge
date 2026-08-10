@@ -69,7 +69,8 @@ cli.py  ─ orchestration（fetch / clean / export / run、基底/派生を判�
   │     atoms.py    … 各年の area 階層 → 「標準的な市区町村」による最finest分割（アトム=fact 層）
   │     events.py   … 実効合併イベント＝parsed ⊕ overrides（old_code/successor_code/year/kind）
   │     mapping.py  … rollup: 施行年≤base_year のイベントを推移閉包で畳み code→base_code
-  │     aggregate.py… attach_crosswalk: 畳まず base_code/base_name 列を同梱（10列）／aggregate_to_base: それを base_code で合算＝基準年へ合併集約（8列）
+  │     aggregate.py… 時間軸の合併集約。attach_crosswalk: 畳まず base_code/base_name 列を同梱（10列）／aggregate_to_base: それを base_code で合算＝基準年へ合併集約（8列）
+  │     spatial_rollup.py… 空間軸の行政集約。aggregate_to_admin: 県プレフィックスで都道府県/地方ブロックへ上位集約（events 非依存・aggregate と直交）
   │     reconcile.py… 人口保存チェック＋孤児アトム検出＝ area-check / area-orphans（堀の駆動）
   │     history/ingest.py … 廃置分合CSV → 正規化イベント（events_parsed）。列仕様は実物CSVで確定（TODO）
   │     seeds/      … events_overrides の「ひな形」CSV（.example）。実データは data/area/（.gitignore＝堀）

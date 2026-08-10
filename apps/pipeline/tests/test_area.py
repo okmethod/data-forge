@@ -7,7 +7,7 @@ rollup（推移閉包・基準年カットオフ）、基準年集約（人口�
 
 import polars as pl
 
-from data_forge.area import aggregate, atoms, events, mapping, reconcile
+from data_forge.area import aggregate, atoms, events, mapping, reconcile, spatial_rollup
 
 # --- 合成 area 階層（令和型 level を模す）---
 # 通常市 A(01201)・B(01202)、政令市 P(27100)+行政区(level5)、東京特別区部(13100)+2区(level4)
@@ -279,7 +279,7 @@ def test_aggregate_to_admin_prefecture_sums_and_names():
             ("14100", "横浜市", 2020, 370),
         ]
     )
-    out = aggregate.aggregate_to_admin(fact, level="prefecture")
+    out = spatial_rollup.aggregate_to_admin(fact, level="prefecture")
     assert out.columns == fact.columns  # 入力スキーマを踏襲
     tokyo = out.filter(pl.col("area_code") == "13000").row(0, named=True)
     assert tokyo["area_name"] == "東京都"
@@ -297,7 +297,7 @@ def test_aggregate_to_admin_region_folds_prefectures():
             ("01100", "札幌市", 2020, 200),
         ]
     )
-    out = aggregate.aggregate_to_admin(fact, level="region")
+    out = spatial_rollup.aggregate_to_admin(fact, level="region")
     kanto = out.filter(pl.col("area_code") == "R3").row(0, named=True)
     assert kanto["area_name"] == "関東地方"
     assert kanto["population"] == 470  # 東京+神奈川
@@ -313,7 +313,7 @@ def test_aggregate_to_admin_conserves_national_and_keeps_axis():
             ("14100", "横浜市", 2020, {"1": 60, "2": 250, "3": 55, "9": 5}),  # 総数370
         ]
     )
-    pref = aggregate.aggregate_to_admin(fact, level="prefecture")
+    pref = spatial_rollup.aggregate_to_admin(fact, level="prefecture")
     assert pref.columns == fact.columns  # age_class 軸は畳まれず保持
     # 東京の年齢別も県内で合算されている（千代田のみ→総数60・年少10…）
     tokyo_age = dict(

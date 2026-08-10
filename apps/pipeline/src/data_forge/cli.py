@@ -21,6 +21,7 @@ from data_forge.area import aggregate as area_aggregate
 from data_forge.area import atoms as area_atoms
 from data_forge.area import events as area_events
 from data_forge.area import reconcile as area_reconcile
+from data_forge.area import spatial_rollup as area_spatial
 from data_forge.area.history import ingest as area_ingest
 from data_forge.combine import combine_years
 from data_forge.datasets import CompositeDataset, Dataset, get_dataset
@@ -32,6 +33,13 @@ from data_forge.sources.estat import transform
 # NOTE: 現状ソースは e-Stat 固定。
 # 複数ソース対応（Source プロトコル + dispatch）はPhase 2 で導入する。
 # ここではソース固有パラメータの読み出しだけ抽象化しておく。
+
+# --join の正規化モード。3系統に分かれる（combine 系 / 時間軸=合併集約 / 空間軸=行政集約）。
+# argparse の choices と _load_composite の分岐でこの定義を共有する（列挙の二重管理を避ける）。
+_COMBINE_JOINS = ("union", "intersection", "grid")  # combine のみ（アトム抽出なし）
+_TIME_ROLLUP_JOINS = ("aggregate_to_base", "crosswalk")  # 合併集約（events 依存）
+_SPACE_ROLLUP_JOINS = ("prefecture", "region")  # 行政集約（events 非依存）
+_JOIN_CHOICES = [*_COMBINE_JOINS, *_TIME_ROLLUP_JOINS, *_SPACE_ROLLUP_JOINS]
 
 
 def _load_base(ds: Dataset, *, refresh: bool = False) -> tuple[pl.DataFrame, SourceMeta]:
@@ -83,26 +91,33 @@ def _atom_upstreams(
     return atom_frames, metas, pl.concat(nationals)
 
 
+def _combine_atoms(ds: CompositeDataset, *, refresh: bool) -> tuple[pl.DataFrame, list[SourceMeta]]:
+    """rollup 系パスの共通前段: clean→atoms(年ごと)→combine(union) でアトム時系列を組む。
+
+    集約は combine に埋め込まず、この後段で aggregate（時間軸）/ spatial_rollup（空間軸）が行う。
+    """
+    atom_frames, metas, _ = _atom_upstreams(ds, refresh=refresh)
+    return combine_years(atom_frames, mode="union", grain=ds.grain), metas
+
+
 def _load_composite(
     ds: CompositeDataset, *, refresh: bool, join: str, base_year: int | None
 ) -> tuple[pl.DataFrame, SourceMeta]:
-    """派生（複数年結合）データセットを upstream 合成して返す。"""
-    if join in ("aggregate_to_base", "crosswalk"):
-        # clean→atoms(年ごと)→combine(union)→area.aggregate と配線（集約は combine に埋め込まない）
-        atom_frames, metas, _ = _atom_upstreams(ds, refresh=refresh)
-        atom_fact = combine_years(atom_frames, mode="union", grain=ds.grain)
+    """派生（複数年結合）データセットを upstream 合成して返す（3系統に分岐）。"""
+    if join in _TIME_ROLLUP_JOINS:
+        # 時間軸＝合併集約（events 依存）。crosswalk=畳まず後継コード列同梱 / base=畳んで確定。
+        atom_fact, metas = _combine_atoms(ds, refresh=refresh)
         events = area_events.load_events()
         if join == "crosswalk":
-            # 畳まず後継コード列を同梱（利用者が GROUP BY base_code で任意集約）
             df = area_aggregate.attach_crosswalk(atom_fact, events, base_year=base_year)
         else:
             df = area_aggregate.aggregate_to_base(atom_fact, events, base_year=base_year)
-    elif join in ("prefecture", "region"):
-        # 行政階層の上位集約（events 非依存・合併 rollup と直交）。県プレフィックスで束ねる。
-        atom_frames, metas, _ = _atom_upstreams(ds, refresh=refresh)
-        atom_fact = combine_years(atom_frames, mode="union", grain=ds.grain)
-        df = area_aggregate.aggregate_to_admin(atom_fact, level=join)
+    elif join in _SPACE_ROLLUP_JOINS:
+        # 空間軸＝行政集約（events 非依存・合併 rollup と直交）。県プレフィックスで束ねる。
+        atom_fact, metas = _combine_atoms(ds, refresh=refresh)
+        df = area_spatial.aggregate_to_admin(atom_fact, level=join)
     else:
+        # combine のみ（union/intersection/grid）。アトム抽出なしで各年 fact を直接結合。
         frames, metas = _upstream_frames(ds, refresh=refresh)
         df = combine_years(frames, mode=join, grain=ds.grain)  # type: ignore[arg-type]
     return df, combine_meta(metas, title=ds.title)
@@ -159,6 +174,7 @@ def _composite_atoms(
     """area 支援ツール用に、アトム時系列・全国行・実効イベントを構築して返す。"""
     if not isinstance(ds, CompositeDataset):
         raise SystemExit(f"{ds.key!r} は派生（時系列）データセットではありません")
+    # national 行だけ別途要る（人口保存検査用）ので _atom_upstreams を直接呼ぶ。
     atom_frames, _, national = _atom_upstreams(ds, refresh=args.refresh)
     atom_fact = combine_years(atom_frames, mode="union", grain=ds.grain)
     return atom_fact, national, area_events.load_events()
@@ -239,15 +255,7 @@ def build_parser() -> argparse.ArgumentParser:
         p.add_argument("--refresh", action="store_true", help="キャッシュを無視して再取得")
         p.add_argument(
             "--join",
-            choices=[
-                "union",
-                "intersection",
-                "grid",
-                "aggregate_to_base",
-                "crosswalk",
-                "prefecture",
-                "region",
-            ],
+            choices=_JOIN_CHOICES,
             default=None,
             help="派生（時系列）データセットの正規化モード。既定はデータセット定義に従う"
             "（prefecture/region は都道府県/地方ブロックへの上位集約）",
