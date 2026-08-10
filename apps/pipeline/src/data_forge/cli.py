@@ -97,6 +97,11 @@ def _load_composite(
             df = area_aggregate.attach_crosswalk(atom_fact, events, base_year=base_year)
         else:
             df = area_aggregate.aggregate_to_base(atom_fact, events, base_year=base_year)
+    elif join in ("prefecture", "region"):
+        # 行政階層の上位集約（events 非依存・合併 rollup と直交）。県プレフィックスで束ねる。
+        atom_frames, metas, _ = _atom_upstreams(ds, refresh=refresh)
+        atom_fact = combine_years(atom_frames, mode="union", grain=ds.grain)
+        df = area_aggregate.aggregate_to_admin(atom_fact, level=join)
     else:
         frames, metas = _upstream_frames(ds, refresh=refresh)
         df = combine_years(frames, mode=join, grain=ds.grain)  # type: ignore[arg-type]
@@ -234,9 +239,18 @@ def build_parser() -> argparse.ArgumentParser:
         p.add_argument("--refresh", action="store_true", help="キャッシュを無視して再取得")
         p.add_argument(
             "--join",
-            choices=["union", "intersection", "grid", "aggregate_to_base", "crosswalk"],
+            choices=[
+                "union",
+                "intersection",
+                "grid",
+                "aggregate_to_base",
+                "crosswalk",
+                "prefecture",
+                "region",
+            ],
             default=None,
-            help="派生（時系列）データセットの正規化モード。既定はデータセット定義に従う",
+            help="派生（時系列）データセットの正規化モード。既定はデータセット定義に従う"
+            "（prefecture/region は都道府県/地方ブロックへの上位集約）",
         )
         p.add_argument(
             "--base-year",

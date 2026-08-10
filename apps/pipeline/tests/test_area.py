@@ -270,6 +270,67 @@ def test_aggregate_daynight_parallel_axis_folds_independently():
     assert cons["ok"].to_list() == [True]
 
 
+def test_aggregate_to_admin_prefecture_sums_and_names():
+    # 市区町村を県コード先頭2桁で束ね、実 JIS コード XX000・県名・level2・現存 になる。
+    fact = _fact(
+        [
+            ("13101", "千代田区", 2020, 60),
+            ("13102", "中央区", 2020, 40),
+            ("14100", "横浜市", 2020, 370),
+        ]
+    )
+    out = aggregate.aggregate_to_admin(fact, level="prefecture")
+    assert out.columns == fact.columns  # 入力スキーマを踏襲
+    tokyo = out.filter(pl.col("area_code") == "13000").row(0, named=True)
+    assert tokyo["area_name"] == "東京都"
+    assert tokyo["population"] == 100  # 60+40
+    assert tokyo["area_level"] == 2 and tokyo["is_current"] is True
+    assert out.filter(pl.col("area_code") == "14000")["population"][0] == 370
+
+
+def test_aggregate_to_admin_region_folds_prefectures():
+    # 東京(13)・神奈川(14)は共に関東(R3)へ、北海道(01)は北海道地方(R1)へ束ねる（標準8区分）。
+    fact = _fact(
+        [
+            ("13101", "千代田区", 2020, 100),
+            ("14100", "横浜市", 2020, 370),
+            ("01100", "札幌市", 2020, 200),
+        ]
+    )
+    out = aggregate.aggregate_to_admin(fact, level="region")
+    kanto = out.filter(pl.col("area_code") == "R3").row(0, named=True)
+    assert kanto["area_name"] == "関東地方"
+    assert kanto["population"] == 470  # 東京+神奈川
+    assert kanto["area_level"] == 0
+    assert out.filter(pl.col("area_code") == "R1")["population"][0] == 200  # 北海道地方
+
+
+def test_aggregate_to_admin_conserves_national_and_keeps_axis():
+    # 県合計 == 全国 を national_conservation で確認（by_age の総数×総数スライスでも成立）。
+    fact = _age_fact(
+        [
+            ("13101", "千代田区", 2020, {"1": 10, "2": 40, "3": 8, "9": 2}),  # 総数60
+            ("14100", "横浜市", 2020, {"1": 60, "2": 250, "3": 55, "9": 5}),  # 総数370
+        ]
+    )
+    pref = aggregate.aggregate_to_admin(fact, level="prefecture")
+    assert pref.columns == fact.columns  # age_class 軸は畳まれず保持
+    # 東京の年齢別も県内で合算されている（千代田のみ→総数60・年少10…）
+    tokyo_age = dict(
+        zip(
+            pref.filter(pl.col("area_code") == "13000")["age_class_code"].to_list(),
+            pref.filter(pl.col("area_code") == "13000")["population"].to_list(),
+            strict=True,
+        )
+    )
+    assert tokyo_age == {"0": 60, "1": 10, "2": 40, "3": 8, "9": 2}
+    national = _age_fact([("00000", "全国", 2020, {"1": 70, "2": 290, "3": 63, "9": 7})])  # 430
+    cons = reconcile.national_conservation(pref, national)
+    assert cons["national"].to_list() == [430]
+    assert cons["atom_sum"].to_list() == [430]  # 県合計＝全国
+    assert cons["ok"].to_list() == [True]
+
+
 def test_events_override_wins_and_ignore(tmp_path):
     parsed = tmp_path / "p.csv"
     over = tmp_path / "o.csv"

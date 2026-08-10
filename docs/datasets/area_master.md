@@ -115,6 +115,30 @@ uv run data-forge run population_timeseries --join crosswalk --base-year 2020 # 
 現 partition に新年 fact を union し、新イベントを events に追記するだけで済む。過去に配布した時系列の
 基準年ビューは据え置ける（配布物の安定性を `base_year` で守る）。
 
+### 上位集約 `prefecture` / `region`（行政階層 roll-up）
+
+合併 rollup（`aggregate_to_base`）が**時間方向**（合併後継で畳む）なのに対し、都道府県・地方ブロックへの
+集約は**空間方向の行政階層**を上る別軸。両者は直交する（`area/aggregate.py` の `aggregate_to_admin`）。
+
+- **events 非依存:** 市区町村は都道府県を跨がないため、各年アトムを `area_code` の県プレフィックス
+  （先頭2桁）で group して合算するだけで県/地方合計になる。合併を畳もうが畳むまいが県内合計は不変
+  （＝`national_conservation` が保証する不変量）なので、`aggregate_to_base` の前後どちらに適用しても同値。
+- `prefecture` … `area_code[:2]+"000"`（実 JIS コード）へ集約。`area_level`=2、名称は 47 都道府県マスタ
+  （`_PREFECTURES`）。**従来 dashboard 側に埋め込んでいた県名マスタ＋集約 SQL をパイプへ昇格し一元化**。
+- `region` … 標準8地方区分（`_REGIONS`：三重=近畿・沖縄=九州）で `R1`〜`R8` へ集約。`area_level`=0
+  （全国=1 と都道府県=2 の間の合成集約層）。地方名は「北海道地方」〜「九州地方」。
+- 出力スキーマは入力 fact を踏襲し、分類軸（sex/age/daynight）は `_cat_code_cols` で保持
+  （population / population_by_age / daynight_population 共用の無改修一般化）。
+
+```bash
+uv run data-forge run population_timeseries --join prefecture  # 47 都道府県へ集約
+uv run data-forge run population_timeseries --join region      # 8 地方ブロックへ集約
+```
+
+> **検証（実データ・全3ファクト）:** 「県/地方合計 == 全国total」を `national_conservation` で全年 diff=0
+> 確認（1980 の 37 人差＝区未定分も `KNOWN_DIFFS` で受容）。スポット: 東京都 2020=14,047,594・
+> 大阪府 2020=8,837,685・北海道地方 2020=5,224,614（いずれも公表値一致）。
+
 ### reconcile（堀の駆動）
 
 parsed だけでは埋まらない箇所を機械的にフラグし、人手 overrides（クッション）で埋める運用を支える
