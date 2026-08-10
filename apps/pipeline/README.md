@@ -6,7 +6,7 @@
 
 e-Stat のデータを利用。  
 出力物には出典表記（`_source_meta` / `*.meta.json` に自動埋め込み済み）を明示すること。  
-データソースの商用可否は [docs/data_catalog.md](../../docs/data_catalog.md) を参照。
+データソースの商用可否は [docs/datasets/data_catalog.md](../../docs/datasets/data_catalog.md) を参照。
 
 ---
 
