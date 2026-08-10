@@ -11,7 +11,7 @@ from typing import Any
 
 import polars as pl
 
-from data_forge.sources.estat import population
+from data_forge.sources.estat import daynight, population
 
 
 @dataclass(frozen=True)
@@ -202,6 +202,42 @@ DATASETS: dict[str, Dataset | CompositeDataset] = {
         table_name="population_by_age",
         index_columns=["area_code", "sex_code", "age_class_code", "year"],
         grain=["area_code", "sex_code", "age_class_code", "year"],
+    ),
+    # === daynight_population（昼夜間人口＝従業地・通学地集計）====================
+    # 時系列ファミリー「常住地又は従業地・通学地別人口（夜間人口・昼間人口）」
+    # （statsDataId 0003412192〜197 / 0004003060、1990〜2020）。年齢3区分ファミリーの
+    # 同世代・直前連番で area 軸同型（JIS コード・全国行あり）。cat01=100(夜間)/180(昼間) の
+    # 2総数のみ採り grain に daynight_code を持つ（sex 軸なし）。cleaner は全年 1 個。
+    # area 集約の `*_code` 自動判別が sex/age 以外の軸でも無改修で乗るかの3例目。
+    **{
+        f"daynight_population_{year}": Dataset(
+            key=f"daynight_population_{year}",
+            source="estat",
+            source_params={"stats_data_id": sid},
+            cleaner=daynight.clean_daynight_population,
+            stem=f"census_daynight_population_{year}",
+            table_name="daynight_population",
+            index_columns=["area_code", "daynight_code"],
+        )
+        for year, sid in {
+            1990: "0003412192",
+            1995: "0003412193",
+            2000: "0003412194",
+            2005: "0003412195",
+            2010: "0003412196",
+            2015: "0003412197",
+            2020: "0004003060",
+        }.items()
+    },
+    # 派生: 1990〜2020 を結合した昼夜間人口の時系列テーブル（1980/1985 は該当表なし）。
+    "daynight_population_timeseries": CompositeDataset(
+        key="daynight_population_timeseries",
+        upstreams=[f"daynight_population_{y}" for y in (1990, 1995, 2000, 2005, 2010, 2015, 2020)],
+        title="国勢調査 昼夜間人口（常住地・従業地通学地別人口）時系列（1990年〜2020年 5年間隔）",
+        stem="census_daynight_population_timeseries",
+        table_name="daynight_population",
+        index_columns=["area_code", "daynight_code", "year"],
+        grain=["area_code", "daynight_code", "year"],
     ),
 }
 

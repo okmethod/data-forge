@@ -216,6 +216,60 @@ def test_orphans_by_age_dedups_to_total():
     assert orph["last_population"].to_list() == [40]  # 総数（年齢別の重複でなく）
 
 
+def _daynight_fact(rows: list[tuple[str, str, int, int, int]]) -> pl.DataFrame:
+    """(area_code, area_name, year, night, day) から昼夜間人口 fact を作る（8列・sex 軸なし）。
+
+    daynight_code="0"=夜間(常住地)/"1"=昼間(従業地通学地)。sex/age のような入れ子でなく、
+    "1" は "0" へ合算されない並列母集団＝一般化（`*_code` 自動判別）の3例目検証用。
+    """
+    recs: list[dict] = []
+    for area_code, area_name, year, night, day in rows:
+        for code, name, val in (("0", "夜間人口（常住地）", night), ("1", "昼間人口（従業地・通学地）", day)):
+            recs.append(
+                {
+                    "area_code": area_code,
+                    "area_name": area_name,
+                    "area_level": 4,
+                    "daynight_code": code,
+                    "daynight": name,
+                    "year": year,
+                    "population": val,
+                    "is_current": True,
+                }
+            )
+    return pl.DataFrame(recs)
+
+
+def test_aggregate_daynight_parallel_axis_folds_independently():
+    # 3例目: 昼夜間人口（sex なし・"1" は "0" の内訳でない並列母集団）でも
+    # 合併集約が daynight_code ごとに独立に畳まれ、総数スライスは夜間(0)のみを拾う。
+    fact = _daynight_fact(
+        [
+            ("01201", "A市", 2005, 100, 120),  # 夜間100/昼間120（流入超）
+            ("01202", "B市", 2005, 40, 30),  # 夜間40/昼間30（流出超）
+            ("01201", "A市", 2010, 150, 170),
+        ]
+    )
+    ev = pl.DataFrame(
+        {"old_code": ["01202"], "successor_code": ["01201"], "year": [2008], "kind": [None]},
+        schema=events.EVENTS_SCHEMA,
+    )
+    out = aggregate.aggregate_to_base(fact, ev, base_year=2020)
+    assert out.columns == fact.columns  # 入力8列を踏襲（daynight 軸が残る）
+    a2005 = out.filter((pl.col("area_code") == "01201") & (pl.col("year") == 2005))
+    by = dict(zip(a2005["daynight_code"].to_list(), a2005["population"].to_list(), strict=True))
+    # 夜間・昼間それぞれ 旧A+旧B を独立に合算（夜間140 / 昼間150）
+    assert by == {"0": 140, "1": 150}
+    assert out.filter(pl.col("area_code") == "01202").height == 0  # B は A へ畳まれる
+
+    # 総数スライス（全 *_code=="0"）＝夜間のみ。国民保存は夜間人口で成立する。
+    national = _daynight_fact([("00000", "全国", 2005, 140, 150)])
+    cons = reconcile.national_conservation(fact, national)
+    assert cons["national"].to_list() == [140]  # 昼間(150)を拾わず夜間総数のみ
+    assert cons["atom_sum"].to_list() == [140]
+    assert cons["ok"].to_list() == [True]
+
+
 def test_events_override_wins_and_ignore(tmp_path):
     parsed = tmp_path / "p.csv"
     over = tmp_path / "o.csv"
