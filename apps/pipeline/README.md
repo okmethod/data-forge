@@ -43,14 +43,11 @@ uv run poe check   # lint + test（CI相当）
 
 ## データセット
 
-データセットごとの仕様（statsDataId・出力スキーマ・年ごとのスキーマ差・時系列の正規化モード等）は`docs/datasets/` に置く。  
-新規追加時は [src/data_forge/datasets.py](src/data_forge/datasets.py) にエントリを足し、対応する `docs/datasets/<name>.md` を用意する。
+データセットごとの仕様（statsDataId・出力スキーマ・年ごとのスキーマ差・時系列の正規化モード等）は`docs/datasets/` に置く。
+**一覧は [docs/README.md](../../docs/README.md) を正典とする**（ここには再掲しない）。
 
-| データセット群      | 内容                                               | ドキュメント                                                                   |
-| ------------------- | -------------------------------------------------- | ------------------------------------------------------------------------------ |
-| population          | 国勢調査 男女別人口（1980〜2020, 単年＋時系列）    | [docs/datasets/population.md](../../docs/datasets/population.md)               |
-| population_by_age   | 国勢調査 年齢3区分×男女別人口（1980〜2020）        | [docs/datasets/population_by_age.md](../../docs/datasets/population_by_age.md) |
-| （共有）area_master | 地域マスタ（アトム軸スタースキーマ・合併集約ハブ） | [docs/datasets/area_master.md](../../docs/datasets/area_master.md)             |
+新規追加時は [src/data_forge/datasets.py](src/data_forge/datasets.py) にエントリを足し、
+対応する `docs/datasets/<name>.md` を用意して [docs/README.md](../../docs/README.md) の索引に追記する。
 
 ---
 
