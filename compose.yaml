@@ -1,0 +1,45 @@
+# 開発用コンテナ構成。
+# - dashboard: node:22（Evidence 推奨 18.13/20/22）を直書き。依存は起動時 install。
+# - pipeline : uv ベースの Dockerfile。バッチなので都度 `run` で実行する。
+# どちらも bind mount でソースを被せ、ホットリロード / 編集即反映を効かせる。
+
+services:
+  dashboard:
+    image: node:22
+    # sources/*/connection.yaml が data/ を ../../../../ で参照するため、
+    # リポジトリと同じ階層に配置して相対パスを成立させる
+    working_dir: /repo/apps/dashboard
+    ports:
+      - "3000:3000"
+    environment:
+      # mac の bind mount では inotify が取りこぼすためポーリング監視に切替
+      CHOKIDAR_USEPOLLING: "true"
+    volumes:
+      - ./apps/dashboard:/repo/apps/dashboard
+      # パイプライン出力の sqlite を参照（Evidence は読むだけなので read-only）
+      - ./data:/repo/data:ro
+      # native 依存を含むため node_modules はコンテナ側で解決
+      - dashboard-node-modules:/repo/apps/dashboard/node_modules
+      # Evidence の生成物はコンテナ内に隔離（速度・破損回避）
+      - dashboard-evidence:/repo/apps/dashboard/.evidence
+      - dashboard-sveltekit:/repo/apps/dashboard/.svelte-kit
+    command: sh -c "npm install && ./node_modules/.bin/evidence dev --host 0.0.0.0 --port 3000"
+
+  pipeline:
+    build:
+      context: ./apps/pipeline
+      args:
+        PYTHON_VERSION: "3.12.13"
+        UV_VERSION: "0.12.3"
+    working_dir: /repo/apps/pipeline
+    volumes:
+      # config.py の REPO_ROOT=parents[4] に合わせ、リポジトリと同じ階層へマウント
+      - ./apps/pipeline:/repo/apps/pipeline
+      - ./data:/repo/data
+    # venv は /opt/venv（イメージ内）に隔離済み。.env は bind mount 経由で読まれる。
+    # 実行例: docker compose run --rm pipeline data-forge run
+
+volumes:
+  dashboard-node-modules:
+  dashboard-evidence:
+  dashboard-sveltekit:

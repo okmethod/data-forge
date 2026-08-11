@@ -43,17 +43,41 @@ data-forge/
 │   ├── raw/         # 取得した生データ
 │   └── processed/   # 精製済みデータ
 └── docs/
-    └── sources/     # データソースカタログ
+    └── datasets/    # データソース・データセットの説明
 ```
 
 ---
 
-## セットアップ
+## 起動（Docker Compose）
+
+### ダッシュボード（Evidence・ホットリロード）
 
 ```bash
-# 依存パッケージのインストール（uv を使用）
-uv sync --extra dev
-
-# 動作確認
-uv run pytest
+docker compose up dashboard  # → http://localhost:3000
 ```
+
+- ソースは bind mount で被せているため、`apps/dashboard/` の編集が即反映される。
+- 初回はデータ未生成のため、ソース（parquet）を生成する:
+
+  ```bash
+  docker compose run --rm dashboard npm run sources
+  ```
+
+### パイプライン（バッチ実行）
+
+```bash
+docker compose run --rm pipeline data-forge run  # 取得→精製→出力
+docker compose run --rm pipeline poe check       # lint + test
+```
+
+- 出力先の `data/` はホストにマウントしており、コンテナで生成した精製データがそのまま残る。
+- e-Stat の appId は `apps/pipeline/.env`（`ESTAT_APP_ID`）に設定する。
+
+### 停止・後片付け
+
+```bash
+docker compose down     # コンテナ停止・削除
+docker compose down -v  # 依存キャッシュ（named volume）も削除
+```
+
+> コンテナを使わないローカル開発（uv セットアップ等）は [apps/pipeline/README.md](apps/pipeline/README.md) を参照。
