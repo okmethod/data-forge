@@ -16,7 +16,7 @@ sidebar_position: 1
 
 ```sql national
   select year, sum(population) as population
-  from census.prefecture_population
+  from census_prefecture.population
   where sex = '総数'
   group by year
   order by year
@@ -61,7 +61,7 @@ sidebar_position: 1
 ```sql pref_change
   with p as (
     select pref_name, year, population
-    from census.prefecture_population
+    from census_prefecture.population
     where sex = '総数'
   ),
   chg as (
@@ -102,13 +102,13 @@ seriesOrder={['減少', '増加']}
 
 ```sql pref_list
   select distinct pref_name, pref_code
-  from census.prefecture_population
+  from census_prefecture.population
   order by pref_code
 ```
 
 ```sql pref_trend
   select year, population
-  from census.prefecture_population
+  from census_prefecture.population
   where sex = '総数' and pref_name = '${inputs.pref.value}'
   order by year
 ```
@@ -133,12 +133,12 @@ seriesOrder={['減少', '増加']}
   -- （x範囲が違う系列を seriesOrder で先頭にすると、その系列の年範囲が先に軸化されてしまうため）
   with folded as (
     select year, population
-    from census.sample_cities
+    from census_city.population
     where area_name = '印西市' and sex = '総数'
   ),
   raw as (
     select year, population
-    from census_raw.sample_cities_raw
+    from census_city_raw.population
     where sex = '総数'
   )
   select '① 畳み込み無し' as series, f.year, r.population

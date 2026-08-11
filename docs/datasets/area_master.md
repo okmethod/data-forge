@@ -137,6 +137,15 @@ uv run data-forge run population_timeseries --join prefecture  # 47 都道府県
 uv run data-forge run population_timeseries --join region      # 8 地方ブロックへ集約
 ```
 
+**登録済みの県粒度データセット（配布物）:** 3ファクトとも県粒度を `default_join="prefecture"` で固定した専用データセットを持つ（市区町村時系列と upstream 共通・stem だけ分離した派生ビュー）。
+dashboard はこれを素の射影で consume する（従来ダッシュ側に3重で埋めていた県集約 SQL＋47行 VALUES 県マスタを撤廃し、県名の正典を `_PREFECTURES` に一元化）。`region` は現状 dashboard 未使用のため未登録。
+
+```bash
+uv run data-forge run population_prefecture_timeseries          # 男女別人口・県粒度
+uv run data-forge run population_by_age_prefecture_timeseries   # 年齢3区分×男女別・県粒度
+uv run data-forge run daynight_population_prefecture_timeseries # 昼夜間人口・県粒度
+```
+
 > **検証（実データ・全3ファクト）:** 「県/地方合計 == 全国total」を `national_conservation` で全年 diff=0
 > 確認（1980 の 37 人差＝区未定分も `KNOWN_DIFFS` で受容）。スポット: 東京都 2020=14,047,594・
 > 大阪府 2020=8,837,685・北海道地方 2020=5,224,614（いずれも公表値一致）。

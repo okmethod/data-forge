@@ -1,0 +1,6 @@
+name: census_city
+type: sqlite
+options:
+  # サンプル市区町村（印西市など）抽出用＝市区町村粒度の折込済み時系列。
+  # 都道府県粒度は census_prefecture 側（census_population_prefecture_timeseries.sqlite）を参照。
+  filename: ../../../../data/processed/census_population_timeseries.sqlite

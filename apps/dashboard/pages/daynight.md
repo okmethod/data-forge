@@ -20,7 +20,7 @@ sidebar_position: 3
 
 ```sql national_dn
   select year, daynight, sum(population) as population
-  from census_daynight.prefecture_daynight
+  from census_daynight_prefecture.daynight
   group by year, daynight_code, daynight
   order by year, daynight_code
 ```
@@ -41,7 +41,7 @@ sidebar_position: 3
       max(case when daynight_code = '1' then population end) * 100.0
       / max(case when daynight_code = '0' then population end)
     , 1) as ratio
-  from census_daynight.prefecture_daynight
+  from census_daynight_prefecture.daynight
   where year = 2020
   group by pref_name
   order by ratio desc
@@ -64,7 +64,7 @@ sidebar_position: 3
 
 ```sql dn_pref_list
   select distinct pref_name, pref_code
-  from census_daynight.prefecture_daynight
+  from census_daynight_prefecture.daynight
   order by pref_code
 ```
 
@@ -74,7 +74,7 @@ sidebar_position: 3
       max(case when daynight_code = '1' then population end) * 100.0
       / max(case when daynight_code = '0' then population end)
     , 1) as ratio
-  from census_daynight.prefecture_daynight
+  from census_daynight_prefecture.daynight
   where pref_name = '${inputs.dnpref.value}'
   group by year
   order by year
@@ -92,7 +92,7 @@ sidebar_position: 3
 
 ```sql inzai_dn
   select year, daynight, population
-  from census_daynight.sample_cities_daynight
+  from census_daynight_city.daynight
   order by year, daynight_code
 ```
 
@@ -102,7 +102,7 @@ sidebar_position: 3
   select year,
     round(max(case when daynight_code = '1' then population end) * 100.0
       / max(case when daynight_code = '0' then population end), 1) as ratio
-  from census_daynight.sample_cities_daynight
+  from census_daynight_city.daynight
   group by year
   order by year
 ```

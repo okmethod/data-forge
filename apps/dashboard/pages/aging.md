@@ -23,7 +23,7 @@ sidebar_position: 2
       sum(case when age_class_code = '3' then population end) * 100.0
       / sum(case when age_class_code in ('1','2','3') then population end)
     , 1) as aging_pct
-  from census_age.prefecture_age
+  from census_age_prefecture.by_age
   where sex_code = '0'
   group by year
   order by year
@@ -42,7 +42,7 @@ sidebar_position: 2
     year,
     age_class,
     sum(population) as population
-  from census_age.prefecture_age
+  from census_age_prefecture.by_age
   where sex_code = '0' and age_class_code in ('1','2','3')
   group by year, age_class_code, age_class
   order by year, age_class_code
@@ -64,7 +64,7 @@ sidebar_position: 2
       sum(case when age_class_code = '3' then population end) * 100.0
       / sum(case when age_class_code in ('1','2','3') then population end)
     , 1) as aging_pct
-  from census_age.prefecture_age
+  from census_age_prefecture.by_age
   where sex_code = '0' and year = 2020
   group by pref_name
   order by aging_pct desc
@@ -88,7 +88,7 @@ sidebar_position: 2
 
 ```sql pref_list
   select distinct pref_name, pref_code
-  from census_age.prefecture_age
+  from census_age_prefecture.by_age
   order by pref_code
 ```
 
@@ -99,7 +99,7 @@ sidebar_position: 2
       sum(case when age_class_code = '3' then population end) * 100.0
       / sum(case when age_class_code in ('1','2','3') then population end)
     , 1) as aging_pct
-  from census_age.prefecture_age
+  from census_age_prefecture.by_age
   where sex_code = '0' and pref_name = '${inputs.pref.value}'
   group by year
   order by year
@@ -118,12 +118,12 @@ sidebar_position: 2
   select '印西市' as region, year,
     round(sum(case when age_class_code = '3' then population end) * 100.0
       / sum(case when age_class_code in ('1','2','3') then population end), 1) as aging_pct
-  from census_age.sample_cities_age where sex_code = '0' group by year
+  from census_age_city.by_age where sex_code = '0' group by year
   union all
   select '全国' as region, year,
     round(sum(case when age_class_code = '3' then population end) * 100.0
       / sum(case when age_class_code in ('1','2','3') then population end), 1) as aging_pct
-  from census_age.prefecture_age where sex_code = '0' group by year
+  from census_age_prefecture.by_age where sex_code = '0' group by year
   order by region, year
 ```
 
@@ -134,7 +134,7 @@ sidebar_position: 2
 ```sql pyramid_1980
   select age_class, sex,
     case when sex_code = '1' then -population else population end as pop
-  from census_age.sample_cities_age
+  from census_age_city.by_age
   where sex_code in ('1','2') and age_class_code in ('1','2','3') and year = 1980
   order by age_class_code desc
 ```
@@ -144,7 +144,7 @@ sidebar_position: 2
 ```sql pyramid_2020
   select age_class, sex,
     case when sex_code = '1' then -population else population end as pop
-  from census_age.sample_cities_age
+  from census_age_city.by_age
   where sex_code in ('1','2') and age_class_code in ('1','2','3') and year = 2020
   order by age_class_code desc
 ```

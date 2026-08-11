@@ -25,7 +25,7 @@ title: okmethod-data-forge 人口ダッシュボード
 
 ```sql national
   select year, sum(population) as population
-  from census.prefecture_population
+  from census_prefecture.population
   where sex = '総数'
   group by year
   order by year

@@ -1,0 +1,7 @@
+name: census_city_raw
+type: sqlite
+options:
+  # サンプル市区町村の「畳み込み無し（生）」時系列＝合併畳込 有/無 の比較デモ専用。
+  # 折込済み（census_city）とは別ファイル。専用データセットで直接 export する:
+  #   cd apps/pipeline && uv run data-forge export population_timeseries_raw
+  filename: ../../../../data/processed/census_population_timeseries_raw.sqlite

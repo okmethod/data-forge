@@ -189,6 +189,20 @@ DATASETS: dict[str, Dataset | CompositeDataset] = {
         index_columns=["area_code", "sex_code", "year"],
         default_join="union",
     ),
+    # 派生（空間軸）: 都道府県別の男女別人口 時系列。upstreams は population_timeseries と同じで
+    # default_join だけ prefecture に振り、市区町村アトムを県プレフィックスで束ねる（events 非依存）。
+    # これは新 base fact ではなく派生ビュー（正典＝市区町村粒度は不変）。stem を分けて上書き衝突を回避。
+    "population_prefecture_timeseries": CompositeDataset(
+        key="population_prefecture_timeseries",
+        upstreams=[
+            f"population_{y}" for y in (1980, 1985, 1990, 1995, 2000, 2005, 2010, 2015, 2020)
+        ],
+        title="国勢調査 男女別人口 都道府県別時系列（1980年〜2020年 5年間隔）",
+        stem="census_population_prefecture_timeseries",
+        table_name="population",
+        index_columns=["area_code", "sex_code", "year"],
+        default_join="prefecture",
+    ),
     # === population_by_age（年齢3区分×男女別人口）=============================
     # 時系列ファミリー「年齢（3区分），男女別人口及び年齢別割合」(413〜420 / 0003448299)。
     # 全年同型（tab=020/cat01=年齢/cat02=男女・全国行なし）なので cleaner は全年 1 個
@@ -229,6 +243,19 @@ DATASETS: dict[str, Dataset | CompositeDataset] = {
         # 配布正典＝合併畳み込み済み（population_timeseries と同じ理由）。
         default_join="aggregate_to_base",
     ),
+    # 派生（空間軸）: 都道府県別の年齢3区分×男女別人口 時系列（population_prefecture と同型）。
+    "population_by_age_prefecture_timeseries": CompositeDataset(
+        key="population_by_age_prefecture_timeseries",
+        upstreams=[
+            f"population_by_age_{y}" for y in (1980, 1985, 1990, 1995, 2000, 2005, 2010, 2015, 2020)
+        ],
+        title="国勢調査 年齢3区分×男女別人口 都道府県別時系列（1980年〜2020年 5年間隔）",
+        stem="census_population_by_age_prefecture_timeseries",
+        table_name="population_by_age",
+        index_columns=["area_code", "sex_code", "age_class_code", "year"],
+        grain=["area_code", "sex_code", "age_class_code", "year"],
+        default_join="prefecture",
+    ),
     # === daynight_population（昼夜間人口＝従業地・通学地集計）====================
     # 時系列ファミリー「常住地又は従業地・通学地別人口（夜間人口・昼間人口）」
     # （statsDataId 0003412192〜197 / 0004003060、1990〜2020）。年齢3区分ファミリーの
@@ -266,6 +293,17 @@ DATASETS: dict[str, Dataset | CompositeDataset] = {
         grain=["area_code", "daynight_code", "year"],
         # 配布正典＝合併畳み込み済み（population_timeseries と同じ理由）。
         default_join="aggregate_to_base",
+    ),
+    # 派生（空間軸）: 都道府県別の昼夜間人口 時系列（population_prefecture と同型）。
+    "daynight_population_prefecture_timeseries": CompositeDataset(
+        key="daynight_population_prefecture_timeseries",
+        upstreams=[f"daynight_population_{y}" for y in (1990, 1995, 2000, 2005, 2010, 2015, 2020)],
+        title="国勢調査 昼夜間人口（常住地・従業地通学地別人口）都道府県別時系列（1990年〜2020年 5年間隔）",
+        stem="census_daynight_population_prefecture_timeseries",
+        table_name="daynight_population",
+        index_columns=["area_code", "daynight_code", "year"],
+        grain=["area_code", "daynight_code", "year"],
+        default_join="prefecture",
     ),
 }
 

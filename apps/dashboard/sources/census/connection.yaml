@@ -1,6 +1,0 @@
-name: census
-type: sqlite
-options:
-  # パスは sources/census（ソースディレクトリ）からの相対。
-  # data/ は非コミットのため、ローカルにパイプライン出力が存在する前提。
-  filename: ../../../../data/processed/census_population_timeseries.sqlite

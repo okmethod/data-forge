@@ -1,6 +1,0 @@
-name: census_age
-type: sqlite
-options:
-  # パスは sources/census_age（ソースディレクトリ）からの相対。
-  # data/ は非コミットのため、ローカルにパイプライン出力が存在する前提。
-  filename: ../../../../data/processed/census_population_by_age_timeseries.sqlite

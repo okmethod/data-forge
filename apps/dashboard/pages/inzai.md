@@ -16,7 +16,7 @@ sidebar_position: 4
 
 ```sql national
   select year, sum(population) as population
-  from census.prefecture_population
+  from census_prefecture.population
   where sex = '総数'
   group by year
   order by year
@@ -32,13 +32,13 @@ sidebar_position: 4
 ```sql pop_index
   with series as (
     select '全国' as region, year, sum(population) as pop
-    from census.prefecture_population where sex = '総数' group by year
+    from census_prefecture.population where sex = '総数' group by year
     union all
     select '千葉県' as region, year, sum(population) as pop
-    from census.prefecture_population where sex = '総数' and pref_name = '千葉県' group by year
+    from census_prefecture.population where sex = '総数' and pref_name = '千葉県' group by year
     union all
     select '印西市' as region, year, population as pop
-    from census.sample_cities where sex = '総数'
+    from census_city.population where sex = '総数'
   )
   select s.region, s.year, round(s.pop * 100.0 / b.pop, 1) as idx
   from series s
@@ -57,7 +57,7 @@ sidebar_position: 4
 
 ```sql inzai_pop
   select year, population
-  from census.sample_cities
+  from census_city.population
   where area_name = '印西市' and sex = '総数'
   order by year
 ```
@@ -76,12 +76,12 @@ sidebar_position: 4
   select '印西市' as region, year,
     round(sum(case when age_class_code = '3' then population end) * 100.0
       / sum(case when age_class_code in ('1','2','3') then population end), 1) as aging_pct
-  from census_age.sample_cities_age where sex_code = '0' group by year
+  from census_age_city.by_age where sex_code = '0' group by year
   union all
   select '全国' as region, year,
     round(sum(case when age_class_code = '3' then population end) * 100.0
       / sum(case when age_class_code in ('1','2','3') then population end), 1) as aging_pct
-  from census_age.prefecture_age where sex_code = '0' group by year
+  from census_age_prefecture.by_age where sex_code = '0' group by year
   order by region, year
 ```
 
@@ -94,7 +94,7 @@ sidebar_position: 4
     age_class,
     sex,
     case when sex_code = '1' then -population else population end as pop
-  from census_age.sample_cities_age
+  from census_age_city.by_age
   where sex_code in ('1','2') and age_class_code in ('1','2','3') and year = 1980
   order by age_class_code desc
 ```
@@ -117,7 +117,7 @@ sidebar_position: 4
     age_class,
     sex,
     case when sex_code = '1' then -population else population end as pop
-  from census_age.sample_cities_age
+  from census_age_city.by_age
   where sex_code in ('1','2') and age_class_code in ('1','2','3') and year = 2020
   order by age_class_code desc
 ```
@@ -144,7 +144,7 @@ sidebar_position: 4
 
 ```sql inzai_dn
   select year, daynight, population
-  from census_daynight.sample_cities_daynight
+  from census_daynight_city.daynight
   order by year, daynight_code
 ```
 
@@ -154,7 +154,7 @@ sidebar_position: 4
   select year,
     round(max(case when daynight_code = '1' then population end) * 100.0
       / max(case when daynight_code = '0' then population end), 1) as ratio
-  from census_daynight.sample_cities_daynight
+  from census_daynight_city.daynight
   group by year
   order by year
 ```
@@ -173,7 +173,7 @@ sidebar_position: 4
 ```sql pref_change
   with p as (
     select pref_name, year, population
-    from census.prefecture_population
+    from census_prefecture.population
     where sex = '総数'
   ),
   chg as (
