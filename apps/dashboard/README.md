@@ -21,24 +21,21 @@ SQL + Markdown で記述し、静的サイト（`build/`）を生成する。
 
 ### SQLite の生成
 
-時系列3表は**合併畳み込み済み（`--join aggregate_to_base`）**で出力する。  
-既定の `export`（=`union`＝生）だと、市制施行や合併で消えた旧コードが畳まれず、サンプル市の連続時系列が作れない。  
-（例: 印西市 12231 は 1996年の市制施行前が別コードのため union では 2000年以降しか出ない）
+時系列3表は既定で**合併畳み込み済み（`default_join="aggregate_to_base"`）**を出力する。
+市制施行や合併で消えた旧コードを後継自治体へ畳むため、サンプル市の連続時系列を作れる。
+（例: 印西市 12231 は 1996年の市制施行前が別コードだが、畳み込みで 1980年から連続に）
 
 ```bash
 cd apps/pipeline
-uv run data-forge export population_timeseries          --join aggregate_to_base  # census_population_timeseries.sqlite
-uv run data-forge export population_by_age_timeseries   --join aggregate_to_base  # census_population_by_age_timeseries.sqlite
-uv run data-forge export daynight_population_timeseries --join aggregate_to_base  # census_daynight_population_timeseries.sqlite
+uv run data-forge export population_timeseries           # census_population_timeseries.sqlite（畳込済）
+uv run data-forge export population_by_age_timeseries    # census_population_by_age_timeseries.sqlite（畳込済）
+uv run data-forge export daynight_population_timeseries  # census_daynight_population_timeseries.sqlite（畳込済）
 ```
 
-`census_raw`（畳み込み有り/無しの比較デモ専用）の SQLite は上記とは別に、生（`union`）版を作って退避する:
+`census_raw`（畳み込み有り/無しの比較デモ専用）は生（`union`）版の専用データセットで直接出力する:
 
 ```bash
-uv run data-forge export population_timeseries                # union(生)
-cp ../../data/processed/census_population_timeseries.sqlite \
-   ../../data/processed/census_population_timeseries_raw.sqlite
-uv run data-forge export population_timeseries --join aggregate_to_base  # 畳込済を復元（census 用に戻す）
+uv run data-forge export population_timeseries_raw       # census_population_timeseries_raw.sqlite（生）
 ```
 
 ## 使い方

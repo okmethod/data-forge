@@ -164,6 +164,30 @@ DATASETS: dict[str, Dataset | CompositeDataset] = {
         stem="census_population_timeseries",
         table_name="population",
         index_columns=["area_code", "sex_code", "year"],
+        # 配布正典＝合併畳み込み済み（市制施行・合併で消えた旧コードを後継自治体へ畳み、
+        # サンプル市の連続時系列を作れる）。生（union）版は population_timeseries_raw で別出し。
+        default_join="aggregate_to_base",
+    ),
+    # 生（畳み込み無し）版。census_raw ダッシュボード＝合併畳込有無の比較デモ専用。
+    # population_timeseries と upstreams は同じで stem/既定 join だけ違える（cp 往復を排除）。
+    "population_timeseries_raw": CompositeDataset(
+        key="population_timeseries_raw",
+        upstreams=[
+            "population_1980",
+            "population_1985",
+            "population_1990",
+            "population_1995",
+            "population_2000",
+            "population_2005",
+            "population_2010",
+            "population_2015",
+            "population_2020",
+        ],
+        title="国勢調査 男女別人口 時系列（1980年〜2020年・畳み込み無し＝各年当時の境界のまま）",
+        stem="census_population_timeseries_raw",
+        table_name="population",
+        index_columns=["area_code", "sex_code", "year"],
+        default_join="union",
     ),
     # === population_by_age（年齢3区分×男女別人口）=============================
     # 時系列ファミリー「年齢（3区分），男女別人口及び年齢別割合」(413〜420 / 0003448299)。
@@ -202,6 +226,8 @@ DATASETS: dict[str, Dataset | CompositeDataset] = {
         table_name="population_by_age",
         index_columns=["area_code", "sex_code", "age_class_code", "year"],
         grain=["area_code", "sex_code", "age_class_code", "year"],
+        # 配布正典＝合併畳み込み済み（population_timeseries と同じ理由）。
+        default_join="aggregate_to_base",
     ),
     # === daynight_population（昼夜間人口＝従業地・通学地集計）====================
     # 時系列ファミリー「常住地又は従業地・通学地別人口（夜間人口・昼間人口）」
@@ -238,6 +264,8 @@ DATASETS: dict[str, Dataset | CompositeDataset] = {
         table_name="daynight_population",
         index_columns=["area_code", "daynight_code", "year"],
         grain=["area_code", "daynight_code", "year"],
+        # 配布正典＝合併畳み込み済み（population_timeseries と同じ理由）。
+        default_join="aggregate_to_base",
     ),
 }
 

@@ -78,10 +78,12 @@ uv run poe run population_timeseries   # 1980〜2020 時系列
 ## 派生データセット（複数年結合）の正規化モード
 
 年をまたぐと市町村合併・市部/郡部・人口集中地区などで地域集合が年ごとに変わる。
-`population_timeseries` は結合時の地域正規化を `--join` で選べる（既定 `union`）。
+`population_timeseries` は結合時の地域正規化を `--join` で選べる。**既定は配布正典の `aggregate_to_base`（合併畳み込み済み）**。
+生（畳み込み無し）版が必要なら専用データセット `population_timeseries_raw`（既定 `union`）を使う。
 
 ```bash
-uv run data-forge run population_timeseries --join union         # 全部表示（既定）
+uv run data-forge run population_timeseries                      # 既定=aggregate_to_base（畳込済）
+uv run data-forge run population_timeseries_raw                  # 生（union）版・比較デモ用
 uv run data-forge run population_timeseries --join intersection  # 共通地域のみ
 uv run data-forge run population_timeseries --join grid          # 欠損をnull行で明示
 ```
