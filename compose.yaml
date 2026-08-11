@@ -23,7 +23,8 @@ services:
       # Evidence の生成物はコンテナ内に隔離（速度・破損回避）
       - dashboard-evidence:/repo/apps/dashboard/.evidence
       - dashboard-sveltekit:/repo/apps/dashboard/.svelte-kit
-    command: sh -c "npm install && ./node_modules/.bin/evidence dev --host 0.0.0.0 --port 3000"
+    # 起動前に sources を再評価してから dev
+    command: sh -c "npm install && ./node_modules/.bin/evidence sources && ./node_modules/.bin/evidence dev --host 0.0.0.0 --port 3000"
 
   pipeline:
     build:

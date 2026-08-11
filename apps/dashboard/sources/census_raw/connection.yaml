@@ -1,0 +1,11 @@
+name: census_raw
+type: sqlite
+options:
+  # 「畳み込み無し（生）」の時系列。合併畳み込み有り/無しの比較デモ専用。
+  # census_population_timeseries.sqlite（畳み込み済み）とは別ファイル。生成手順:
+  #   cd apps/pipeline
+  #   uv run data-forge export population_timeseries                # union(生)→ census_population_timeseries.sqlite
+  #   cp ../../data/processed/census_population_timeseries.sqlite \
+  #      ../../data/processed/census_population_timeseries_raw.sqlite
+  #   uv run data-forge export population_timeseries --join aggregate_to_base  # folded を復元
+  filename: ../../../../data/processed/census_population_timeseries_raw.sqlite
