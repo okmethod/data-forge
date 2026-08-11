@@ -3,7 +3,7 @@ title: 人口
 sidebar_position: 1
 ---
 
-データセット: **合併畳み込み済みの市区町村別 男女別人口** - 1980〜2020年・全9回分
+データセット: **合併畳み込み済みの市区町村別 男女別人口** - 1980〜2020年・全9回分（＋2025速報）
 
 このページは **全国 → 都道府県の偏在 → ドリルダウン → サンプル市** の順に同じデータを見ていく。  
 （印西市を軸にした横断的な読み解きは [印西市ケーススタディ](/inzai) を参照）
@@ -23,6 +23,8 @@ sidebar_position: 1
 ```
 
 <LineChart data={national} x=year y=population title="全国総人口" yFmt="#,##0" yMin=110000000 yMax=130000000 xType=category />
+
+_※ 末尾の2025年は**速報値**（人口速報集計）。2020年までは確定値。_
 
 ---
 
@@ -115,6 +117,8 @@ seriesOrder={['減少', '増加']}
 
 <LineChart data={pref_trend} x=year y=population title="{inputs.pref.value} の総人口推移" yFmt="#,##0" xType=category />
 
+_※ 末尾の2025年は**速報値**。2020年までは確定値。_
+
 ---
 
 ## サンプル市：千葉県印西市（合併畳み込みの考慮）
@@ -134,7 +138,8 @@ seriesOrder={['減少', '増加']}
   with folded as (
     select year, population
     from census_city.population
-    where area_name = '印西市' and sex = '総数'
+    -- 合併畳み込みの方法論デモ（1980-2020）に集中。2025速報は総人口推移の各図で表示する。
+    where area_name = '印西市' and sex = '総数' and data_status = 'confirmed'
   ),
   raw as (
     select year, population

@@ -157,6 +157,10 @@ clean_2005 = _year_cleaner(sex_axis="cat01", sex_by_code=SEX_2005)  # cat01に�
 clean_2010 = _year_cleaner(sex_axis="cat02", sex_by_code=SEX_2010, filters=[_DID_WHOLE])
 clean_2015 = _year_cleaner(sex_axis="cat02", sex_by_code=SEX_2015, filters=[_DID_WHOLE])
 clean_2020 = _year_cleaner(sex_axis="cat01", sex_by_code=SEX_2020)  # 令和型
+# 2025 人口速報集計(0004050397)は 2020 と同型の令和型。
+# （tab=人口単一・cat01=男女0/1/2・全国行あり・time→2025）
+# 速報=総人口のみで年齢/昼夜間軸は無い。確定が出たら破棄する。
+clean_2025_preliminary = _year_cleaner(sex_axis="cat01", sex_by_code=SEX_2020)
 
 
 # --- population_by_age（年齢3区分×男女別人口）------------------------------------
@@ -194,12 +198,23 @@ def clean_population_by_age(tidy: pl.DataFrame) -> pl.DataFrame:
             pl.col("area_code"),
             pl.col("area_name"),
             pl.col("area_level").cast(pl.Int8, strict=False).alias("area_level"),
-            pl.col("cat02_code").replace_strict({k: v[0] for k, v in SEX_2005.items()}).alias("sex_code"),
-            pl.col("cat02_code").replace_strict({k: v[1] for k, v in SEX_2005.items()}).alias("sex"),
-            pl.col("cat01_code").replace_strict({k: v[0] for k, v in AGE_TS.items()}).alias("age_class_code"),
-            pl.col("cat01_code").replace_strict({k: v[1] for k, v in AGE_TS.items()}).alias("age_class"),
+            pl.col("cat02_code")
+            .replace_strict({k: v[0] for k, v in SEX_2005.items()})
+            .alias("sex_code"),
+            pl.col("cat02_code")
+            .replace_strict({k: v[1] for k, v in SEX_2005.items()})
+            .alias("sex"),
+            pl.col("cat01_code")
+            .replace_strict({k: v[0] for k, v in AGE_TS.items()})
+            .alias("age_class_code"),
+            pl.col("cat01_code")
+            .replace_strict({k: v[1] for k, v in AGE_TS.items()})
+            .alias("age_class"),
             pl.col("time_code").str.slice(0, 4).cast(pl.Int16).alias("year"),
-            pl.col("value").str.replace_all(r"[^0-9-]", "").cast(pl.Int64, strict=False).alias("population"),
+            pl.col("value")
+            .str.replace_all(r"[^0-9-]", "")
+            .cast(pl.Int64, strict=False)
+            .alias("population"),
         )
         .with_columns((pl.col("area_level") != _OBSOLETE_AREA_LEVEL).alias("is_current"))
     )

@@ -5,7 +5,7 @@
   2. 県粒度派生ビューの正規化モード（default_join="prefecture"）と出力先分離。
 """
 
-from data_forge.datasets import DATASETS, CompositeDataset, get_dataset
+from data_forge.datasets import DATASETS, CompositeDataset, Dataset, get_dataset
 
 _PREFECTURE_KEYS = (
     "population_prefecture_timeseries",
@@ -41,3 +41,13 @@ def test_prefecture_datasets_share_upstreams_with_municipality_view() -> None:
         assert isinstance(pref, CompositeDataset) and isinstance(muni, CompositeDataset)
         assert pref.upstreams == muni.upstreams
         assert pref.table_name == muni.table_name
+
+
+def test_preliminary_upstreams_reference_existing_base_datasets() -> None:
+    """preliminary_upstreams のキーは実在する基底 Dataset を指す（配線ずれ・タイポの早期検知）。"""
+    for ds in DATASETS.values():
+        if not isinstance(ds, CompositeDataset):
+            continue
+        for key in ds.preliminary_upstreams:
+            up = get_dataset(key)  # 未知キーなら KeyError
+            assert isinstance(up, Dataset), f"{ds.key}: 速報 upstream {key!r} は基底 Dataset 必須"

@@ -51,6 +51,11 @@ class CompositeDataset:
     # 結合の粒度（combine_years の一意性ガード用）。既定＝area×sex×year。
     # 分類軸が増える fact（例: 年齢区分）だけ明示的に上書きする。
     grain: list[str] = field(default_factory=lambda: ["area_code", "sex_code", "year"])
+    # 速報 upstream（基底 Dataset キー）。確定 upstream を集約し終えた**後段**で継ぎ足し、
+    # `data_status=preliminary` を付与する（provenance.splice_preliminary）。
+    # 最新境界＝合併 rollup 不要なので集約機械を通さず、area 集約を無改修に保つ。
+    # 空なら来歴列は付かず既存出力と同一（＝速報が出た fact だけ column が生える）。
+    preliminary_upstreams: list[str] = field(default_factory=list)
 
 
 DATASETS: dict[str, Dataset | CompositeDataset] = {
@@ -146,6 +151,18 @@ DATASETS: dict[str, Dataset | CompositeDataset] = {
         table_name="population",
         index_columns=["area_code", "sex_code"],
     ),
+    # 速報: 令和7年国勢調査 人口速報集計「男女別人口」(0004050397)。2020 と同型の令和型。
+    # 総人口のみ（年齢別/昼夜間は速報に無い）。単体では全国/県/市区町村の8列を出力し、
+    # 時系列へは preliminary_upstreams 経由で data_status=preliminary として合流する。
+    "population_2025_preliminary": Dataset(
+        key="population_2025_preliminary",
+        source="estat",
+        source_params={"stats_data_id": "0004050397"},
+        cleaner=population.clean_2025_preliminary,
+        stem="census_population_2025_preliminary",
+        table_name="population",
+        index_columns=["area_code", "sex_code"],
+    ),
     # 派生: 1980〜2020 を結合した男女別人口の時系列テーブル。
     "population_timeseries": CompositeDataset(
         key="population_timeseries",
@@ -167,6 +184,9 @@ DATASETS: dict[str, Dataset | CompositeDataset] = {
         # 配布正典＝合併畳み込み済み（市制施行・合併で消えた旧コードを後継自治体へ畳み、
         # サンプル市の連続時系列を作れる）。生（union）版は population_timeseries_raw で別出し。
         default_join="aggregate_to_base",
+        # 2025 速報を合流（data_status=preliminary）。
+        # 速報の全国/県行は splice 前に確定ビューの area_code へ intersection scoping され、市区町村行のみ残る。
+        preliminary_upstreams=["population_2025_preliminary"],
     ),
     # 生（畳み込み無し）版。census_raw ダッシュボード＝合併畳込有無の比較デモ専用。
     # population_timeseries と upstreams は同じで stem/既定 join だけ違える（cp 往復を排除）。
@@ -202,6 +222,9 @@ DATASETS: dict[str, Dataset | CompositeDataset] = {
         table_name="population",
         index_columns=["area_code", "sex_code", "year"],
         default_join="prefecture",
+        # 2025 速報を合流。速報の県行(01000 等)が確定の県ビューへ intersection scoping で残る。
+        # （県境は不変なので合併 rollup 問題なし＝ダッシュボードが使う粒度）
+        preliminary_upstreams=["population_2025_preliminary"],
     ),
     # === population_by_age（年齢3区分×男女別人口）=============================
     # 時系列ファミリー「年齢（3区分），男女別人口及び年齢別割合」(413〜420 / 0003448299)。

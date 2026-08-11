@@ -24,6 +24,8 @@ sidebar_position: 4
 
 <LineChart data={national} x=year y=population title="全国総人口" yFmt="#,##0" yMin=110000000 yMax=130000000 xType=category />
 
+_※ 末尾の2025年は**速報値**（人口速報集計）。2020年までは確定値。_
+
 同じ40年を **1980年=100 の指数** で並べると差は歴然。  
 全国は +7.8%、千葉県は +32.7% にとどまるが、**印西市は 342.4（＝3.4倍）** に膨らんだ。  
 印旛村・本埜村を編入した2010年の合併をまたいでも、畳み込み済みの市区町村時系列なら **旧境界を越えて連続比較** できる。  
@@ -48,6 +50,8 @@ sidebar_position: 4
 
 <LineChart data={pop_index} x=year y=idx series=region title="人口指数（1980年=100）" yFmt="0.0" xType=category />
 
+_※ 末尾の2025年は**速報値**。2020年までは確定値。_
+
 ---
 
 ## 2. 印西市の人口：3万人から10万人へ
@@ -62,7 +66,9 @@ sidebar_position: 4
   order by year
 ```
 
-<LineChart data={inzai_pop} x=year y=population title="印西市 総人口（合併畳み込み済み）" yFmt="#,##0" yMin=20000 yMax=110000 xType=category />
+<LineChart data={inzai_pop} x=year y=population title="印西市 総人口（合併畳み込み済み）" yFmt="#,##0" yMin=20000 yMax=115000 xType=category />
+
+_※ 末尾の2025年は**速報値**（人口速報集計）。2020年までは確定値。_
 
 ---
 

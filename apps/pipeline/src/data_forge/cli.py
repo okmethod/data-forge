@@ -27,6 +27,7 @@ from data_forge.combine import combine_years
 from data_forge.datasets import CompositeDataset, Dataset, get_dataset
 from data_forge.io.export import export_all
 from data_forge.meta import SourceMeta, combine_meta
+from data_forge.provenance import splice_preliminary
 from data_forge.sources.estat import fetch as estat_fetch
 from data_forge.sources.estat import transform
 
@@ -120,7 +121,37 @@ def _load_composite(
         # combine のみ（union/intersection/grid）。アトム抽出なしで各年 fact を直接結合。
         frames, metas = _upstream_frames(ds, refresh=refresh)
         df = combine_years(frames, mode=join, grain=ds.grain)  # type: ignore[arg-type]
+    if ds.preliminary_upstreams:
+        # 確定ビュー確定後の後段で速報を継ぎ足す（area 集約=共有ハブは無改修）。
+        df, metas = _splice_preliminary(ds, df, metas, refresh=refresh)
     return df, combine_meta(metas, title=ds.title)
+
+
+def _splice_preliminary(
+    ds: CompositeDataset, confirmed: pl.DataFrame, metas: list[SourceMeta], *, refresh: bool
+) -> tuple[pl.DataFrame, list[SourceMeta]]:
+    """確定ビューに速報 upstream を継ぎ足し、data_status 来歴列で明示する（集約の後段）。
+
+    速報は最新境界＝合併 rollup 不要なので集約機械を通さず、ここで合流させる。
+    速報表は全国/県/市区町村が混在するため、確定ビューに既に在る area_code だけへ
+    intersection scoping してから継ぎ足す。
+    レベル混在・二重計上を防ぎ、view の粒度に自動追従。
+    2025 新設合併など確定側に無いコードは coverage gap として落ちるだけ。
+    出典メタは速報ソース分を確定分に足して束ねる（配布物に速報の出典も残す）。
+    """
+    frames: list[pl.DataFrame] = []
+    prelim_metas: list[SourceMeta] = []
+    for key in ds.preliminary_upstreams:
+        up = get_dataset(key)
+        if not isinstance(up, Dataset):
+            raise TypeError(f"preliminary upstream {key!r} は基底データセットである必要があります")
+        frame, meta = _load_base(up, refresh=refresh)
+        frames.append(frame)
+        prelim_metas.append(meta)
+    confirmed_areas = confirmed.get_column("area_code").unique().to_list()
+    prelim = pl.concat(frames, how="vertical").filter(pl.col("area_code").is_in(confirmed_areas))
+    spliced = splice_preliminary(confirmed, prelim, grain=ds.grain)
+    return spliced, [*metas, *prelim_metas]
 
 
 def _load(

@@ -28,7 +28,15 @@ GRAIN = ["area_code", "sex_code", "year"]
 # grid モードで「地域×年」と直交させる分類軸を成す、area/年/値でない属性列。
 # code とその名称（sex_code↔sex, age_class_code↔age_class 等）が 1:1 で対になるため、
 # grain を明示しなくても DF の列構成から自動判別できる。
-_NON_CATEGORY_COLS = {"area_code", "area_name", "area_level", "year", "population", "is_current"}
+_NON_CATEGORY_COLS = {
+    "area_code",
+    "area_name",
+    "area_level",
+    "year",
+    "population",
+    "is_current",
+    "data_status",  # 来歴列（provenance）は分類軸ではない。grid の cross 対象から除く。
+}
 
 
 def combine_years(
