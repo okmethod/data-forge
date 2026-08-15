@@ -33,7 +33,7 @@ class Dataset:
 
 
 @dataclass(frozen=True)
-class CompositeDataset:
+class StitchedDataset:
     """複数の基底データセットを合成した派生データセット（例: 複数年結合）。
 
     `upstreams` は基底 Dataset のキー。各 upstream を fetch→clean した結果
@@ -58,7 +58,7 @@ class CompositeDataset:
     preliminary_upstreams: list[str] = field(default_factory=list)
 
 
-DATASETS: dict[str, Dataset | CompositeDataset] = {
+DATASETS: dict[str, Dataset | StitchedDataset] = {
     # 単年（古い順）。同名でも e-Stat の軸設計は年（テーブル世代）で異なり、
     # 年ごとの cleaner が同一8列スキーマへ写像する。
     # （構造差の詳細は population.py / docs 参照）
@@ -164,7 +164,7 @@ DATASETS: dict[str, Dataset | CompositeDataset] = {
         index_columns=["area_code", "sex_code"],
     ),
     # 派生: 1980〜2020 を結合した男女別人口の時系列テーブル。
-    "population_timeseries": CompositeDataset(
+    "population_timeseries": StitchedDataset(
         key="population_timeseries",
         upstreams=[
             "population_1980",
@@ -190,7 +190,7 @@ DATASETS: dict[str, Dataset | CompositeDataset] = {
     ),
     # 生（畳み込み無し）版。census_raw ダッシュボード＝合併畳込有無の比較デモ専用。
     # population_timeseries と upstreams は同じで stem/既定 join だけ違える（cp 往復を排除）。
-    "population_timeseries_raw": CompositeDataset(
+    "population_timeseries_raw": StitchedDataset(
         key="population_timeseries_raw",
         upstreams=[
             "population_1980",
@@ -212,7 +212,7 @@ DATASETS: dict[str, Dataset | CompositeDataset] = {
     # 派生（空間軸）: 都道府県別の男女別人口 時系列。upstreams は population_timeseries と同じで
     # default_join だけ prefecture に振り、市区町村アトムを県プレフィックスで束ねる（events 非依存）。
     # これは新 base fact ではなく派生ビュー（正典＝市区町村粒度は不変）。stem を分けて上書き衝突を回避。
-    "population_prefecture_timeseries": CompositeDataset(
+    "population_prefecture_timeseries": StitchedDataset(
         key="population_prefecture_timeseries",
         upstreams=[
             f"population_{y}" for y in (1980, 1985, 1990, 1995, 2000, 2005, 2010, 2015, 2020)
@@ -253,7 +253,7 @@ DATASETS: dict[str, Dataset | CompositeDataset] = {
         }.items()
     },
     # 派生: 1980〜2020 を結合した年齢3区分×男女別人口の時系列テーブル。
-    "population_by_age_timeseries": CompositeDataset(
+    "population_by_age_timeseries": StitchedDataset(
         key="population_by_age_timeseries",
         upstreams=[
             f"population_by_age_{y}" for y in (1980, 1985, 1990, 1995, 2000, 2005, 2010, 2015, 2020)
@@ -267,7 +267,7 @@ DATASETS: dict[str, Dataset | CompositeDataset] = {
         default_join="aggregate_to_base",
     ),
     # 派生（空間軸）: 都道府県別の年齢3区分×男女別人口 時系列（population_prefecture と同型）。
-    "population_by_age_prefecture_timeseries": CompositeDataset(
+    "population_by_age_prefecture_timeseries": StitchedDataset(
         key="population_by_age_prefecture_timeseries",
         upstreams=[
             f"population_by_age_{y}" for y in (1980, 1985, 1990, 1995, 2000, 2005, 2010, 2015, 2020)
@@ -306,7 +306,7 @@ DATASETS: dict[str, Dataset | CompositeDataset] = {
         }.items()
     },
     # 派生: 1990〜2020 を結合した昼夜間人口の時系列テーブル（1980/1985 は該当表なし）。
-    "daynight_population_timeseries": CompositeDataset(
+    "daynight_population_timeseries": StitchedDataset(
         key="daynight_population_timeseries",
         upstreams=[f"daynight_population_{y}" for y in (1990, 1995, 2000, 2005, 2010, 2015, 2020)],
         title="国勢調査 昼夜間人口（常住地・従業地通学地別人口）時系列（1990年〜2020年 5年間隔）",
@@ -318,7 +318,7 @@ DATASETS: dict[str, Dataset | CompositeDataset] = {
         default_join="aggregate_to_base",
     ),
     # 派生（空間軸）: 都道府県別の昼夜間人口 時系列（population_prefecture と同型）。
-    "daynight_population_prefecture_timeseries": CompositeDataset(
+    "daynight_population_prefecture_timeseries": StitchedDataset(
         key="daynight_population_prefecture_timeseries",
         upstreams=[f"daynight_population_{y}" for y in (1990, 1995, 2000, 2005, 2010, 2015, 2020)],
         title="国勢調査 昼夜間人口（常住地・従業地通学地別人口）都道府県別時系列（1990年〜2020年 5年間隔）",
@@ -354,7 +354,7 @@ DATASETS: dict[str, Dataset | CompositeDataset] = {
     # 派生: 全国＋47都道府県を area 軸で縦結合した 1920〜2020 の 5歳階級時系列（配布正典）。
     # 各 upstream が既に全年を持つため結合軸は year ではなく area（disjoint な 00000＋47県）＝
     # 単純 union（合併 rollup 不要＝area master を通さない）。grain に age_class_code を持つ。
-    "population_by_age5_timeseries": CompositeDataset(
+    "population_by_age5_timeseries": StitchedDataset(
         key="population_by_age5_timeseries",
         upstreams=["population_by_age5_national", "population_by_age5_prefecture"],
         title="国勢調査 年齢5歳階級×男女別人口 全国・都道府県別時系列（1920年〜2020年 5年間隔）",
@@ -367,7 +367,7 @@ DATASETS: dict[str, Dataset | CompositeDataset] = {
 }
 
 
-def get_dataset(key: str) -> Dataset | CompositeDataset:
+def get_dataset(key: str) -> Dataset | StitchedDataset:
     try:
         return DATASETS[key]
     except KeyError:
