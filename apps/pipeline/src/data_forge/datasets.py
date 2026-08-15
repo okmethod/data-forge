@@ -11,7 +11,7 @@ from typing import Any
 
 import polars as pl
 
-from data_forge.sources.estat import age5, daynight, population
+from data_forge.sources.estat import age5, daynight, households, population
 
 
 @dataclass(frozen=True)
@@ -382,6 +382,21 @@ DATASETS: dict[str, Dataset | StitchedDataset | ProjectedDataset] = {
         table_name="population_by_age5",
         index_columns=["area_code", "sex_code", "age_class_code", "year"],
         grain=["area_code", "sex_code", "age_class_code", "year"],
+    ),
+    # === households（世帯の種類別 世帯数・世帯人員）==============================
+    # 時系列データ製品「世帯の種類別世帯数及び世帯人員 － 全国，都道府県」(0003410420、
+    # その1＝一般世帯及び施設等の世帯・1960〜2020)。単一 ID に全国(level1)＋47都道府県(level2)＋
+    # 全年を含む＝合併なし＝area master 不要。全国も県も同一 ID なので age5 のような射影も不要で
+    # cleaner 1 個の単独 Dataset で完結する。sex 軸なし・分類軸=世帯の種類(総数/一般/施設)、
+    # 世帯数と世帯人員の2測定量を1行に横並べ（1世帯当たり人員は導出可能ゆえ持たない）。
+    "households": Dataset(
+        key="households",
+        source="estat",
+        source_params={"stats_data_id": "0003410420"},
+        cleaner=households.clean_households,
+        stem="census_households",
+        table_name="households",
+        index_columns=["area_code", "household_type_code", "year"],
     ),
 }
 
