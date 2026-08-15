@@ -58,7 +58,27 @@ class StitchedDataset:
     preliminary_upstreams: list[str] = field(default_factory=list)
 
 
-DATASETS: dict[str, Dataset | StitchedDataset] = {
+@dataclass(frozen=True)
+class ProjectedDataset:
+    """既製の時系列帳票（e-Stat 時系列データ製品）を area 軸で union するだけの派生。
+
+    StitchedDataset（縫合）と対になる「射影」フロー。各 upstream は既に全年を持つ時系列で、
+    disjoint な area パーティション（例: 全国 00000 ＋ 47 都道府県）を単純に縦積みする。
+    年の縫合・合併畳み込み（area master）・速報 splice は持たない
+    （＝combine.combine_years の重機構ではなく combine.union_areas を通る）。
+    分類軸が増える fact（例: 年齢区分）は grain を上書きして disjoint 検証の粒度を明示する。
+    """
+
+    key: str
+    upstreams: list[str]  # 既製時系列の disjoint な area パーティション（基底 Dataset キー）
+    title: str
+    stem: str
+    table_name: str
+    index_columns: list[str] = field(default_factory=list)
+    grain: list[str] = field(default_factory=lambda: ["area_code", "sex_code", "year"])
+
+
+DATASETS: dict[str, Dataset | StitchedDataset | ProjectedDataset] = {
     # 単年（古い順）。同名でも e-Stat の軸設計は年（テーブル世代）で異なり、
     # 年ごとの cleaner が同一8列スキーマへ写像する。
     # （構造差の詳細は population.py / docs 参照）
@@ -351,10 +371,10 @@ DATASETS: dict[str, Dataset | StitchedDataset] = {
         table_name="population_by_age5",
         index_columns=["area_code", "sex_code", "age_class_code", "year"],
     ),
-    # 派生: 全国＋47都道府県を area 軸で縦結合した 1920〜2020 の 5歳階級時系列（配布正典）。
-    # 各 upstream が既に全年を持つため結合軸は year ではなく area（disjoint な 00000＋47県）＝
-    # 単純 union（合併 rollup 不要＝area master を通さない）。grain に age_class_code を持つ。
-    "population_by_age5_timeseries": StitchedDataset(
+    # 派生（射影フロー）: 全国＋47都道府県を area 軸で縦結合した 1920〜2020 の 5歳階級時系列（配布正典）。
+    # 各 upstream が既に全年を持つ既製時系列＝結合軸は year ではなく area（disjoint な 00000＋47県）で
+    # 単純 union するだけ（合併 rollup 不要＝area master を通さない）。grain に age_class_code を持つ。
+    "population_by_age5_timeseries": ProjectedDataset(
         key="population_by_age5_timeseries",
         upstreams=["population_by_age5_national", "population_by_age5_prefecture"],
         title="国勢調査 年齢5歳階級×男女別人口 全国・都道府県別時系列（1920年〜2020年 5年間隔）",
@@ -362,12 +382,11 @@ DATASETS: dict[str, Dataset | StitchedDataset] = {
         table_name="population_by_age5",
         index_columns=["area_code", "sex_code", "age_class_code", "year"],
         grain=["area_code", "sex_code", "age_class_code", "year"],
-        default_join="union",  # 全国＋県は area disjoint＝縦積みのみ（合併集約なし）
     ),
 }
 
 
-def get_dataset(key: str) -> Dataset | StitchedDataset:
+def get_dataset(key: str) -> Dataset | StitchedDataset | ProjectedDataset:
     try:
         return DATASETS[key]
     except KeyError:

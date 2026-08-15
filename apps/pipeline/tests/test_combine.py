@@ -6,7 +6,7 @@ union / intersection / grid の各正規化モードと、二重計上を防ぐ�
 import polars as pl
 import pytest
 
-from data_forge.combine import combine_years
+from data_forge.combine import combine_years, union_areas
 
 # 共通スキーマの最小フレーム。地域Aは両年、Bは2015のみ、Cは2020のみ（sexは総数だけ）。
 _2015 = pl.DataFrame(
@@ -111,3 +111,58 @@ def test_grid_crosses_age_class():
         (pl.col("area_code") == "A") & (pl.col("year") == 2020) & (pl.col("age_class_code") == "0")
     ).row(0, named=True)
     assert a2020["population"] is None
+
+
+# --- union_areas（射影フロー: 既製時系列の disjoint な area パーティションを縦積み）----------
+def _area_frame(area: str, year: int, pop: int) -> pl.DataFrame:
+    # 1 地域 × 総数(sex=0) × 1 年の最小フレーム（各 upstream が全年を持つ想定）
+    return pl.DataFrame(
+        {
+            "area_code": [area],
+            "area_name": [area],
+            "area_level": [1],
+            "sex_code": ["0"],
+            "sex": ["総数"],
+            "year": [year],
+            "population": [pop],
+            "is_current": [True],
+        }
+    )
+
+
+def test_union_areas_stacks_disjoint_partitions():
+    # 全国(00000) と 県(01000) は各々全年を持つ disjoint パーティション → 縦積みで全行保持
+    national = pl.concat([_area_frame("00000", 1920, 100), _area_frame("00000", 2020, 200)])
+    pref = pl.concat([_area_frame("01000", 1920, 10), _area_frame("01000", 2020, 20)])
+    df = union_areas([national, pref])
+    assert df.height == 4
+    assert set(df["area_code"]) == {"00000", "01000"}
+    # sort は combine_years と同一（area_code, year 昇順）
+    assert df["area_code"].to_list() == ["00000", "00000", "01000", "01000"]
+    assert df["year"].to_list() == [1920, 2020, 1920, 2020]
+
+
+def test_union_areas_matches_combine_years_union_on_disjoint():
+    # disjoint 入力なら union_areas は combine_years(mode="union") と出力等価（age5 の等価性担保）
+    national = pl.concat([_area_frame("00000", 1920, 100), _area_frame("00000", 2020, 200)])
+    pref = pl.concat([_area_frame("01000", 1920, 10), _area_frame("01000", 2020, 20)])
+    assert union_areas([national, pref]).equals(
+        combine_years([national, pref], mode="union")
+    )
+
+
+def test_union_areas_rejects_overlapping_partitions():
+    # 同一 area×sex×year が2 upstream に → パーティションが disjoint でない＝粒度違反
+    a = _area_frame("00000", 2020, 100)
+    b = _area_frame("00000", 2020, 100)
+    with pytest.raises(ValueError, match="粒度違反"):
+        union_areas([a, b])
+
+
+def test_union_areas_with_age_grain():
+    # grain に age_class_code を含む形（age5 相当）でも disjoint 判定が正しい
+    national = _age_frame(2020, "00000", 100)
+    pref = _age_frame(2020, "01000", 50)
+    df = union_areas([national, pref], grain=_AGE_GRAIN)
+    assert df.height == 4  # 2 area × 2 age(総数/年少)
+    assert set(df["area_code"]) == {"00000", "01000"}

@@ -5,7 +5,13 @@
   2. 県粒度派生ビューの正規化モード（default_join="prefecture"）と出力先分離。
 """
 
-from data_forge.datasets import DATASETS, StitchedDataset, Dataset, get_dataset
+from data_forge.datasets import (
+    DATASETS,
+    Dataset,
+    ProjectedDataset,
+    StitchedDataset,
+    get_dataset,
+)
 
 _PREFECTURE_KEYS = (
     "population_prefecture_timeseries",
@@ -51,3 +57,25 @@ def test_preliminary_upstreams_reference_existing_base_datasets() -> None:
         for key in ds.preliminary_upstreams:
             up = get_dataset(key)  # 未知キーなら KeyError
             assert isinstance(up, Dataset), f"{ds.key}: 速報 upstream {key!r} は基底 Dataset 必須"
+
+
+def test_age5_timeseries_is_projected_flow() -> None:
+    """5歳階級時系列は射影フロー（ProjectedDataset）＝縫合専用の機構を持たない。
+
+    既製の時系列帳票を area union するだけなので、default_join（正規化モード）も
+    preliminary_upstreams（速報 splice）も持たないことを固定する。
+    """
+    ds = get_dataset("population_by_age5_timeseries")
+    assert isinstance(ds, ProjectedDataset)
+    assert not hasattr(ds, "default_join")
+    assert not hasattr(ds, "preliminary_upstreams")
+
+
+def test_projected_datasets_reference_existing_base_upstreams() -> None:
+    """射影データセットの upstream は実在する基底 Dataset（既製時系列の area パーティション）。"""
+    for ds in DATASETS.values():
+        if not isinstance(ds, ProjectedDataset):
+            continue
+        for key in ds.upstreams:
+            up = get_dataset(key)
+            assert isinstance(up, Dataset), f"{ds.key}: upstream {key!r} は基底 Dataset 必須"

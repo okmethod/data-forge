@@ -23,8 +23,8 @@ from data_forge.area import events as area_events
 from data_forge.area import reconcile as area_reconcile
 from data_forge.area import spatial_rollup as area_spatial
 from data_forge.area.history import ingest as area_ingest
-from data_forge.combine import combine_years
-from data_forge.datasets import StitchedDataset, Dataset, get_dataset
+from data_forge.combine import combine_years, union_areas
+from data_forge.datasets import Dataset, ProjectedDataset, StitchedDataset, get_dataset
 from data_forge.io.export import export_all
 from data_forge.meta import SourceMeta, combine_meta
 from data_forge.provenance import splice_preliminary
@@ -51,9 +51,12 @@ def _load_base(ds: Dataset, *, refresh: bool = False) -> tuple[pl.DataFrame, Sou
 
 
 def _upstream_frames(
-    ds: StitchedDataset, *, refresh: bool
+    ds: StitchedDataset | ProjectedDataset, *, refresh: bool
 ) -> tuple[list[pl.DataFrame], list[SourceMeta]]:
-    """派生データセットの各 upstream を fetch→clean し、フレーム群とメタ群を返す。"""
+    """派生データセットの各 upstream を fetch→clean し、フレーム群とメタ群を返す。
+
+    縫合（combine 系 else 節）・射影の両フローが共通で使う fetch→clean の前段。
+    """
     frames: list[pl.DataFrame] = []
     metas: list[SourceMeta] = []
     for key in ds.upstreams:
@@ -101,10 +104,10 @@ def _combine_atoms(ds: StitchedDataset, *, refresh: bool) -> tuple[pl.DataFrame,
     return combine_years(atom_frames, mode="union", grain=ds.grain), metas
 
 
-def _load_composite(
+def _load_stitched(
     ds: StitchedDataset, *, refresh: bool, join: str, base_year: int | None
 ) -> tuple[pl.DataFrame, SourceMeta]:
-    """派生（複数年結合）データセットを upstream 合成して返す（3系統に分岐）。"""
+    """縫合（複数年を year 軸で結合）データセットを upstream 合成して返す（3系統に分岐）。"""
     if join in _TIME_ROLLUP_JOINS:
         # 時間軸＝合併集約（events 依存）。crosswalk=畳まず後継コード列同梱 / base=畳んで確定。
         atom_fact, metas = _combine_atoms(ds, refresh=refresh)
@@ -124,6 +127,17 @@ def _load_composite(
     if ds.preliminary_upstreams:
         # 確定ビュー確定後の後段で速報を継ぎ足す（area 集約=共有ハブは無改修）。
         df, metas = _splice_preliminary(ds, df, metas, refresh=refresh)
+    return df, combine_meta(metas, title=ds.title)
+
+
+def _load_projected(ds: ProjectedDataset, *, refresh: bool) -> tuple[pl.DataFrame, SourceMeta]:
+    """射影（既製時系列を area 軸で union）データセットを合成して返す。
+
+    upstream は各々全年を持つ disjoint な area パーティション。年の縫合・合併集約・速報 splice は
+    無く、union_areas で縦積みするだけ（combine_years の重機構も area master も通さない）。
+    """
+    frames, metas = _upstream_frames(ds, refresh=refresh)
+    df = union_areas(frames, grain=ds.grain)
     return df, combine_meta(metas, title=ds.title)
 
 
@@ -155,21 +169,24 @@ def _splice_preliminary(
 
 
 def _load(
-    ds: Dataset | StitchedDataset, args: argparse.Namespace
+    ds: Dataset | StitchedDataset | ProjectedDataset, args: argparse.Namespace
 ) -> tuple[pl.DataFrame, SourceMeta]:
-    """基底/派生を判別して配布用 DF と出典メタを返す。"""
+    """基底/縫合/射影を判別して配布用 DF と出典メタを返す。"""
     if isinstance(ds, StitchedDataset):
-        return _load_composite(
+        return _load_stitched(
             ds,
             refresh=args.refresh,
             join=args.join or ds.default_join,
             base_year=args.base_year,
         )
+    if isinstance(ds, ProjectedDataset):
+        # 射影フローは正規化モードを持たない（--join / base_year は無視）。
+        return _load_projected(ds, refresh=args.refresh)
     return _load_base(ds, refresh=args.refresh)
 
 
-def _cmd_fetch(ds: Dataset | StitchedDataset, args: argparse.Namespace) -> None:
-    if isinstance(ds, StitchedDataset):
+def _cmd_fetch(ds: Dataset | StitchedDataset | ProjectedDataset, args: argparse.Namespace) -> None:
+    if isinstance(ds, StitchedDataset | ProjectedDataset):
         for key in ds.upstreams:
             _cmd_fetch(get_dataset(key), args)
         return
@@ -179,13 +196,13 @@ def _cmd_fetch(ds: Dataset | StitchedDataset, args: argparse.Namespace) -> None:
     print(f"[fetch] {ds.key}: statsDataId={stats_data_id} → {n:,} 行をキャッシュ")
 
 
-def _cmd_clean(ds: Dataset | StitchedDataset, args: argparse.Namespace) -> None:
+def _cmd_clean(ds: Dataset | StitchedDataset | ProjectedDataset, args: argparse.Namespace) -> None:
     df, _ = _load(ds, args)
     print(f"[clean] {ds.key}: {df.height:,} 行 / {df.width} 列")
     print(df.head(10))
 
 
-def _cmd_export(ds: Dataset | StitchedDataset, args: argparse.Namespace) -> None:
+def _cmd_export(ds: Dataset | StitchedDataset | ProjectedDataset, args: argparse.Namespace) -> None:
     df, src_meta = _load(ds, args)
     outputs = export_all(
         df,
@@ -200,9 +217,14 @@ def _cmd_export(ds: Dataset | StitchedDataset, args: argparse.Namespace) -> None
 
 
 def _composite_atoms(
-    ds: Dataset | StitchedDataset, args: argparse.Namespace
+    ds: Dataset | StitchedDataset | ProjectedDataset, args: argparse.Namespace
 ) -> tuple[pl.DataFrame, pl.DataFrame, pl.DataFrame]:
     """area 支援ツール用に、アトム時系列・全国行・実効イベントを構築して返す。"""
+    if isinstance(ds, ProjectedDataset):
+        # 射影フローは area master 非依存（合併集約を持たない）＝area 検査の対象外。
+        raise SystemExit(
+            f"{ds.key!r} は射影（area master 非依存）データセットで、area 検査の対象外です"
+        )
     if not isinstance(ds, StitchedDataset):
         raise SystemExit(f"{ds.key!r} は派生（時系列）データセットではありません")
     # national 行だけ別途要る（人口保存検査用）ので _atom_upstreams を直接呼ぶ。
@@ -211,7 +233,9 @@ def _composite_atoms(
     return atom_fact, national, area_events.load_events()
 
 
-def _cmd_area_orphans(ds: Dataset | StitchedDataset, args: argparse.Namespace) -> None:
+def _cmd_area_orphans(
+    ds: Dataset | StitchedDataset | ProjectedDataset, args: argparse.Namespace
+) -> None:
     """base_year に届かない消滅アトム（＝合併イベント未整備）を一覧＝次に埋める候補。"""
     atom_fact, _, events = _composite_atoms(ds, args)
     rep = area_reconcile.orphans(atom_fact, events, base_year=args.base_year)
@@ -221,7 +245,9 @@ def _cmd_area_orphans(ds: Dataset | StitchedDataset, args: argparse.Namespace) -
         print(rep)
 
 
-def _cmd_area_check(ds: Dataset | StitchedDataset, args: argparse.Namespace) -> None:
+def _cmd_area_check(
+    ds: Dataset | StitchedDataset | ProjectedDataset, args: argparse.Namespace
+) -> None:
     """人口保存（各年 アトム合計==全国total）と孤児アトム件数を検証。"""
     atom_fact, national, events = _composite_atoms(ds, args)
     cons = area_reconcile.national_conservation(atom_fact, national)

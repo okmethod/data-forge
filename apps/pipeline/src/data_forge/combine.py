@@ -64,6 +64,21 @@ def combine_years(
     return out.sort(sort_keys)
 
 
+def union_areas(frames: list[pl.DataFrame], *, grain: Sequence[str] = GRAIN) -> pl.DataFrame:
+    """既製の時系列フレーム群を area 軸で縦結合する（射影フロー＝ProjectedDataset）。
+
+    各フレームは既に全年を持つ disjoint な area パーティション（例: 全国＋都道府県）。
+    combine_years と違い年の縫合はせず単純 union する。`grain` の重複は「パーティションが
+    disjoint でない（同一キーが複数 upstream に）」ことの検出に使い、combine_years(union) と
+    同一の sort キーで整列する（＝disjoint 入力なら両者は出力等価）。
+    """
+    grain = list(grain)
+    df = pl.concat(frames, how="vertical")
+    _assert_grain(df, grain)
+    sort_keys = ["area_code", "year", *(c for c in grain if c not in ("area_code", "year"))]
+    return df.sort(sort_keys)
+
+
 def _assert_grain(df: pl.DataFrame, grain: list[str]) -> None:
     """grain 列群の組で重複が無いことを保証する。
 
