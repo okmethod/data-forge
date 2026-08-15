@@ -27,3 +27,10 @@ data-forge/
 └── docs/
     └── sources/    # データソースカタログ（商用可否・利用規約）
 ```
+
+## 参照先（正典はここを見る／CLAUDE.md には再掲しない＝ドリフト防止）
+
+- **コマンド・使い方**: [apps/pipeline/README.md](apps/pipeline/README.md) の「使い方」（poe タスク一覧は `apps/pipeline/pyproject.toml` の `[tool.poe.tasks]`）
+  - lint + test（最頻・CI 相当）: `cd apps/pipeline && uv run poe check`
+- **データセット仕様・一覧**: [docs/README.md](docs/README.md) を索引の正典とし、各 `docs/datasets/<name>.md` が個別の正典
+- **各段の内部設計**: 当該パッケージの `__init__.py` docstring が正典

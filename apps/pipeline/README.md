@@ -37,6 +37,9 @@ uv run poe run population_2020 --refresh
 # 開発タスク
 uv run poe check   # lint + test（CI相当）
 # その他については pyproject.toml の [tool.poe.tasks] 参照。
+
+# 探索: 帳票（statsDataId）を e-Stat から検索する（データセット非依存。詳細は --help）
+uv run data-forge estat-search --word 年齢 --limit 50
 ```
 
 ---
@@ -59,7 +62,7 @@ uv run poe check   # lint + test（CI相当）
 ```text
 data_forge/
 │   # 入口・レジストリ
-├── cli.py          # 入口：引数解析＋コマンド dispatch（fetch/clean/export/run/area-*）
+├── cli.py          # 入口：引数解析＋コマンド dispatch（本流 fetch/clean/export/run・支援 area-*/estat-search）
 ├── datasets.py     # レジストリ：何を・どの型で作るか（Dataset ＋ 派生2型）
 │
 │   # 共有の下地（段に属さず、各段が一方向に参照する中立層）

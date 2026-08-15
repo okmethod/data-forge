@@ -16,6 +16,7 @@
 
 import argparse
 import sys
+from typing import Any
 
 import polars as pl
 
@@ -25,6 +26,7 @@ from data_forge.area.history import ingest as area_ingest
 from data_forge.datasets import Dataset, ProjectedDataset, StitchedDataset, get_dataset
 from data_forge.output import export_all
 from data_forge.sources.estat import fetch as estat_fetch
+from data_forge.sources.estat.client import get_stats_list
 
 # NOTE: 現状ソースは e-Stat 固定。
 # 複数ソース対応（Source プロトコル + dispatch）はPhase 2 で導入する。
@@ -112,6 +114,53 @@ def _cmd_area_ingest(args: argparse.Namespace) -> None:
     print(ev.group_by("kind").len().sort("len", descending=True))
 
 
+def _estat_field(value: Any) -> str:
+    """e-Stat のフィールドは {"$": 値} の dict にも素の値にもなり得るため吸収する。"""
+    if isinstance(value, dict):
+        return str(value.get("$", ""))
+    return "" if value is None else str(value)
+
+
+def _cmd_estat_search(args: argparse.Namespace) -> None:
+    """帳票リスト（getStatsList）を検索し、statsDataId と表題を端末へ一覧表示する。
+
+    探索専用の使い捨てツール。目当ての statsDataId を突き止めたら docs へ手で記録する。
+    キャッシュや docs 生成はしない（正典は docs/datasets/ 側）。
+    """
+    tables = get_stats_list(
+        stats_code=args.stats_code,
+        search_word=args.word,
+        survey_years=args.survey_years,
+        search_kind=args.search_kind,
+        limit=args.limit,
+    )
+    cond = ", ".join(
+        f"{k}={v}"
+        for k, v in (
+            ("statsCode", args.stats_code),
+            ("word", args.word),
+            ("surveyYears", args.survey_years),
+        )
+        if v is not None
+    )
+    # e-Stat は表題の部分一致で同一 statsDataId を複数回返すため id 単位で畳む
+    seen: set[str] = set()
+    lines: list[str] = []
+    for t in tables:
+        stats_data_id = _estat_field(t.get("@id"))
+        if stats_data_id in seen:
+            continue
+        seen.add(stats_data_id)
+        title = _estat_field(t.get("TITLE")) or _estat_field(t.get("STATISTICS_NAME"))
+        survey = _estat_field(t.get("SURVEY_DATE"))
+        rows = _estat_field(t.get("OVERALL_TOTAL_NUMBER"))
+        lines.append(f"  {stats_data_id}  {survey:>8}  {title}（行数: {rows}）")
+
+    print(f"[estat-search] {len(lines)} 件" + (f"（{cond}）" if cond else ""))
+    for line in lines:
+        print(line)
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="data-forge", description="公的データ精製パイプライン")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -127,6 +176,22 @@ def build_parser() -> argparse.ArgumentParser:
         help="生CSVのエンコーディング（既定 utf8。Shift-JIS 版なら shift-jis）",
     )
     pi.set_defaults(handler=lambda ds, args: _cmd_area_ingest(args))
+
+    # 帳票リスト検索（getStatsList）＝目当ての statsDataId を探す探索ツール
+    ps = sub.add_parser("estat-search", help="帳票リストを検索し statsDataId を一覧表示")
+    ps.add_argument("--stats-code", default=None, help="政府統計コード（例: 00200521=国勢調査）")
+    ps.add_argument("--word", default=None, help="検索キーワード（searchWord。AND/OR 可）")
+    ps.add_argument(
+        "--survey-years", default=None, help="調査年（yyyy / yyyymm / yyyymm-yyyymm 範囲）"
+    )
+    ps.add_argument(
+        "--search-kind",
+        type=int,
+        default=None,
+        help="検索種別（1=統計情報 既定, 2=小地域/メッシュ）",
+    )
+    ps.add_argument("--limit", type=int, default=None, help="取得件数の上限")
+    ps.set_defaults(handler=lambda ds, args: _cmd_estat_search(args))
 
     handlers = {
         "fetch": _cmd_fetch,
