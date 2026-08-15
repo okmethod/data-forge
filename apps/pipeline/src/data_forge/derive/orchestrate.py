@@ -18,8 +18,8 @@ from data_forge.area import aggregate as area_aggregate
 from data_forge.area import atoms as area_atoms
 from data_forge.area import events as area_events
 from data_forge.area import spatial_rollup as area_spatial
-from data_forge.combine import combine_years, union_areas
 from data_forge.datasets import Dataset, ProjectedDataset, StitchedDataset, get_dataset
+from data_forge.derive.combine import combine_years, union_areas
 from data_forge.meta import SourceMeta, combine_meta
 from data_forge.provenance import splice_preliminary
 from data_forge.sources.estat import fetch as estat_fetch

@@ -1,4 +1,4 @@
-"""出力共通層（io/export）の出典表記（citation）担保テスト。
+"""出力共通層（output/export）の出典表記（citation）担保テスト。
 
 全成果物に citation が同梱されること、および欠けた場合に
 _verify_attribution が例外で出荷を止めることを検証する。
@@ -11,8 +11,8 @@ import duckdb
 import polars as pl
 import pytest
 
-from data_forge.io import export
 from data_forge.meta import SourceMeta
+from data_forge.output import export
 
 _META = SourceMeta(
     source="estat",

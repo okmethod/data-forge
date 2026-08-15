@@ -53,35 +53,39 @@ uv run poe check   # lint + test（CI相当）
 
 ## アーキテクチャ
 
-```
-cli.py  ─ orchestration（fetch / clean / export / run、基底/派生を判別）
-  ├─ datasets.py ─ レジストリ（Dataset / CompositeDataset）
-  ├─ sources/estat/ ─ ソース固有層
-  │     client.py    … getStatsData 呼び出し・ページング（汎用）
-  │     fetch.py     … raw JSON 取得＋ data/raw/ キャッシュ
-  │     transform.py … star schema → tidy DF（汎用）＋ extract_meta（出典生成）
-  │     population.py … 人口固有クレンジング（clean_population 1本＋年ごと設定で3変種を吸収）
-  ├─ combine.py ─ 派生合成層（複数年結合＝時系列化。union/intersection/grid ＋ 粒度ガード）
-  ├─ area/ ─ 地域参照層（実装済み・アトム軸スタースキーマ）データセット非依存の地域マスタ（コード軸=JIS。ソース非依存ではない）
-  │     atoms.py    … 各年の area 階層 → 「標準的な市区町村」による最finest分割（アトム=fact 層）
-  │     events.py   … 実効合併イベント＝parsed ⊕ overrides（old_code/successor_code/year/kind）
-  │     mapping.py  … rollup: 施行年≤base_year のイベントを推移閉包で畳み code→base_code
-  │     aggregate.py… 時間軸の合併集約。attach_crosswalk: 畳まず base_code/base_name 列を同梱（10列）／aggregate_to_base: それを base_code で合算＝基準年へ合併集約（8列）
-  │     spatial_rollup.py… 空間軸の行政集約。aggregate_to_admin: 県プレフィックスで都道府県/地方ブロックへ上位集約（events 非依存・aggregate と直交）
-  │     reconcile.py… 人口保存チェック＋孤児アトム検出＝ area-check / area-orphans（堀の駆動）
-  │     history/ingest.py … 廃置分合CSV → 正規化イベント（events_parsed）。列仕様は実物CSVで確定（TODO）
-  │     seeds/      … events_overrides の「ひな形」CSV（.example）。実データは data/area/（.gitignore＝堀）
-  ├─ io/export.py ─ 出力共通層（DF → parquet / csv / sqlite ＋ メタ埋め込み）
-  ├─ meta.py   ─ SourceMeta（ソース非依存）＋ combine_meta（複数ソース束ね）
-  └─ config.py ─ 設定・パス解決
+段レベルの俯瞰のみを示す。  
+各段の内部ファイルの役割は当該パッケージの `__init__.py` docstring を正典とする。
+
+```text
+data_forge/
+│   # 入口・レジストリ
+├── cli.py          # 入口：引数解析＋コマンド dispatch（fetch/clean/export/run/area-*）
+├── datasets.py     # レジストリ：何を・どの型で作るか（Dataset ＋ 派生2型）
+│
+│   # 共有の下地（段に属さず、各段が一方向に参照する中立層）
+├── meta.py         # SourceMeta：出典 citation を運ぶソース非依存の出力契約型
+├── provenance.py   # data_status：行の確からしさ（確定/速報）を表す来歴語彙
+├── config.py       # 設定・パス解決
+├── area/           # 参照データ：合併集約の材料（アトム軸・データセット非依存）
+│
+│   # パイプライン段（取得 → 合成 → 出力）
+├── sources/        # ① 取得＋クレンジング（ソース固有）
+│   └── estat/
+├── derive/         # ② 合成（派生データセット）
+└── output/         # ③ 出力（DF→parquet/csv/sqlite/duckdb＋メタ埋め込み）
 ```
 
-**依存の向きの原則:** `sources/*`（ソース固有）・`io/*`（出力）・`combine.py`（合成）・
-`area/`（地域参照）は互いに依存せず、共通型 `meta.py`・共通の出力スキーマにのみ依存する。
+> **派生の2フロー（縫合 / 射影）:** `derive/combine.py` は縫合（`combine_years`）と射影（`union_areas`）の
+> 両変換を持ち、`derive.load` が基底 / 縫合（`StitchedDataset`）/ 射影（`ProjectedDataset`）を判別して配線する。
+> **縫合**＝各回帳票（年ごと別 statsDataId）を year 軸で結合し合併畳込 等を通す既存フロー。
+> **射影**＝e-Stat 既製の時系列帳票（1 ID が全年）を area 軸で union するだけの最小フロー（area master 不要）。
+
+**依存の向きの原則:** `sources/*`（取得）・`output/*`（出力）・`derive/combine`（純変換）・
+`area/`（参照）は互いに依存せず、共通型 `meta.py`・共通の出力スキーマにのみ依存する。
 とくに `combine`（縦結合）と `area.aggregate`（基準年集約）は相互に依存させず、
-オーケストレーション（`cli.py`）が clean→combine→area.aggregate と順に配線する
+`derive/orchestrate` が clean→combine→area.aggregate と順に配線する
 （集約を `combine` に埋め込むと合成層が特定の参照データ＝area に縛られ本質軸がブレるため、意図的に分離）。
-出典表記（citation）は各ソースが規約に沿って生成する責務を持ち、`io/export` は書き出すだけ（出力層はソース非依存）。
+出典表記（citation）は各ソースが規約に沿って生成する責務を持ち、`output/export` は書き出すだけ（出力層はソース非依存）。
 
 > **`area/` の非依存性の範囲（注意）:** 確実なのは**データセット非依存**（population 固有でない）まで。
 > **ソース非依存ではない**——アトム抽出は各ソースの area 表現に依存する（今は e-Stat の area 階層前提）。
@@ -96,7 +100,8 @@ cli.py  ─ orchestration（fetch / clean / export / run、基底/派生を判�
 | e-Stat の別データセット追加 | `sources/estat/` に `cleaner` を1つ書き、`datasets.py` に1エントリ                                                     |
 | データセット固有パラメータ  | `Dataset.source_params`（ソース語彙をここに閉じ込める）                                                                |
 | 出典メタの項目追加          | `meta.py` の `SourceMeta` / 各ソースの `extract_meta`                                                                  |
-| 複数年/複数表の結合         | `datasets.py` に `CompositeDataset` を1エントリ（`combine` を再利用）                                                  |
+| 複数年を結合（縫合）        | `datasets.py` に `StitchedDataset` を1エントリ（`combine_years` を再利用）                                             |
+| 既製の時系列を取込（射影）  | `datasets.py` に `ProjectedDataset` を1エントリ（`union_areas` を再利用）                                              |
 | 合併の後継対応を追加/修正   | `data/area/events_overrides.csv` に1行足す（`area-orphans`/`area-check` で支援。コード変更不要）                       |
 | 地域正規化した時系列を出す  | `area.aggregate.aggregate_to_base` に `events`・`base_year` を渡す（既存 union 等は生モードで併存）                    |
 | 畳む/畳まないを固定せず出す | `--join crosswalk`＝`attach_crosswalk` で `base_code`/`base_name` 列を同梱（利用者が `GROUP BY base_code` で任意集約） |
@@ -105,12 +110,12 @@ cli.py  ─ orchestration（fetch / clean / export / run、基底/派生を判�
 
 原則は **「実例が2つ揃ってから抽象化する」**（対応する実作業とセットで導入し、逆依存など明確な欠陥だけ前倒し）。
 
-| Phase | トリガー            | 対応内容                                                                                                                                |
-| ----- | ------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| **1** | 2つ目のデータセット | 地域コード正規化の共通層／年度パラメータ化／バリデーション規則                                                                          |
-| **2** | 2つ目のデータソース | `Source` プロトコル確定＋ `cli.py` を registry dispatch へ。併せて各ソースの生レスポンスを Pydantic で検証／設定は pydantic-settings 化 |
-| **3** | D1 / R2 配信        | Exporter レジストリ化（フォーマットと transport の分離）                                                                                |
-| **4** | データセット合成    | ✅ `CompositeDataset` + `combine.py` で着手済み（複数年結合）。汎用の依存グラフ化は3例目が出てから                                      |
+| Phase | トリガー            | 対応内容                                                                                                                                                   |
+| ----- | ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **1** | 2つ目のデータセット | 地域コード正規化の共通層／年度パラメータ化／バリデーション規則                                                                                             |
+| **2** | 2つ目のデータソース | `Source` プロトコル確定＋ `cli.py` を registry dispatch へ。併せて各ソースの生レスポンスを Pydantic で検証／設定は pydantic-settings 化                    |
+| **3** | D1 / R2 配信        | Exporter レジストリ化（フォーマットと transport の分離）                                                                                                   |
+| **4** | データセット合成    | ✅ 派生2型（`StitchedDataset` 縫合 / `ProjectedDataset` 射影）＋ `derive/`（`combine_years`/`union_areas`）で着手済み。汎用の依存グラフ化は3例目が出てから |
 
 > **直近の着手確定タスク（トリガー待ちではない）:** 地域マスタ（アトム軸スタースキーマ）による**合併集約**。
 > これは新 Phase ではなく **Phase 4（データセット合成）の深化**——`combine` の正規化モードを
@@ -120,7 +125,7 @@ cli.py  ─ orchestration（fetch / clean / export / run、基底/派生を判�
 
 **Phase 1 の実地知見:** 同名「男女別人口」でも 2015 と 2020 で e-Stat のスキーマ設計が全く異なった
 （tab軸の有無・男女軸の位置）。そのため「入力パースの共通化」ではなく **年ごとの cleaner が
-共通の出力スキーマへ写像し、結合層（`combine.py`）で地域正規化する**構成に落ち着いた。
+共通の出力スキーマへ写像し、結合層（`derive/combine.py`）で地域正規化する**構成に落ち着いた。
 crosswalk（合併の後継自治体への集約）は Phase 4 の深化として実装済み。fact は各年の「標準的な
 市区町村」による最finest分割（アトム）に固定し、外部データが要るのは合併の後継対応（events）のみ
 ——parsed（廃置分合CSV）で埋め、埋まらない箇所だけを人手 overrides（堀）に閉じ込める

@@ -6,7 +6,7 @@ union / intersection / grid の各正規化モードと、二重計上を防ぐ�
 import polars as pl
 import pytest
 
-from data_forge.combine import combine_years, union_areas
+from data_forge.derive import combine_years, union_areas
 
 # 共通スキーマの最小フレーム。地域Aは両年、Bは2015のみ、Cは2020のみ（sexは総数だけ）。
 _2015 = pl.DataFrame(

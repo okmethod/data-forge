@@ -2,7 +2,7 @@
 
 出力物に同梱する出典情報を、特定のデータソースに依存しない形で表す。
 `citation`（出典表記）は各ソースが自身の利用規約に沿って組み立てる責務を持ち、
-共通層（io/export）はこの型を受け取って書き出すだけにする。
+共通層（output/export）はこの型を受け取って書き出すだけにする。
 """
 
 from dataclasses import dataclass, field

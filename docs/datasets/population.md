@@ -123,7 +123,7 @@ uv run data-forge run population_timeseries --join grid          # 欠損をnull
 - 速報は最新境界＝合併 rollup 不要なので、確定を集約し終えた**後段**で継ぎ足す（`provenance.splice_preliminary`）。area 集約（共有ディメンション）は無改修。
 - **area scope 自動追従**: 速報表は全国/県/市区町村が混在するが、splice 前に確定ビューに既に在る `area_code` へ intersection scoping する。よって県ビューには県行だけ、市区町村ビューには市区町村行だけが残る（レベル混在・二重計上を防ぐ）。2020→2025 の境界変更で確定側に無い 2025 コードは coverage gap として落ちる（市区町村ビューで全国比 約99.85%、過大計上ではない）。
 - **配布物の利用者は `data_status` を必読**。この列を無視すると速報行を確定と誤認する。
-- 実装: 来歴語彙・検証・splice は [src/data_forge/provenance.py](../../apps/pipeline/src/data_forge/provenance.py)、合成配線は `CompositeDataset.preliminary_upstreams` と cli `_splice_preliminary`。
+- 実装: 来歴語彙・検証・splice は [src/data_forge/provenance.py](../../apps/pipeline/src/data_forge/provenance.py)、合成配線は `StitchedDataset.preliminary_upstreams` と `derive._splice_preliminary`。
 
 > 速報は令和7年国勢調査「人口速報集計」（statsDataId `0004050397`、2020 と同型の令和型）。
 > 単体 `population_2025_preliminary` は全国/県/市区町村の8列（`data_status` 無し）を出力する。

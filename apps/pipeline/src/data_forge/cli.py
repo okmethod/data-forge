@@ -23,7 +23,7 @@ from data_forge import config, derive
 from data_forge.area import reconcile as area_reconcile
 from data_forge.area.history import ingest as area_ingest
 from data_forge.datasets import Dataset, ProjectedDataset, StitchedDataset, get_dataset
-from data_forge.io.export import export_all
+from data_forge.output import export_all
 from data_forge.sources.estat import fetch as estat_fetch
 
 # NOTE: 現状ソースは e-Stat 固定。
