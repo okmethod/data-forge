@@ -1,0 +1,6 @@
+name: census_age5
+type: sqlite
+options:
+  # 年齢5歳階級×男女別人口（全国・都道府県／1920〜2020）。市区町村は持たない（ソース非対称）。
+  # 3区分版は census_age_prefecture / census_age_city 側。data/ は非コミットのためローカル出力前提。
+  filename: ../../../../data/processed/census_population_by_age5_timeseries.sqlite

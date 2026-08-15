@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
 
 /**
  * 各ページの見え方チェック。
@@ -9,7 +9,7 @@ import { test, expect } from "@playwright/test";
  */
 
 // 指定枚数の ECharts canvas が描画されるまで待つ（初回コンパイルが重いページ向けに長め）。
-async function waitCharts(page, n: number) {
+async function waitCharts(page: Page, n: number) {
   await page.waitForFunction((min) => document.querySelectorAll("canvas").length >= min, n, {
     timeout: 45_000,
   });
@@ -42,9 +42,10 @@ test("人口ページ（全国→県→サンプル市）が描画される", as
 
 test("年齢構成ページが描画される", async ({ page }) => {
   await page.goto("/aging", { waitUntil: "networkidle" });
-  await waitCharts(page, 4);
+  await waitCharts(page, 6);
 
   await expect(page.getByRole("heading", { name: "全国：高齢化率の推移" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /5歳階級で見る一世紀/ })).toBeVisible();
   await expect(page.getByRole("heading", { name: /高齢化率ランキング/ })).toBeVisible();
   await expect(page.getByRole("heading", { name: "サンプル市：千葉県印西市" })).toBeVisible();
 

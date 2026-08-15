@@ -52,6 +52,76 @@ sidebar_position: 2
 
 ---
 
+## 全国：5歳階級で見る一世紀（1920〜2020）
+
+**この節だけ**別のデータセットに切り替える（上までの年齢3区分とは出所が異なり、次の「都道府県の偏在」以降は再び3区分に戻る）。
+
+データセット: **年齢5歳階級（0〜4／5〜9／…／85歳以上）×男女別人口** — 1920〜2020年・全21回分  
+出所: e-Stat 国勢調査 時系列データ「年齢（5歳階級），男女別人口及び人口性比」（全国／都道府県の2表）
+
+このデータセットは、同じ「年齢構成」でも上の3区分とは**粒度・年範囲・精製上の扱い**が異なる。デモとして、その差を明示しておく。
+
+- **粒度は都道府県まで（市区町村なし）。** 市区町村の綺麗な5歳階級 長期時系列は e-Stat に存在しない（各回調査ごとに表の設計が違い、経年で接続できない）。市区町村まで下りるのは3区分だけ。→ 印西市の年齢構成は3区分で後述する。
+- **その代わり1920年まで遡れる。** 3区分表は1980年からだが、この5歳階級表は**一世紀（21回）**をカバーする。
+- **年齢の上限は「85歳以上」に統一。** 全国表はさらに細分（85〜89…110歳以上）を持つが、都道府県表は85歳以上止まり。両者を突き合わせられるよう85歳以上を終端に揃えた。
+- **年齢不詳は「総数 −（5歳階級の合計）」で補って明示。** 元表に年齢不詳の欄が無い一方、近年は不詳が無視できない（2020年で全国 895 万人）。`5歳階級の合計 ＋ 不詳 ＝ 総数`が全年・全地域で閉じるよう、精製時に不詳を導出して行に足している。
+
+### 高齢化率の超長期推移
+
+1920年の **5.3%** から一貫して上昇し、戦後に急勾配となって2020年は 25.0%。
+
+```sql aging_national_age5
+  select
+    year,
+    round(
+      sum(case when age_class_code in ('250','260','280','290','310') then population end) * 100.0
+      / sum(case when age_class_code not in ('100','999') then population end)
+    , 1) as aging_pct
+  from census_age5.by_age5
+  where area_code = '00000' and sex_code = '0'
+  group by year
+  order by year
+```
+
+<LineChart data={aging_national_age5} x=year y=aging_pct title="全国 高齢化率（％・5歳階級ベース 1920〜2020）" yFmt="0.0" yMin=0 yMax=40 xType=category />
+
+> **注:** 同じ2020年でも高齢化率は本節（25.0%）と上の3区分ベース（28.7%）でズレる。5歳階級表のほうが
+> 年齢不詳が多く（上記）、不詳を分母から除くと分子（65歳以上）が相対的に小さく出るため。
+> **厳密な高齢化率は3区分ベースを正とし**、本節は一世紀の**形の変化**を見るためのもの。
+
+### 年齢ピラミッド（男女×5歳階級）
+
+**1920年の富士山型 → 2020年の壺型**という一世紀の人口転換が、5歳階級のピラミッドで形として分かる
+（縦軸は同スケール＝±500万人で、総人口 5,596 万→1億2,615 万の拡大も同時に読める）。
+
+```sql pyramid_1920_national
+  select
+    age_class,
+    sex,
+    case when sex_code = '1' then -population else population end as pop
+  from census_age5.by_age5
+  where area_code = '00000' and sex_code in ('1','2')
+    and age_class_code not in ('100','999') and year = 1920
+  order by age_class_code desc
+```
+
+<BarChart data={pyramid_1920_national} title="全国 年齢5歳階級×男女（1920年）左=男 / 右=女" x=age_class y=pop series=sex swapXY=true type=stacked sort=false yMin=-5000000 yMax=5000000 />
+
+```sql pyramid_2020_national
+  select
+    age_class,
+    sex,
+    case when sex_code = '1' then -population else population end as pop
+  from census_age5.by_age5
+  where area_code = '00000' and sex_code in ('1','2')
+    and age_class_code not in ('100','999') and year = 2020
+  order by age_class_code desc
+```
+
+<BarChart data={pyramid_2020_national} title="全国 年齢5歳階級×男女（2020年）左=男 / 右=女" x=age_class y=pop series=sex swapXY=true type=stacked sort=false yMin=-5000000 yMax=5000000 />
+
+---
+
 ## 都道府県の偏在：高齢化率ランキング（2020）
 
 **秋田（37.6%）を筆頭に東北・山陰・四国が高く**、沖縄（22.6%）・東京（22.8%）・愛知など
