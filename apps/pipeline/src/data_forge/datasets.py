@@ -11,7 +11,7 @@ from typing import Any
 
 import polars as pl
 
-from data_forge.sources.estat import daynight, population
+from data_forge.sources.estat import age5, daynight, population
 
 
 @dataclass(frozen=True)
@@ -327,6 +327,42 @@ DATASETS: dict[str, Dataset | CompositeDataset] = {
         index_columns=["area_code", "daynight_code", "year"],
         grain=["area_code", "daynight_code", "year"],
         default_join="prefecture",
+    ),
+    # === population_by_age5（年齢5歳階級×男女別人口）============================
+    # 時系列データ製品「年齢（5歳階級），男女別人口及び人口性比」（全国 0003410380 /
+    # 都道府県 0003410381、1920〜2020）。population_by_age（3区分）と違い年ごとの連番ではなく
+    # 単一 ID で一世紀を提供＝cleaner は各表 1 個・合併なし＝area master 不要の低コスト fact。
+    # 2表は軸同型で差は「全国表は area 軸なし→合成／全国のみ85+を細分」だけ（age5.py 参照）。
+    "population_by_age5_national": Dataset(
+        key="population_by_age5_national",
+        source="estat",
+        source_params={"stats_data_id": "0003410380"},
+        cleaner=age5.clean_national,
+        stem="census_population_by_age5_national",
+        table_name="population_by_age5",
+        index_columns=["sex_code", "age_class_code", "year"],
+    ),
+    "population_by_age5_prefecture": Dataset(
+        key="population_by_age5_prefecture",
+        source="estat",
+        source_params={"stats_data_id": "0003410381"},
+        cleaner=age5.clean_prefecture,
+        stem="census_population_by_age5_prefecture",
+        table_name="population_by_age5",
+        index_columns=["area_code", "sex_code", "age_class_code", "year"],
+    ),
+    # 派生: 全国＋47都道府県を area 軸で縦結合した 1920〜2020 の 5歳階級時系列（配布正典）。
+    # 各 upstream が既に全年を持つため結合軸は year ではなく area（disjoint な 00000＋47県）＝
+    # 単純 union（合併 rollup 不要＝area master を通さない）。grain に age_class_code を持つ。
+    "population_by_age5_timeseries": CompositeDataset(
+        key="population_by_age5_timeseries",
+        upstreams=["population_by_age5_national", "population_by_age5_prefecture"],
+        title="国勢調査 年齢5歳階級×男女別人口 全国・都道府県別時系列（1920年〜2020年 5年間隔）",
+        stem="census_population_by_age5_timeseries",
+        table_name="population_by_age5",
+        index_columns=["area_code", "sex_code", "age_class_code", "year"],
+        grain=["area_code", "sex_code", "age_class_code", "year"],
+        default_join="union",  # 全国＋県は area disjoint＝縦積みのみ（合併集約なし）
     ),
 }
 
