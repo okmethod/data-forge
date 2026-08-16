@@ -1,0 +1,6 @@
+name: census_industry
+type: sqlite
+options:
+  # 産業(大分類)，男女別就業者数（全国 1995〜2020 ／都道府県 2005〜2020）。市区町村は持たない（就業状態等基本集計・単一 ID 時系列）。
+  # 全国 0003410395 ＋ 都道府県 0003410398 を union した配布正典。data/ は非コミットのためローカル出力前提。
+  filename: ../../../../data/processed/census_industry_timeseries.sqlite
