@@ -10,6 +10,9 @@
 - 派生（縫合／射影）フローの汎用意味論 … 下記 StitchedDataset / ProjectedDataset の docstring
 
 本ファイルのコメントは「そのエントリ固有の判断（なぜこの cleaner/join/grain か）」に絞る。
+
+レジストリはファミリー単位のサブ辞書（_POPULATION 等）に分け、末尾の DATASETS で束ねる。
+サブ辞書の区切りは cleaner モジュール／table_name のまとまりに対応し、将来のファイル分割の縫い目でもある。
 """
 
 from collections.abc import Callable
@@ -88,10 +91,14 @@ class ProjectedDataset:
     grain: list[str] = field(default_factory=lambda: ["area_code", "sex_code", "year"])
 
 
-DATASETS: dict[str, Dataset | StitchedDataset | ProjectedDataset] = {
-    # === population（男女別人口）================================================
-    # 軸構造＝population.py docstring／statsDataId 一覧＝docs/datasets/population.md。
-    # 単年 Dataset（古い順）。cleaner は年（テーブル世代）ごとに別関数で同一8列へ写像する。
+# 各サブ辞書・DATASETS・get_dataset で共有するエントリ型。
+DatasetEntry = Dataset | StitchedDataset | ProjectedDataset
+
+
+# === population（男女別人口）================================================
+# 軸構造＝population.py docstring／statsDataId 一覧＝docs/datasets/population.md。
+# 単年 Dataset（古い順）。cleaner は年（テーブル世代）ごとに別関数で同一8列へ写像する。
+_POPULATION: dict[str, DatasetEntry] = {
     "population_1980": Dataset(
         key="population_1980",
         source="estat",
@@ -235,9 +242,13 @@ DATASETS: dict[str, Dataset | StitchedDataset | ProjectedDataset] = {
         default_join="prefecture",
         preliminary_upstreams=["population_2025_preliminary"],
     ),
-    # === population_by_age（年齢3区分×男女別人口）==============================
-    # 軸構造＝population.py（clean_population_by_age）／一覧＝docs/datasets/population_by_age.md。
-    # 全年同型のため cleaner は全年 1 個。年齢不詳は cleaner 側で導出注入する。
+}
+
+
+# === population_by_age（年齢3区分×男女別人口）==============================
+# 軸構造＝population.py（clean_population_by_age）／一覧＝docs/datasets/population_by_age.md。
+# 全年同型のため cleaner は全年 1 個。年齢不詳は cleaner 側で導出注入する。
+_POPULATION_BY_AGE: dict[str, DatasetEntry] = {
     **{
         f"population_by_age_{year}": Dataset(
             key=f"population_by_age_{year}",
@@ -282,9 +293,13 @@ DATASETS: dict[str, Dataset | StitchedDataset | ProjectedDataset] = {
         grain=["area_code", "sex_code", "age_class_code", "year"],
         default_join="prefecture",
     ),
-    # === daynight_population（昼夜間人口＝従業地・通学地集計）====================
-    # 軸構造＝daynight.py／一覧＝docs/datasets/daynight_population.md。
-    # 1990〜2020（1980/1985 は該当表なし）。grain は sex ではなく daynight_code。cleaner は全年 1 個。
+}
+
+
+# === daynight_population（昼夜間人口＝従業地・通学地集計）====================
+# 軸構造＝daynight.py／一覧＝docs/datasets/daynight_population.md。
+# 1990〜2020（1980/1985 は該当表なし）。grain は sex ではなく daynight_code。cleaner は全年 1 個。
+_DAYNIGHT_POPULATION: dict[str, DatasetEntry] = {
     **{
         f"daynight_population_{year}": Dataset(
             key=f"daynight_population_{year}",
@@ -327,9 +342,13 @@ DATASETS: dict[str, Dataset | StitchedDataset | ProjectedDataset] = {
         grain=["area_code", "daynight_code", "year"],
         default_join="prefecture",
     ),
-    # === population_by_age5(年齢5歳階級×男女別人口)============================
-    # 軸構造＝age5.py／一覧＝docs/datasets/population_by_age5.md。
-    # 単一 ID で一世紀を提供＝合併なし＝area master 不要。全国表は area 軸なし→合成（clean_national）。
+}
+
+
+# === population_by_age5（年齢5歳階級×男女別人口）============================
+# 軸構造＝age5.py／一覧＝docs/datasets/population_by_age5.md。
+# 単一 ID で一世紀を提供＝合併なし＝area master 不要。全国表は area 軸なし→合成（clean_national）。
+_POPULATION_BY_AGE5: dict[str, DatasetEntry] = {
     "population_by_age5_national": Dataset(
         key="population_by_age5_national",
         source="estat",
@@ -358,9 +377,13 @@ DATASETS: dict[str, Dataset | StitchedDataset | ProjectedDataset] = {
         index_columns=["area_code", "sex_code", "age_class_code", "year"],
         grain=["area_code", "sex_code", "age_class_code", "year"],
     ),
-    # === households（世帯の種類別 世帯数・世帯人員）==============================
-    # 軸構造＝households.py／一覧＝docs/datasets/households.md。
-    # 単一 ID に全国＋47都道府県＋全年を含む＝合併なし・射影不要で単独 Dataset 完結（sex 軸なし）。
+}
+
+
+# === households（世帯の種類別 世帯数・世帯人員）==============================
+# 軸構造＝households.py／一覧＝docs/datasets/households.md。
+# 単一 ID に全国＋47都道府県＋全年を含む＝合併なし・射影不要で単独 Dataset 完結（sex 軸なし）。
+_HOUSEHOLDS: dict[str, DatasetEntry] = {
     "households": Dataset(
         key="households",
         source="estat",
@@ -370,9 +393,13 @@ DATASETS: dict[str, Dataset | StitchedDataset | ProjectedDataset] = {
         table_name="households",
         index_columns=["area_code", "household_type_code", "year"],
     ),
-    # === labor_force（労働力状態3区分×男女別人口）================================
-    # 軸構造＝labor_force.py／一覧＝docs/datasets/labor_force.md。
-    # 単一 ID で全年・47県固定＝合併なし。両表とも実 area 軸を持つため cleaner は 1 個共用。
+}
+
+
+# === labor_force（労働力状態3区分×男女別人口）================================
+# 軸構造＝labor_force.py／一覧＝docs/datasets/labor_force.md。
+# 単一 ID で全年・47県固定＝合併なし。両表とも実 area 軸を持つため cleaner は 1 個共用。
+_LABOR_FORCE: dict[str, DatasetEntry] = {
     "labor_force_national": Dataset(
         key="labor_force_national",
         source="estat",
@@ -401,9 +428,13 @@ DATASETS: dict[str, Dataset | StitchedDataset | ProjectedDataset] = {
         index_columns=["area_code", "sex_code", "labor_status_code", "year"],
         grain=["area_code", "sex_code", "labor_status_code", "year"],
     ),
-    # === industry（産業大分類×男女別就業者数）====================================
-    # 軸構造＝industry.py／一覧＝docs/datasets/industry.md。
-    # 全国表は area 軸なし→合成（clean_national）。年カバレッジ非対称（全国のみ 1995/2000）。
+}
+
+
+# === industry（産業大分類×男女別就業者数）====================================
+# 軸構造＝industry.py／一覧＝docs/datasets/industry.md。
+# 全国表は area 軸なし→合成（clean_national）。年カバレッジ非対称（全国のみ 1995/2000）。
+_INDUSTRY: dict[str, DatasetEntry] = {
     "industry_national": Dataset(
         key="industry_national",
         source="estat",
@@ -433,9 +464,13 @@ DATASETS: dict[str, Dataset | StitchedDataset | ProjectedDataset] = {
         index_columns=["area_code", "sex_code", "industry_code", "year"],
         grain=["area_code", "sex_code", "industry_code", "year"],
     ),
-    # === occupation major12（職業大分類・12区分）================================
-    # 軸構造・呼称 SSoT＝occupation.py／docs/datasets/occupation.md。industry と軸構造完全同型。
-    # major10 とは大分類が 10↔12 でコード写像不能ゆえ別テーブルにする。
+}
+
+
+# === occupation major12（職業大分類・12区分）================================
+# 軸構造・呼称 SSoT＝occupation.py／docs/datasets/occupation.md。industry と軸構造完全同型。
+# major10 とは大分類が 10↔12 でコード写像不能ゆえ別テーブルにする。
+_OCCUPATION_MAJOR12: dict[str, DatasetEntry] = {
     "occupation_major12_national": Dataset(
         key="occupation_major12_national",
         source="estat",
@@ -464,9 +499,13 @@ DATASETS: dict[str, Dataset | StitchedDataset | ProjectedDataset] = {
         index_columns=["area_code", "sex_code", "occupation_code", "year"],
         grain=["area_code", "sex_code", "occupation_code", "year"],
     ),
-    # === occupation major10（職業大分類・10区分／1980延伸）=======================
-    # 同じ職業軸を分類改訂前へ延伸する別セグメント（呼称 SSoT＝occupation.md）。
-    # cleaner は major12 と共通本体で class map（OCCUPATION_MAJOR10）だけ差し替える。
+}
+
+
+# === occupation major10（職業大分類・10区分／1980延伸）=======================
+# 同じ職業軸を分類改訂前へ延伸する別セグメント（呼称 SSoT＝occupation.md）。
+# cleaner は major12 と共通本体で class map（OCCUPATION_MAJOR10）だけ差し替える。
+_OCCUPATION_MAJOR10: dict[str, DatasetEntry] = {
     "occupation_major10_national": Dataset(
         key="occupation_major10_national",
         source="estat",
@@ -498,7 +537,35 @@ DATASETS: dict[str, Dataset | StitchedDataset | ProjectedDataset] = {
 }
 
 
-def get_dataset(key: str) -> Dataset | StitchedDataset | ProjectedDataset:
+# 全サブ辞書を束ねた公開レジストリ。キー重複は許さない（同名 key があれば追加時に気付けるよう assert）。
+DATASETS: dict[str, DatasetEntry] = {
+    **_POPULATION,
+    **_POPULATION_BY_AGE,
+    **_DAYNIGHT_POPULATION,
+    **_POPULATION_BY_AGE5,
+    **_HOUSEHOLDS,
+    **_LABOR_FORCE,
+    **_INDUSTRY,
+    **_OCCUPATION_MAJOR12,
+    **_OCCUPATION_MAJOR10,
+}
+
+_SUBREGISTRIES = (
+    _POPULATION,
+    _POPULATION_BY_AGE,
+    _DAYNIGHT_POPULATION,
+    _POPULATION_BY_AGE5,
+    _HOUSEHOLDS,
+    _LABOR_FORCE,
+    _INDUSTRY,
+    _OCCUPATION_MAJOR12,
+    _OCCUPATION_MAJOR10,
+)
+if len(DATASETS) != sum(len(sub) for sub in _SUBREGISTRIES):
+    raise ValueError("DATASETS: サブ辞書間で key が重複しています")
+
+
+def get_dataset(key: str) -> DatasetEntry:
     try:
         return DATASETS[key]
     except KeyError:
