@@ -11,7 +11,7 @@ from typing import Any
 
 import polars as pl
 
-from data_forge.sources.estat import age5, daynight, households, industry, labor_force, population
+from data_forge.sources.estat import age5, daynight, households, industry, labor_force, occupation, population
 
 
 @dataclass(frozen=True)
@@ -460,6 +460,40 @@ DATASETS: dict[str, Dataset | StitchedDataset | ProjectedDataset] = {
         table_name="industry",
         index_columns=["area_code", "sex_code", "industry_code", "year"],
         grain=["area_code", "sex_code", "industry_code", "year"],
+    ),
+    # === occupation（職業大分類×男女別就業者数）==================================
+    # 就業状態等基本集計の時系列データ製品「職業(大分類)，男女別就業者数及び人口構成比」（全国
+    # 0003410408＝1995-2020 / 都道府県 0003410411＝2005-2020）。industry と軸構造が完全同型
+    # （全国表が area 軸を持たない → 全国合成 clean_national と実 area clean_prefecture の2 cleaner）。
+    # 職業は（再掲）中間集計が無く大分類フラット12区分（occupation.py 参照）。
+    "occupation_national": Dataset(
+        key="occupation_national",
+        source="estat",
+        source_params={"stats_data_id": "0003410408"},
+        cleaner=occupation.clean_national,
+        stem="census_occupation_national",
+        table_name="occupation",
+        index_columns=["sex_code", "occupation_code", "year"],
+    ),
+    "occupation_prefecture": Dataset(
+        key="occupation_prefecture",
+        source="estat",
+        source_params={"stats_data_id": "0003410411"},
+        cleaner=occupation.clean_prefecture,
+        stem="census_occupation_prefecture",
+        table_name="occupation",
+        index_columns=["area_code", "sex_code", "occupation_code", "year"],
+    ),
+    # 派生（射影フロー）: 全国(1995-2020)＋47都道府県(2005-2020)を area 軸で縦結合した就業者数時系列。
+    # industry_timeseries と同様、年カバレッジ非対称（全国のみ 1995/2000）を union が許容する。
+    "occupation_timeseries": ProjectedDataset(
+        key="occupation_timeseries",
+        upstreams=["occupation_national", "occupation_prefecture"],
+        title="国勢調査 職業大分類×男女別就業者数 全国・都道府県別時系列（全国1995年〜/都道府県2005年〜2020年）",
+        stem="census_occupation_timeseries",
+        table_name="occupation",
+        index_columns=["area_code", "sex_code", "occupation_code", "year"],
+        grain=["area_code", "sex_code", "occupation_code", "year"],
     ),
 }
 

@@ -20,4 +20,5 @@ okmethod/data-forge のドキュメント群。
 | [households](datasets/households.md)                   | 国勢調査 世帯の種類別 世帯数・世帯人員（全国・都道府県, 1960〜2020）        |
 | [labor_force](datasets/labor_force.md)                 | 国勢調査 労働力状態3区分×男女別人口（全国・都道府県, 1950〜2020）           |
 | [industry](datasets/industry.md)                       | 国勢調査 産業大分類×男女別就業者数（全国1995〜/都道府県2005〜2020）         |
+| [occupation](datasets/occupation.md)                   | 国勢調査 職業大分類×男女別就業者数（全国1995〜/都道府県2005〜2020）         |
 | [area_master](datasets/area_master.md)                 | 地域マスタ（アトム軸スタースキーマ）＝合併集約の共有ハブ                    |
