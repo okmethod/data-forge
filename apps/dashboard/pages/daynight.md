@@ -1,9 +1,9 @@
 ---
 title: 昼夜間人口
-sidebar_position: 3
+sidebar_position: 4
 ---
 
-データセット: **昼夜間人口（夜間＝常住地ベース / 昼間＝従業地・通学地ベース）** - 1990〜2020年・全7回分
+データセット: **合併畳み込み済みの市区町村別 昼夜間人口（夜間＝常住地ベース / 昼間＝従業地・通学地ベース）** - 1990〜2020年・全7回分
 
 このページは **全国 → 都道府県の偏在 → ドリルダウン → サンプル市** の順に同じデータを見ていく。  
 （印西市を軸にした横断的な読み解きは [印西市ケーススタディ](/inzai) を参照）
@@ -25,7 +25,15 @@ sidebar_position: 3
   order by year, daynight_code
 ```
 
-<LineChart data={national_dn} x=year y=population series=daynight title="全国 昼間／夜間人口（両者は一致）" yFmt="#,##0" xType=category />
+<LineChart
+  data={national_dn}
+  x=year
+  y=population
+  series=daynight
+  title="全国 昼間／夜間人口（両者は一致）"
+  yFmt="#,##0"
+  xType=category
+/>
 
 そのため、以降は都道府県・市区町村の偏在として読む。
 
@@ -48,19 +56,25 @@ sidebar_position: 3
 ```
 
 <BarChart
-    data={dn_ratio}
-    title="都道府県別 昼夜間人口比率（2020年）"
-    x=pref_name
-    y=ratio
-    swapXY=true
-    sort=false
-    yFmt="0.0"
-    yMin=85
+  data={dn_ratio}
+  x=pref_name
+  y=ratio
+  title="都道府県別 昼夜間人口比率（2020年）"
+  swapXY=true
+  sort=false
+  yFmt="0.0"
+  yMin=85
 />
 
 ## ドリルダウン：都道府県別 昼夜間人口比率の推移
 
-<Dropdown data={dn_pref_list} name=dnpref value=pref_name defaultValue="東京都" title="都道府県" />
+<Dropdown 
+  data={dn_pref_list}
+  name=dnpref
+  value=pref_name
+  defaultValue="東京都"
+  title="都道府県"
+/>
 
 ```sql dn_pref_list
   select distinct pref_name, pref_code
@@ -80,8 +94,18 @@ sidebar_position: 3
   order by year
 ```
 
-<LineChart data={dn_pref_trend} x=year y=ratio title="{inputs.dnpref.value} の昼夜間人口比率の推移" yFmt="0.0" xType=category>
-  <ReferenceLine y=100 label="昼夜均衡" labelPosition=aboveEnd color=negative />
+<!-- prettier-ignore -->
+<LineChart
+  data={dn_pref_trend}
+  x=year y=ratio
+  title="{inputs.dnpref.value} の昼夜間人口比率の推移"
+  yFmt="0.0"
+  xType=category >
+  <ReferenceLine
+    y=100
+    label="昼夜均衡"
+    labelPosition=aboveEnd color=negative
+  />
 </LineChart>
 
 ## サンプル市：千葉県印西市
@@ -96,7 +120,15 @@ sidebar_position: 3
   order by year, daynight_code
 ```
 
-<LineChart data={inzai_dn} x=year y=population series=daynight title="印西市 昼間／夜間人口" yFmt="#,##0" xType=category />
+<LineChart
+  data={inzai_dn}
+  x=year
+  y=population
+  series=daynight
+  title="印西市 昼間／夜間人口"
+  yFmt="#,##0"
+  xType=category
+/>
 
 ```sql inzai_dn_ratio
   select year,
@@ -107,6 +139,20 @@ sidebar_position: 3
   order by year
 ```
 
-<LineChart data={inzai_dn_ratio} x=year y=ratio title="印西市 昼夜間人口比率" yFmt="0.0" yMin=75 yMax=105 xType=category>
-  <ReferenceLine y=100 label="昼夜均衡" labelPosition=aboveEnd color=negative />
+<!-- prettier-ignore -->
+<LineChart
+  data={inzai_dn_ratio}
+  x=year
+  y=ratio
+  title="印西市 昼夜間人口比率"
+  yFmt="0.0"
+  yMin=75
+  yMax=105
+  xType=category >
+  <ReferenceLine
+    y=100
+    label="昼夜均衡"
+    labelPosition=aboveEnd
+    color=negative
+  />
 </LineChart>

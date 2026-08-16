@@ -1,6 +1,6 @@
 ---
 title: 印西市ケーススタディ
-sidebar_position: 4
+sidebar_position: 5
 ---
 
 3つのデータセット（[人口](/census)・[年齢構成](/aging)・[昼夜間人口](/daynight)）を横断し、**人口増加を続ける街・千葉県印西市**を1つのケースに、人口・世代構成・昼夜間人口の3側面から日本の人口動態を読む。
@@ -22,7 +22,16 @@ sidebar_position: 4
   order by year
 ```
 
-<LineChart data={national} x=year y=population title="全国総人口" yFmt="#,##0" yMin=110000000 yMax=130000000 xType=category />
+<LineChart
+  data={national}
+  x=year
+  y=population
+  title="全国総人口"
+  yFmt="#,##0"
+  yMin=110000000
+  yMax=130000000
+  xType=category
+/>
 
 _※ 末尾の2025年は**速報値**（人口速報集計）。2020年までは確定値。_
 
@@ -48,7 +57,15 @@ _※ 末尾の2025年は**速報値**（人口速報集計）。2020年までは
   order by s.region, s.year
 ```
 
-<LineChart data={pop_index} x=year y=idx series=region title="人口指数（1980年=100）" yFmt="0.0" xType=category />
+<LineChart
+  data={pop_index}
+  x=year
+  y=idx
+  series=region
+  title="人口指数（1980年=100）"
+  yFmt="0.0"
+  xType=category
+/>
 
 _※ 末尾の2025年は**速報値**。2020年までは確定値。_
 
@@ -66,7 +83,16 @@ _※ 末尾の2025年は**速報値**。2020年までは確定値。_
   order by year
 ```
 
-<LineChart data={inzai_pop} x=year y=population title="印西市 総人口（合併畳み込み済み）" yFmt="#,##0" yMin=20000 yMax=115000 xType=category />
+<LineChart
+  data={inzai_pop}
+  x=year
+  y=population
+  title="印西市 総人口（合併畳み込み済み）"
+  yFmt="#,##0"
+  yMin=20000
+  yMax=115000
+  xType=category
+/>
 
 _※ 末尾の2025年は**速報値**（人口速報集計）。2020年までは確定値。_
 
@@ -91,7 +117,17 @@ _※ 末尾の2025年は**速報値**（人口速報集計）。2020年までは
   order by region, year
 ```
 
-<LineChart data={aging_compare} x=year y=aging_pct series=region title="高齢化率（％）印西市 vs 全国" yFmt="0.0" yMin=0 yMax=35 xType=category />
+<LineChart
+  data={aging_compare}
+  x=year
+  y=aging_pct
+  series=region
+  title="高齢化率（％）印西市 vs 全国"
+  yFmt="0.0"
+  yMin=0
+  yMax=35
+  xType=category
+/>
 
 年齢3区分×男女の構成（簡易人口ピラミッド）を1980年と2020年で比べると、街の規模が約3倍に膨らみ、生産年齢層を厚く保ちつつ **老年層（上段）が男女とも大きく膨らんだ**ことが読みとれる。
 
@@ -106,16 +142,16 @@ _※ 末尾の2025年は**速報値**（人口速報集計）。2020年までは
 ```
 
 <BarChart
-    data={pyramid_1980}
-    title="印西市 年齢3区分×男女人口（1980年）"
-    x=age_class
-    y=pop
-    series=sex
-    swapXY=true
-    type=stacked
-    sort=false
-    yMin=-35000
-    yMax=35000
+  data={pyramid_1980}
+  x=age_class
+  y=pop
+  series=sex
+  title="印西市 年齢3区分×男女人口（1980年）"
+  swapXY=true
+  type=stacked
+  sort=false
+  yMin=-35000
+  yMax=35000
 />
 
 ```sql pyramid_2020
@@ -129,16 +165,16 @@ _※ 末尾の2025年は**速報値**（人口速報集計）。2020年までは
 ```
 
 <BarChart
-    data={pyramid_2020}
-    title="印西市 年齢3区分×男女人口（2020年）"
-    x=age_class
-    y=pop
-    series=sex
-    swapXY=true
-    type=stacked
-    sort=false
-    yMin=-35000
-    yMax=35000
+  data={pyramid_2020}
+  x=age_class
+  y=pop
+  series=sex
+  title="印西市 年齢3区分×男女人口（2020年）"
+  swapXY=true
+  type=stacked
+  sort=false
+  yMin=-35000
+  yMax=35000
 />
 
 ---
@@ -154,7 +190,15 @@ _※ 末尾の2025年は**速報値**（人口速報集計）。2020年までは
   order by year, daynight_code
 ```
 
-<LineChart data={inzai_dn} x=year y=population series=daynight title="印西市 昼間／夜間人口" yFmt="#,##0" xType=category />
+<LineChart
+  data={inzai_dn}
+  x=year
+  y=population
+  series=daynight
+  title="印西市 昼間／夜間人口"
+  yFmt="#,##0"
+  xType=category
+/>
 
 ```sql inzai_dn_ratio
   select year,
@@ -165,8 +209,22 @@ _※ 末尾の2025年は**速報値**（人口速報集計）。2020年までは
   order by year
 ```
 
-<LineChart data={inzai_dn_ratio} x=year y=ratio title="印西市 昼夜間人口比率" yFmt="0.0" yMin=75 yMax=105 xType=category>
-  <ReferenceLine y=100 label="昼夜均衡" labelPosition=aboveEnd color=negative />
+<!-- prettier-ignore -->
+<LineChart
+  data={inzai_dn_ratio}
+  x=year
+  y=ratio
+  title="印西市 昼夜間人口比率"
+  yFmt="0.0"
+  yMin=75
+  yMax=105
+  xType=category >
+  <ReferenceLine
+    y=100
+    label="昼夜均衡"
+    labelPosition=aboveEnd
+    color=negative
+  />
 </LineChart>
 
 ---
@@ -197,16 +255,17 @@ _※ 末尾の2025年は**速報値**（人口速報集計）。2020年までは
   order by change_pct desc
 ```
 
+<!-- prettier-ignore -->
 <BarChart
-data={pref_change}
-title="都道府県別 人口増減率（％・1980→2020）"
-x=pref_name
-y=change_pct
-series=trend
-swapXY=true
-sort=false
-yFmt="+0.0;-0.0"
-colorPalette={['#2563eb', '#dc2626']}
+  data={pref_change}
+  x=pref_name
+  y=change_pct
+  series=trend
+  title="都道府県別 人口増減率（％・1980→2020）"
+  swapXY=true
+  sort=false
+  colorPalette={['#2563eb', '#dc2626']}
+  yFmt="+0.0;-0.0"
 />
 
 より詳しい全国の傾向は [人口](/census)・[年齢構成と高齢化](/aging)・[昼夜間人口](/daynight) を参照。

@@ -22,7 +22,16 @@ sidebar_position: 1
   order by year
 ```
 
-<LineChart data={national} x=year y=population title="全国総人口" yFmt="#,##0" yMin=110000000 yMax=130000000 xType=category />
+<LineChart
+  data={national}
+  x=year
+  y=population
+  title="全国総人口"
+  yFmt="#,##0"
+  yMin=110000000
+  yMax=130000000
+  xType=category
+/>
 
 _※ 末尾の2025年は**速報値**（人口速報集計）。2020年までは確定値。_
 
@@ -35,8 +44,10 @@ _※ 末尾の2025年は**速報値**（人口速報集計）。2020年までは
 
 **起点年・終点年を切り替えて**、期間ごとに分岐がどう変わるかを確認できる。
 
-<!-- 単一選択 Dropdown は先頭オプションが既定になる（defaultValue/ default 属性は非先頭では効かない）。
-     そのため既定にしたい年を先頭に置く: 起点=1980 昇順 / 終点=2020 降順。 -->
+<!--
+単一選択 Dropdown は先頭オプションが既定になる。defaultValue/ default 属性は非先頭では効かない。
+そのため既定にしたい年を先頭に置く: 起点=1980 昇順 / 終点=2020 降順。
+-->
 <Dropdown name=from_year title="起点年">
   <DropdownOption value=1980/>
   <DropdownOption value=1985/>
@@ -83,17 +94,18 @@ _※ 末尾の2025年は**速報値**（人口速報集計）。2020年までは
   order by change_pct desc
 ```
 
+<!-- prettier-ignore -->
 <BarChart
-data={pref_change}
-title="都道府県別 人口増減率（％）{inputs.from_year.value}→{inputs.to_year.value}"
-x=pref_name
-y=change_pct
-series=trend
-swapXY=true
-sort=false
-yFmt="+0.0;-0.0"
-seriesColors={{'減少':'#dc2626', '増加':'#2563eb'}}
-seriesOrder={['減少', '増加']}
+  data={pref_change}
+  x=pref_name
+  y=change_pct
+  series=trend
+  title="都道府県別 人口増減率（％）{inputs.from_year.value}→{inputs.to_year.value}"
+  swapXY=true
+  sort=false
+  seriesOrder={['減少', '増加']}
+  seriesColors={{'減少':'#dc2626', '増加':'#2563eb'}}
+  yFmt="+0.0;-0.0"
 />
 
 ---
@@ -115,7 +127,14 @@ seriesOrder={['減少', '増加']}
   order by year
 ```
 
-<LineChart data={pref_trend} x=year y=population title="{inputs.pref.value} の総人口推移" yFmt="#,##0" xType=category />
+<LineChart
+  data={pref_trend}
+  x=year
+  y=population
+  title="{inputs.pref.value} の総人口推移"
+  yFmt="#,##0"
+  xType=category
+/>
 
 _※ 末尾の2025年は**速報値**。2020年までは確定値。_
 
@@ -154,16 +173,17 @@ _※ 末尾の2025年は**速報値**。2020年までは確定値。_
   order by year
 ```
 
+<!-- prettier-ignore -->
 <LineChart
-data={inzai_fold}
-x=year
-y=population
-series=series
-title="印西市 総人口：合併畳み込み 無し／有り"
-yFmt="#,##0"
-yMin=20000
-yMax=120000
-xType=category
-seriesColors={{'① 畳み込み無し': '#dc2626', '② 畳み込み済み': '#2563eb'}}
-seriesOrder={['① 畳み込み無し', '② 畳み込み済み']}
+  data={inzai_fold}
+  x=year
+  y=population
+  series=series
+  title="印西市 総人口：合併畳み込み 無し／有り"
+  seriesOrder={['① 畳み込み無し', '② 畳み込み済み']}
+  seriesColors={{'① 畳み込み無し': '#dc2626', '② 畳み込み済み': '#2563eb'}}
+  yFmt="#,##0"
+  yMin=20000
+  yMax=120000
+  xType=category
 />

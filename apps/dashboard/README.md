@@ -60,15 +60,16 @@ npm run build:strict # クエリ/描画エラーを失敗扱いにしてビル�
 
 ## 構成
 
-```
+```text
 apps/dashboard/
 ├── pages/                              # ダッシュボードのページ（.md）
-├── sources/census_prefecture/         # 都道府県別 男女別人口
-├── sources/census_age_prefecture/     # 都道府県別 年齢3区分×男女別人口
-├── sources/census_daynight_prefecture/# 都道府県別 昼夜間人口
-├── sources/census_city/               # サンプル市 男女別人口
-├── sources/census_city_raw/           # サンプル市 合併畳み込み無し版（比較用）
-├── sources/census_age_city/           # サンプル市 年齢3区分×男女別人口
-├── sources/census_daynight_city/      # サンプル市 昼夜間人口
+├── sources/                           # Evidence データソース（fact×粒度で分割）
+│   ├── census_prefecture/             # 都道府県別 男女別人口
+│   ├── census_age_prefecture/         # 都道府県別 年齢3区分×男女別人口
+│   ├── census_daynight_prefecture/    # 都道府県別 昼夜間人口
+│   ├── census_city/                   # サンプル市 男女別人口
+│   ├── census_city_raw/               # サンプル市 合併畳み込み無し版（比較用）
+│   ├── census_age_city/               # サンプル市 年齢3区分×男女別人口
+│   └── census_daynight_city/          # サンプル市 昼夜間人口
 └── evidence.config.yaml
 ```

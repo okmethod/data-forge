@@ -4,8 +4,13 @@ import { test, expect, type Page } from "@playwright/test";
  * 各ページの見え方チェック。
  * チャート（ECharts canvas）が描画され、想定の見出し・データが出ているかを確認し、
  * 全体スクショを test-results/ に保存する。
- * 構成: index=概要ランディング / census=人口 / aging=年齢 / daynight=昼夜間 /
- *       inzai=印西市ケーススタディ（3指標横断）。
+ * 構成:
+ *   - index=概要ランディング
+ *   - census=人口
+ *   - pyramid=人口ピラミッド(5歳階級)
+ *   - aging=高齢化率(3区分)
+ *   - daynight=昼夜間
+ *   - inzai=印西市ケーススタディ（3指標横断）
  */
 
 // 指定枚数の ECharts canvas が描画されるまで待つ（初回コンパイルが重いページ向けに長め）。
@@ -40,12 +45,21 @@ test("人口ページ（全国→県→サンプル市）が描画される", as
   await page.screenshot({ path: "test-results/census-full.png", fullPage: true });
 });
 
-test("年齢構成ページが描画される", async ({ page }) => {
+test("人口ピラミッドページが描画される", async ({ page }) => {
+  await page.goto("/pyramid", { waitUntil: "networkidle" });
+  await waitCharts(page, 3);
+
+  await expect(page.getByRole("heading", { name: /年齢ピラミッドの転換/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /高齢化率の超長期推移/ })).toBeVisible();
+
+  await page.screenshot({ path: "test-results/pyramid-full.png", fullPage: true });
+});
+
+test("高齢化率ページが描画される", async ({ page }) => {
   await page.goto("/aging", { waitUntil: "networkidle" });
   await waitCharts(page, 6);
 
-  await expect(page.getByRole("heading", { name: "全国：高齢化率の推移" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: /5歳階級で見る一世紀/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /高齢化率と年齢3区分構成/ })).toBeVisible();
   await expect(page.getByRole("heading", { name: /高齢化率ランキング/ })).toBeVisible();
   await expect(page.getByRole("heading", { name: "サンプル市：千葉県印西市" })).toBeVisible();
 
