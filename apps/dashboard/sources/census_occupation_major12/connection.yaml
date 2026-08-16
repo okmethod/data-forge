@@ -1,0 +1,7 @@
+name: census_occupation_major12
+type: sqlite
+options:
+  # 職業(大分類・major12＝2009年12月改訂後の12区分)，男女別就業者数（全国 1995〜2020 ／都道府県 2005〜2020）。
+  # 市区町村は持たない（就業状態等基本集計・単一 ID 時系列）。全国 0003410408 ＋ 都道府県 0003410411 を union した配布正典。
+  # major10（旧10区分）は同符号でも中身が違うため別 source。data/ は非コミットのためローカル出力前提。
+  filename: ../../../../data/processed/census_occupation_major12_timeseries.sqlite

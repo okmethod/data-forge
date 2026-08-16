@@ -1,0 +1,7 @@
+name: census_occupation_major10
+type: sqlite
+options:
+  # 職業(旧大分類・major10＝2009年12月改訂前の10区分)，男女別就業者数（全国 1950〜2005 ／都道府県 1980〜2005）。
+  # major12（新12区分）を分類改訂前へ延伸する別セグメント。同符号でも指す職業が違うため union せず別 source。
+  # 全国 0003410409 ＋ 都道府県 0003410412 を union した配布正典。data/ は非コミットのためローカル出力前提。
+  filename: ../../../../data/processed/census_occupation_major10_timeseries.sqlite
