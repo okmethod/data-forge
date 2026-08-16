@@ -234,9 +234,7 @@ DATASETS: dict[str, Dataset | StitchedDataset | ProjectedDataset] = {
     # これは新 base fact ではなく派生ビュー（正典＝市区町村粒度は不変）。stem を分けて上書き衝突を回避。
     "population_prefecture_timeseries": StitchedDataset(
         key="population_prefecture_timeseries",
-        upstreams=[
-            f"population_{y}" for y in (1980, 1985, 1990, 1995, 2000, 2005, 2010, 2015, 2020)
-        ],
+        upstreams=[f"population_{y}" for y in (1980, 1985, 1990, 1995, 2000, 2005, 2010, 2015, 2020)],
         title="国勢調査 男女別人口 都道府県別時系列（1980年〜2020年 5年間隔）",
         stem="census_population_prefecture_timeseries",
         table_name="population",
@@ -275,9 +273,7 @@ DATASETS: dict[str, Dataset | StitchedDataset | ProjectedDataset] = {
     # 派生: 1980〜2020 を結合した年齢3区分×男女別人口の時系列テーブル。
     "population_by_age_timeseries": StitchedDataset(
         key="population_by_age_timeseries",
-        upstreams=[
-            f"population_by_age_{y}" for y in (1980, 1985, 1990, 1995, 2000, 2005, 2010, 2015, 2020)
-        ],
+        upstreams=[f"population_by_age_{y}" for y in (1980, 1985, 1990, 1995, 2000, 2005, 2010, 2015, 2020)],
         title="国勢調査 年齢3区分×男女別人口 時系列（1980年〜2020年 5年間隔）",
         stem="census_population_by_age_timeseries",
         table_name="population_by_age",
@@ -289,9 +285,7 @@ DATASETS: dict[str, Dataset | StitchedDataset | ProjectedDataset] = {
     # 派生（空間軸）: 都道府県別の年齢3区分×男女別人口 時系列（population_prefecture と同型）。
     "population_by_age_prefecture_timeseries": StitchedDataset(
         key="population_by_age_prefecture_timeseries",
-        upstreams=[
-            f"population_by_age_{y}" for y in (1980, 1985, 1990, 1995, 2000, 2005, 2010, 2015, 2020)
-        ],
+        upstreams=[f"population_by_age_{y}" for y in (1980, 1985, 1990, 1995, 2000, 2005, 2010, 2015, 2020)],
         title="国勢調査 年齢3区分×男女別人口 都道府県別時系列（1980年〜2020年 5年間隔）",
         stem="census_population_by_age_prefecture_timeseries",
         table_name="population_by_age",

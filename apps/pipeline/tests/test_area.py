@@ -154,9 +154,7 @@ def test_crosswalk_keeps_atoms_and_groupby_equals_aggregate():
         .rename({"base_code": "area_code"})
         .sort("area_code", "year", "sex_code")
     )
-    agg = aggregate.aggregate_to_base(fact, ev, base_year=2010).select(
-        "area_code", "year", "sex_code", "population"
-    )
+    agg = aggregate.aggregate_to_base(fact, ev, base_year=2010).select("area_code", "year", "sex_code", "population")
     assert grouped.sort("area_code", "year", "sex_code").to_dicts() == agg.to_dicts()
 
 
@@ -188,7 +186,7 @@ def test_aggregate_by_age_folds_and_conserves_age():
 
 def test_national_conservation_by_age_uses_total_slice():
     # Phase 2: 全国行が age_class 別でも、総数×総数スライスだけで人口保存を検査する
-    #（さもないと 年少+生産+老年+不詳 の二重計上で atom_sum が総数の2倍になる）。
+    # （さもないと 年少+生産+老年+不詳 の二重計上で atom_sum が総数の2倍になる）。
     fact = _age_fact(
         [
             ("01201", "A市", 2020, {"1": 40, "2": 70, "3": 35, "9": 5}),  # 総数150
@@ -224,7 +222,10 @@ def _daynight_fact(rows: list[tuple[str, str, int, int, int]]) -> pl.DataFrame:
     """
     recs: list[dict] = []
     for area_code, area_name, year, night, day in rows:
-        for code, name, val in (("0", "夜間人口（常住地）", night), ("1", "昼間人口（従業地・通学地）", day)):
+        for code, name, val in (
+            ("0", "夜間人口（常住地）", night),
+            ("1", "昼間人口（従業地・通学地）", day),
+        ):
             recs.append(
                 {
                     "area_code": area_code,
@@ -354,9 +355,7 @@ def test_reconcile_orphans_flags_unmapped():
     orph = reconcile.orphans(fact, empty, base_year=2020)
     assert orph["area_code"].to_list() == ["01202"]
 
-    national = pl.DataFrame(
-        {"year": [2005, 2020], "sex_code": ["0", "0"], "population": [140, 150]}
-    )
+    national = pl.DataFrame({"year": [2005, 2020], "sex_code": ["0", "0"], "population": [140, 150]})
     cons = reconcile.national_conservation(fact, national)
     assert cons["ok"].to_list() == [True, True]
 
@@ -365,9 +364,7 @@ def test_conservation_known_diff_is_accepted():
     # 1980 は既知差分 37（区未定分）を受容＝ok。他年の diff=0 も ok。値は KNOWN_DIFFS で固定。
     assert reconcile.KNOWN_DIFFS[1980] == 37
     fact = _fact([("01201", "A市", 1980, 100 - 37), ("01201", "A市", 2020, 150)])
-    national = pl.DataFrame(
-        {"year": [1980, 2020], "sex_code": ["0", "0"], "population": [100, 150]}
-    )
+    national = pl.DataFrame({"year": [1980, 2020], "sex_code": ["0", "0"], "population": [100, 150]})
     cons = reconcile.national_conservation(fact, national).sort("year")
     assert cons["diff"].to_list() == [37, 0]
     assert cons["ok"].to_list() == [True, True]  # 既知差分は許容

@@ -50,17 +50,10 @@ def clean_daynight_population(tidy: pl.DataFrame) -> pl.DataFrame:
             pl.col("area_code"),
             pl.col("area_name"),
             pl.col("area_level").cast(pl.Int8, strict=False).alias("area_level"),
-            pl.col("cat01_code")
-            .replace_strict({k: v[0] for k, v in DAYNIGHT.items()})
-            .alias("daynight_code"),
-            pl.col("cat01_code")
-            .replace_strict({k: v[1] for k, v in DAYNIGHT.items()})
-            .alias("daynight"),
+            pl.col("cat01_code").replace_strict({k: v[0] for k, v in DAYNIGHT.items()}).alias("daynight_code"),
+            pl.col("cat01_code").replace_strict({k: v[1] for k, v in DAYNIGHT.items()}).alias("daynight"),
             pl.col("time_code").str.slice(0, 4).cast(pl.Int16).alias("year"),
-            pl.col("value")
-            .str.replace_all(r"[^0-9-]", "")
-            .cast(pl.Int64, strict=False)
-            .alias("population"),
+            pl.col("value").str.replace_all(r"[^0-9-]", "").cast(pl.Int64, strict=False).alias("population"),
         )
         .with_columns((pl.col("area_level") != _OBSOLETE_AREA_LEVEL).alias("is_current"))
         .sort("area_code", "daynight_code")

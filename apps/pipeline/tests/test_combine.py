@@ -102,14 +102,12 @@ def test_age_grain_guard_still_rejects_true_duplicates():
 
 def test_grid_crosses_age_class():
     # A は 2015 のみ、B は 2020 のみ → grid で全 (area×year×age) 格子が埋まり欠損は null
-    df = combine_years(
-        [_age_frame(2015, "A", 100), _age_frame(2020, "B", 200)], mode="grid", grain=_AGE_GRAIN
-    )
+    df = combine_years([_age_frame(2015, "A", 100), _age_frame(2020, "B", 200)], mode="grid", grain=_AGE_GRAIN)
     # 2 area × 2 year × 2 age × 1 sex = 8 行
     assert df.height == 8
-    a2020 = df.filter(
-        (pl.col("area_code") == "A") & (pl.col("year") == 2020) & (pl.col("age_class_code") == "0")
-    ).row(0, named=True)
+    a2020 = df.filter((pl.col("area_code") == "A") & (pl.col("year") == 2020) & (pl.col("age_class_code") == "0")).row(
+        0, named=True
+    )
     assert a2020["population"] is None
 
 
@@ -146,9 +144,7 @@ def test_union_areas_matches_combine_years_union_on_disjoint():
     # disjoint 入力なら union_areas は combine_years(mode="union") と出力等価（age5 の等価性担保）
     national = pl.concat([_area_frame("00000", 1920, 100), _area_frame("00000", 2020, 200)])
     pref = pl.concat([_area_frame("01000", 1920, 10), _area_frame("01000", 2020, 20)])
-    assert union_areas([national, pref]).equals(
-        combine_years([national, pref], mode="union")
-    )
+    assert union_areas([national, pref]).equals(combine_years([national, pref], mode="union"))
 
 
 def test_union_areas_rejects_overlapping_partitions():

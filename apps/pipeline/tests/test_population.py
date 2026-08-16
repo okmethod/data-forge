@@ -205,17 +205,13 @@ def test_clean_population_by_age_schema_and_national_restore():
     ]
     # 全国行(00000)が県合計から復元されている（総数・総数 = 100+200 = 300）
     nat = df.filter(
-        (pl.col("area_code") == "00000")
-        & (pl.col("sex_code") == "0")
-        & (pl.col("age_class_code") == "0")
+        (pl.col("area_code") == "00000") & (pl.col("sex_code") == "0") & (pl.col("age_class_code") == "0")
     ).row(0, named=True)
     assert nat["population"] == 300
     assert nat["area_name"] == "全国"
     # 割合(105)は採られない（総数(age=0,sex=0)は人口 100 のまま）
     p = df.filter(
-        (pl.col("area_code") == "01000")
-        & (pl.col("sex_code") == "0")
-        & (pl.col("age_class_code") == "0")
+        (pl.col("area_code") == "01000") & (pl.col("sex_code") == "0") & (pl.col("age_class_code") == "0")
     ).row(0, named=True)
     assert p["population"] == 100
     assert p["year"] == 2020
@@ -238,9 +234,7 @@ def test_clean_population_by_age_conservation():
 
     # 不詳(9)が正の導出値として注入されている（県01000・総数 = 100-(10+60+25) = 5）
     unknown = df.filter(
-        (pl.col("area_code") == "01000")
-        & (pl.col("sex_code") == "0")
-        & (pl.col("age_class_code") == "9")
+        (pl.col("area_code") == "01000") & (pl.col("sex_code") == "0") & (pl.col("age_class_code") == "9")
     ).row(0, named=True)
     assert unknown["population"] == 5
     assert unknown["age_class"] == "年齢不詳"

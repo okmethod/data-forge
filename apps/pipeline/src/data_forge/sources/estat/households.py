@@ -54,17 +54,10 @@ def clean_households(tidy: pl.DataFrame) -> pl.DataFrame:
     世帯の種類（cat01）を分類軸に採り、世帯数(tab=040)と世帯人員(tab=050)を
     area×household_type×year の同一行へ横並びに束ねる。DID 行は除外する。
     """
-    base = tidy.filter(
-        pl.col("cat01_code").is_in(list(HOUSEHOLD_TYPE))
-        & ~pl.col("area_code").is_in(_DID_AREA_CODES)
-    )
+    base = tidy.filter(pl.col("cat01_code").is_in(list(HOUSEHOLD_TYPE)) & ~pl.col("area_code").is_in(_DID_AREA_CODES))
     keys = ["area_code", "area_name", "area_level", "cat01_code", "time_code"]
-    households = base.filter(pl.col("tab_code") == _TAB_HOUSEHOLDS).select(
-        *keys, _int_value().alias("households")
-    )
-    members = base.filter(pl.col("tab_code") == _TAB_MEMBERS).select(
-        *keys, _int_value().alias("household_members")
-    )
+    households = base.filter(pl.col("tab_code") == _TAB_HOUSEHOLDS).select(*keys, _int_value().alias("households"))
+    members = base.filter(pl.col("tab_code") == _TAB_MEMBERS).select(*keys, _int_value().alias("household_members"))
     fact = households.join(members, on=keys, how="left")
     return (
         fact.select(

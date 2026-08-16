@@ -63,9 +63,7 @@ def _cmd_export(ds: Dataset | StitchedDataset | ProjectedDataset, args: argparse
         print(f"  - {path}")
 
 
-def _cmd_area_orphans(
-    ds: Dataset | StitchedDataset | ProjectedDataset, args: argparse.Namespace
-) -> None:
+def _cmd_area_orphans(ds: Dataset | StitchedDataset | ProjectedDataset, args: argparse.Namespace) -> None:
     """base_year に届かない消滅アトム（＝合併イベント未整備）を一覧＝次に埋める候補。"""
     atom_fact, _, events = derive.build_atoms(ds, refresh=args.refresh)
     rep = area_reconcile.orphans(atom_fact, events, base_year=args.base_year)
@@ -75,16 +73,12 @@ def _cmd_area_orphans(
         print(rep)
 
 
-def _cmd_area_check(
-    ds: Dataset | StitchedDataset | ProjectedDataset, args: argparse.Namespace
-) -> None:
+def _cmd_area_check(ds: Dataset | StitchedDataset | ProjectedDataset, args: argparse.Namespace) -> None:
     """人口保存（各年 アトム合計==全国total）と孤児アトム件数を検証。"""
     atom_fact, national, events = derive.build_atoms(ds, refresh=args.refresh)
     cons = area_reconcile.national_conservation(atom_fact, national)
     n_bad = int(cons.filter(~pl.col("ok")).height)
-    print(
-        f"[area-check] {ds.key}: 人口保存 {'✅ 全年一致' if n_bad == 0 else f'⚠️ {n_bad} 年で不一致'}"
-    )
+    print(f"[area-check] {ds.key}: 人口保存 {'✅ 全年一致' if n_bad == 0 else f'⚠️ {n_bad} 年で不一致'}")
     for row in cons.filter(pl.col("known")).iter_rows(named=True):
         reason = area_reconcile.KNOWN_DIFF_REASONS.get(row["year"], "")
         print(f"  ⚠️ {row['year']} は既知差分 {row['diff']} 人を受容: {reason}")
@@ -103,9 +97,7 @@ def _cmd_area_ingest(args: argparse.Namespace) -> None:
     if src is None:
         csvs = sorted(config.AREA_HISTORY_RAW.glob("*.csv"))
         if len(csvs) != 1:
-            raise SystemExit(
-                f"{config.AREA_HISTORY_RAW} にCSVが {len(csvs)} 件。パスを引数で指定してください。"
-            )
+            raise SystemExit(f"{config.AREA_HISTORY_RAW} にCSVが {len(csvs)} 件。パスを引数で指定してください。")
         src = csvs[0]
     ev = area_ingest.parse_history_csv(src, encoding=args.encoding)
     config.AREA_EVENTS_PARSED.parent.mkdir(parents=True, exist_ok=True)
@@ -167,9 +159,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     # 廃置分合CSV → 正規化イベント（データセット非依存の単発コマンド）
     pi = sub.add_parser("area-ingest", help="廃置分合の生CSVを events_parsed.csv へ正規化")
-    pi.add_argument(
-        "path", nargs="?", default=None, help="生CSVパス（省略時は data/raw/history/ の単一CSV）"
-    )
+    pi.add_argument("path", nargs="?", default=None, help="生CSVパス（省略時は data/raw/history/ の単一CSV）")
     pi.add_argument(
         "--encoding",
         default="utf8",
@@ -181,9 +171,7 @@ def build_parser() -> argparse.ArgumentParser:
     ps = sub.add_parser("estat-search", help="帳票リストを検索し statsDataId を一覧表示")
     ps.add_argument("--stats-code", default=None, help="政府統計コード（例: 00200521=国勢調査）")
     ps.add_argument("--word", default=None, help="検索キーワード（searchWord。AND/OR 可）")
-    ps.add_argument(
-        "--survey-years", default=None, help="調査年（yyyy / yyyymm / yyyymm-yyyymm 範囲）"
-    )
+    ps.add_argument("--survey-years", default=None, help="調査年（yyyy / yyyymm / yyyymm-yyyymm 範囲）")
     ps.add_argument(
         "--search-kind",
         type=int,

@@ -51,6 +51,4 @@ def load_events(parsed_path=None, overrides_path=None) -> pl.DataFrame:
         how="vertical",
     )
     # 無効化（successor_code 空/null）行を除去
-    return merged.filter(
-        pl.col("successor_code").is_not_null() & (pl.col("successor_code").str.len_chars() > 0)
-    )
+    return merged.filter(pl.col("successor_code").is_not_null() & (pl.col("successor_code").str.len_chars() > 0))

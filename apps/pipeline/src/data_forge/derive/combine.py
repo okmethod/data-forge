@@ -39,9 +39,7 @@ _NON_CATEGORY_COLS = {
 }
 
 
-def combine_years(
-    frames: list[pl.DataFrame], *, mode: Mode = "union", grain: Sequence[str] = GRAIN
-) -> pl.DataFrame:
+def combine_years(frames: list[pl.DataFrame], *, mode: Mode = "union", grain: Sequence[str] = GRAIN) -> pl.DataFrame:
     """同一スキーマの年次フレーム群を時系列テーブルへ結合する。
 
     `grain` はこの結合表を一意に定める列群（既定＝area×sex×year）。fact 毎に

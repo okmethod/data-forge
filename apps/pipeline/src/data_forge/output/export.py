@@ -110,9 +110,7 @@ def _write_duckdb(
     conn = duckdb.connect(str(path))
     try:
         # 併設 Parquet を直接読み込む（型をそのまま保持でき、pyarrow 依存も不要）。
-        conn.execute(
-            f"CREATE TABLE {table_name} AS SELECT * FROM read_parquet(?)", [str(parquet_path)]
-        )
+        conn.execute(f"CREATE TABLE {table_name} AS SELECT * FROM read_parquet(?)", [str(parquet_path)])
         for col in index_columns:
             conn.execute(f'CREATE INDEX idx_{table_name}_{col} ON {table_name}("{col}")')
         conn.execute("CREATE TABLE _source_meta (key VARCHAR PRIMARY KEY, value VARCHAR)")
@@ -133,9 +131,7 @@ _PL_TO_SQLITE = {
 
 
 def _create_data_table(conn: sqlite3.Connection, df: pl.DataFrame, table_name: str) -> None:
-    cols_ddl = ", ".join(
-        f'"{name}" {_PL_TO_SQLITE.get(dtype, "TEXT")}' for name, dtype in zip(df.columns, df.dtypes)
-    )
+    cols_ddl = ", ".join(f'"{name}" {_PL_TO_SQLITE.get(dtype, "TEXT")}' for name, dtype in zip(df.columns, df.dtypes))
     conn.execute(f"CREATE TABLE {table_name} ({cols_ddl})")
     placeholders = ", ".join("?" for _ in df.columns)
     conn.executemany(

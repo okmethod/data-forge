@@ -47,7 +47,7 @@ def splice_preliminary(
     速報側に `preliminary` を付与して縦結合する。
     速報は最新境界＝合併 rollup 不要なので、集約の**後段**で
     ここに合流させることで area 集約（共有ハブ）を無改修に保つ。
-    後段に置くのが要点＝`aggregate.py` は列を「値=sum」「code↔label ペア」の 2 種しかモデル化せず、aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    後段に置くのが要点＝`aggregate.py` は列を「値=sum」「code↔label ペア」の 2 種しかモデル化せず、
     来歴列は第 3 種で `.select(atom_fact.columns)` に落とされ共有ハブも汚す。
     よって集約の機械には通さず、畳み終えた最終ビューにだけ足す。
 
@@ -56,13 +56,10 @@ def splice_preliminary(
     """
     if set(confirmed.columns) != set(preliminary.columns):
         raise ValueError(
-            f"confirmed と preliminary の列が不一致: "
-            f"{sorted(set(confirmed.columns) ^ set(preliminary.columns))}"
+            f"confirmed と preliminary の列が不一致: {sorted(set(confirmed.columns) ^ set(preliminary.columns))}"
         )
     tagged_confirmed = confirmed.with_columns(pl.lit("confirmed").alias(COLUMN))
-    tagged_preliminary = preliminary.select(confirmed.columns).with_columns(
-        pl.lit("preliminary").alias(COLUMN)
-    )
+    tagged_preliminary = preliminary.select(confirmed.columns).with_columns(pl.lit("preliminary").alias(COLUMN))
     out = pl.concat([tagged_confirmed, tagged_preliminary], how="vertical")
 
     grain = list(grain)

@@ -46,9 +46,7 @@ def _base_year(atom_fact: pl.DataFrame, base_year: int | None) -> int:
     return base_year if base_year is not None else max(atom_fact.get_column("year").to_list())
 
 
-def attach_crosswalk(
-    atom_fact: pl.DataFrame, events: pl.DataFrame, *, base_year: int | None = None
-) -> pl.DataFrame:
+def attach_crosswalk(atom_fact: pl.DataFrame, events: pl.DataFrame, *, base_year: int | None = None) -> pl.DataFrame:
     """各年アトムを畳まず、後継コード列 base_code・base_name を同梱して返す（入力列＋2列）。
 
     畳む/畳まないを配布時に固定しない「非固定」ビュー。利用者は area_code のまま使えば
@@ -79,9 +77,7 @@ def attach_crosswalk(
     )
 
 
-def aggregate_to_base(
-    atom_fact: pl.DataFrame, events: pl.DataFrame, *, base_year: int | None = None
-) -> pl.DataFrame:
+def aggregate_to_base(atom_fact: pl.DataFrame, events: pl.DataFrame, *, base_year: int | None = None) -> pl.DataFrame:
     """アトム時系列を base_year 境界の自治体時系列へ畳む（入力と同じスキーマで返す）。
 
     = attach_crosswalk を base_code で実際に合算した確定ビュー。
@@ -95,9 +91,7 @@ def aggregate_to_base(
     cw = attach_crosswalk(atom_fact, events, base_year=base)
 
     cat_codes = _cat_code_cols(atom_fact)
-    cat_labels = [
-        c.removesuffix("_code") for c in cat_codes
-    ]  # sex_code→sex / age_class_code→age_class
+    cat_labels = [c.removesuffix("_code") for c in cat_codes]  # sex_code→sex / age_class_code→age_class
     agg = cw.group_by(["base_code", "year", *cat_codes]).agg(
         pl.col("population").sum().alias("population"),
         *(pl.col(lbl).first().alias(lbl) for lbl in cat_labels),

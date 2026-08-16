@@ -6,7 +6,8 @@ e-Stat のスキーマ設計は年（テーブル世代）で全く異なる。�
 コード対応・事前フィルタ）だけで吸収する（＝年関数を増やさない）。
 
 年ごとの構造の違い（すべて同一の出力スキーマへ写像する）:
-    - 1980(0003412413)/1985(0003412414)/1990(0003412415)/1995(0003412416): 同型の「年齢3区分,男女別人口及び年齢別割合」表。
+    - 1980(0003412413)/1985(0003412414)/1990(0003412415)/1995(0003412416):
+      同型の「年齢3区分,男女別人口及び年齢別割合」表。
       area 構造は 2000/2005 と同型（level3=市区町村・level4=区）だが、男女は cat02。
       年齢3区分(cat01)・表章項目tab(020人口/105割合)を持つため tab=020・cat01=100(年齢総数) で絞る。
       本表は全国(00000)行を持たない（都道府県始まり）→ 他年と揃え 47都道府県合計から全国行を復元する。
@@ -71,19 +72,12 @@ def clean_population(
             pl.col("area_code"),
             pl.col("area_name"),
             pl.col("area_level").cast(pl.Int8, strict=False).alias("area_level"),
-            pl.col(axis_code)
-            .replace_strict({k: v[0] for k, v in sex_by_code.items()})
-            .alias("sex_code"),
-            pl.col(axis_code)
-            .replace_strict({k: v[1] for k, v in sex_by_code.items()})
-            .alias("sex"),
+            pl.col(axis_code).replace_strict({k: v[0] for k, v in sex_by_code.items()}).alias("sex_code"),
+            pl.col(axis_code).replace_strict({k: v[1] for k, v in sex_by_code.items()}).alias("sex"),
             # time_code 例: "2020000000" の先頭4桁が年
             pl.col("time_code").str.slice(0, 4).cast(pl.Int16).alias("year"),
             # value は文字列。数字以外（"-" 等の欠損記号）は null に落とす
-            pl.col("value")
-            .str.replace_all(r"[^0-9-]", "")
-            .cast(pl.Int64, strict=False)
-            .alias("population"),
+            pl.col("value").str.replace_all(r"[^0-9-]", "").cast(pl.Int64, strict=False).alias("population"),
         )
         .with_columns(
             (pl.col("area_level") != _OBSOLETE_AREA_LEVEL).alias("is_current"),
@@ -198,23 +192,12 @@ def clean_population_by_age(tidy: pl.DataFrame) -> pl.DataFrame:
             pl.col("area_code"),
             pl.col("area_name"),
             pl.col("area_level").cast(pl.Int8, strict=False).alias("area_level"),
-            pl.col("cat02_code")
-            .replace_strict({k: v[0] for k, v in SEX_2005.items()})
-            .alias("sex_code"),
-            pl.col("cat02_code")
-            .replace_strict({k: v[1] for k, v in SEX_2005.items()})
-            .alias("sex"),
-            pl.col("cat01_code")
-            .replace_strict({k: v[0] for k, v in AGE_TS.items()})
-            .alias("age_class_code"),
-            pl.col("cat01_code")
-            .replace_strict({k: v[1] for k, v in AGE_TS.items()})
-            .alias("age_class"),
+            pl.col("cat02_code").replace_strict({k: v[0] for k, v in SEX_2005.items()}).alias("sex_code"),
+            pl.col("cat02_code").replace_strict({k: v[1] for k, v in SEX_2005.items()}).alias("sex"),
+            pl.col("cat01_code").replace_strict({k: v[0] for k, v in AGE_TS.items()}).alias("age_class_code"),
+            pl.col("cat01_code").replace_strict({k: v[1] for k, v in AGE_TS.items()}).alias("age_class"),
             pl.col("time_code").str.slice(0, 4).cast(pl.Int16).alias("year"),
-            pl.col("value")
-            .str.replace_all(r"[^0-9-]", "")
-            .cast(pl.Int64, strict=False)
-            .alias("population"),
+            pl.col("value").str.replace_all(r"[^0-9-]", "").cast(pl.Int64, strict=False).alias("population"),
         )
         .with_columns((pl.col("area_level") != _OBSOLETE_AREA_LEVEL).alias("is_current"))
     )

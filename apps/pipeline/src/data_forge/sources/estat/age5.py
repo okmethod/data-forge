@@ -99,10 +99,7 @@ def clean_age5(tidy: pl.DataFrame, *, national: bool) -> pl.DataFrame:
         # time_code 例: "2020000000" の先頭4桁が年
         pl.col("time_code").str.slice(0, 4).cast(pl.Int16).alias("year"),
         # value は文字列。数字以外（"-" 等の欠損記号）は null に落とす
-        pl.col("value")
-        .str.replace_all(r"[^0-9-]", "")
-        .cast(pl.Int64, strict=False)
-        .alias("population"),
+        pl.col("value").str.replace_all(r"[^0-9-]", "").cast(pl.Int64, strict=False).alias("population"),
     ).with_columns((pl.col("area_level") != _OBSOLETE_AREA_LEVEL).alias("is_current"))
     return _inject_age_unknown(fact)
 

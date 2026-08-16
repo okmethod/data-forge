@@ -29,7 +29,6 @@ def get_estat_app_id() -> str:
     app_id = os.getenv("ESTAT_APP_ID")
     if not app_id or app_id == "your_app_id_here":
         raise RuntimeError(
-            "ESTAT_APP_ID が未設定です。apps/pipeline/.env に設定してください "
-            "（取得: https://www.e-stat.go.jp/api/）。"
+            "ESTAT_APP_ID が未設定です。apps/pipeline/.env に設定してください （取得: https://www.e-stat.go.jp/api/）。"
         )
     return app_id

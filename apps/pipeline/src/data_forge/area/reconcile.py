@@ -50,17 +50,11 @@ def national_conservation(atom_fact: pl.DataFrame, national: pl.DataFrame) -> pl
         .group_by("year")
         .agg(pl.col("population").fill_null(0).sum().alias("atom_sum"))
     )
-    nat = national.filter(_total_mask(national)).select(
-        "year", pl.col("population").alias("national")
-    )
+    nat = national.filter(_total_mask(national)).select("year", pl.col("population").alias("national"))
     return (
         nat.join(atom_sum, on="year", how="left")
         .with_columns((pl.col("national") - pl.col("atom_sum")).alias("diff"))
-        .with_columns(
-            pl.col("year")
-            .replace_strict(KNOWN_DIFFS, default=0, return_dtype=pl.Int64)
-            .alias("known_diff")
-        )
+        .with_columns(pl.col("year").replace_strict(KNOWN_DIFFS, default=0, return_dtype=pl.Int64).alias("known_diff"))
         .with_columns(
             (pl.col("diff") == pl.col("known_diff")).alias("ok"),
             ((pl.col("diff") != 0) & (pl.col("diff") == pl.col("known_diff"))).alias("known"),
@@ -69,9 +63,7 @@ def national_conservation(atom_fact: pl.DataFrame, national: pl.DataFrame) -> pl
     )
 
 
-def orphans(
-    atom_fact: pl.DataFrame, events: pl.DataFrame, *, base_year: int | None = None
-) -> pl.DataFrame:
+def orphans(atom_fact: pl.DataFrame, events: pl.DataFrame, *, base_year: int | None = None) -> pl.DataFrame:
     """rollup 後も base_year に存在しないアトム（＝イベント未整備）を人口降順で返す。
 
     列: area_code / area_name / last_year / last_population / base_code。

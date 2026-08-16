@@ -59,9 +59,7 @@ def _upstream_frames(
     return frames, metas
 
 
-def _atom_upstreams(
-    ds: StitchedDataset, *, refresh: bool
-) -> tuple[list[pl.DataFrame], list[SourceMeta], pl.DataFrame]:
+def _atom_upstreams(ds: StitchedDataset, *, refresh: bool) -> tuple[list[pl.DataFrame], list[SourceMeta], pl.DataFrame]:
     """各 upstream（単年）を fetch→clean→アトム抽出し、アトムフレーム群・メタ群・全国行を返す。
 
     アトム抽出には area 階層（parentCode）が要るため raw から直接取り出す
@@ -167,9 +165,7 @@ def load(
 ) -> tuple[pl.DataFrame, SourceMeta]:
     """基底/縫合/射影を判別して配布用 DF と出典メタを返す（CLI 各コマンドの入口）。"""
     if isinstance(ds, StitchedDataset):
-        return _load_stitched(
-            ds, refresh=refresh, join=join or ds.default_join, base_year=base_year
-        )
+        return _load_stitched(ds, refresh=refresh, join=join or ds.default_join, base_year=base_year)
     if isinstance(ds, ProjectedDataset):
         # 射影フローは正規化モードを持たない（join / base_year は無視）。
         return _load_projected(ds, refresh=refresh)
@@ -185,9 +181,7 @@ def build_atoms(
     """
     if isinstance(ds, ProjectedDataset):
         # 射影フローは area master 非依存（合併集約を持たない）＝area 検査の対象外。
-        raise SystemExit(
-            f"{ds.key!r} は射影（area master 非依存）データセットで、area 検査の対象外です"
-        )
+        raise SystemExit(f"{ds.key!r} は射影（area master 非依存）データセットで、area 検査の対象外です")
     if not isinstance(ds, StitchedDataset):
         raise SystemExit(f"{ds.key!r} は派生（時系列）データセットではありません")
     # national 行だけ別途要る（人口保存検査用）ので _atom_upstreams を直接呼ぶ。

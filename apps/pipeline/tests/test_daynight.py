@@ -23,10 +23,28 @@ def test_clean_daynight_schema_and_axis_mapping():
     df = daynight.clean_daynight_population(
         _tidy(
             [
-                {"cat01_code": "100", "area_code": "00000", "area_name": "全国", "area_level": "1", "value": "126146099"},
-                {"cat01_code": "180", "area_code": "00000", "area_name": "全国", "area_level": "1", "value": "126146099"},
+                {
+                    "cat01_code": "100",
+                    "area_code": "00000",
+                    "area_name": "全国",
+                    "area_level": "1",
+                    "value": "126146099",
+                },
+                {
+                    "cat01_code": "180",
+                    "area_code": "00000",
+                    "area_name": "全国",
+                    "area_level": "1",
+                    "value": "126146099",
+                },
                 # 通勤流動の内訳（採らない）
-                {"cat01_code": "140", "area_code": "00000", "area_name": "全国", "area_level": "1", "value": "999"},
+                {
+                    "cat01_code": "140",
+                    "area_code": "00000",
+                    "area_name": "全国",
+                    "area_level": "1",
+                    "value": "999",
+                },
             ]
         )
     )
@@ -55,8 +73,20 @@ def test_clean_daynight_levels_and_missing():
     df = daynight.clean_daynight_population(
         _tidy(
             [
-                {"cat01_code": "100", "area_code": "01303", "area_name": "当別町", "area_level": "6", "value": "17456"},
-                {"cat01_code": "180", "area_code": "0120B", "area_name": "（旧：函館市）", "area_level": "7", "value": "-"},
+                {
+                    "cat01_code": "100",
+                    "area_code": "01303",
+                    "area_name": "当別町",
+                    "area_level": "6",
+                    "value": "17456",
+                },
+                {
+                    "cat01_code": "180",
+                    "area_code": "0120B",
+                    "area_name": "（旧：函館市）",
+                    "area_level": "7",
+                    "value": "-",
+                },
             ]
         )
     ).sort("area_code")

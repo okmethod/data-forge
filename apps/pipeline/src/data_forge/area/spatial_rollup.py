@@ -42,9 +42,7 @@ _REGION_SPEC: list[tuple[str, str, tuple[str, ...]]] = [
     ("R8", "九州地方", ("40", "41", "42", "43", "44", "45", "46", "47")),
 ]
 # 都道府県コード → (region_code, region_name)。
-_REGIONS: dict[str, tuple[str, str]] = {
-    pref: (code, name) for code, name, prefs in _REGION_SPEC for pref in prefs
-}
+_REGIONS: dict[str, tuple[str, str]] = {pref: (code, name) for code, name, prefs in _REGION_SPEC for pref in prefs}
 
 
 def aggregate_to_admin(atom_fact: pl.DataFrame, *, level: str) -> pl.DataFrame:

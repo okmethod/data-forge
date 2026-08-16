@@ -69,9 +69,7 @@ def _national_tidy() -> pl.DataFrame:
 def test_national_schema_and_area_synthesis():
     df = age5.clean_national(_national_tidy())
     assert df.columns == _COLUMNS
-    nat = df.filter((pl.col("sex_code") == "0") & (pl.col("age_class_code") == "100")).row(
-        0, named=True
-    )
+    nat = df.filter((pl.col("sex_code") == "0") & (pl.col("age_class_code") == "100")).row(0, named=True)
     assert nat["area_code"] == "00000"  # area 軸なし → 全国を合成
     assert nat["area_name"] == "全国"
     assert nat["area_level"] == 1
@@ -87,34 +85,27 @@ def test_national_drops_finer_and_recategory_and_imputed():
     assert "320" not in codes and "380" not in codes
     assert "310" in codes
     # 5歳階級合計は不詳補完値(999→time000010の30)を混ぜず 30+25+40=95。
-    parts = df.filter(
-        (pl.col("sex_code") == "0") & pl.col("age_class_code").is_in(["110", "120", "310"])
-    )["population"].sum()
+    parts = df.filter((pl.col("sex_code") == "0") & pl.col("age_class_code").is_in(["110", "120", "310"]))[
+        "population"
+    ].sum()
     assert parts == 95
 
 
 def test_national_injects_age_unknown():
     df = age5.clean_national(_national_tidy())
-    unknown = df.filter((pl.col("sex_code") == "0") & (pl.col("age_class_code") == "999")).row(
-        0, named=True
-    )
+    unknown = df.filter((pl.col("sex_code") == "0") & (pl.col("age_class_code") == "999")).row(0, named=True)
     assert unknown["population"] == 5  # 総数100 − Σ5歳階級95
     assert unknown["age_class"] == "年齢不詳"
     # 年齢保存: Σ5歳階級 + 不詳 == 総数
-    total = df.filter((pl.col("sex_code") == "0") & (pl.col("age_class_code") == "100"))[
-        "population"
-    ][0]
-    non_total = df.filter((pl.col("sex_code") == "0") & (pl.col("age_class_code") != "100"))[
-        "population"
-    ].sum()
+    total = df.filter((pl.col("sex_code") == "0") & (pl.col("age_class_code") == "100"))["population"][0]
+    non_total = df.filter((pl.col("sex_code") == "0") & (pl.col("age_class_code") != "100"))["population"].sum()
     assert non_total == total
 
 
 def test_national_sex_conservation():
     df = age5.clean_national(_national_tidy())
     by_sex = {
-        r["sex_code"]: r["population"]
-        for r in df.filter(pl.col("age_class_code") == "100").iter_rows(named=True)
+        r["sex_code"]: r["population"] for r in df.filter(pl.col("age_class_code") == "100").iter_rows(named=True)
     }
     assert by_sex["1"] + by_sex["2"] == by_sex["0"]  # 男48 + 女52 == 総数100
 
