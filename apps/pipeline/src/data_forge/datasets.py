@@ -11,7 +11,7 @@ from typing import Any
 
 import polars as pl
 
-from data_forge.sources.estat import age5, daynight, households, population
+from data_forge.sources.estat import age5, daynight, households, labor_force, population
 
 
 @dataclass(frozen=True)
@@ -391,6 +391,40 @@ DATASETS: dict[str, Dataset | StitchedDataset | ProjectedDataset] = {
         stem="census_households",
         table_name="households",
         index_columns=["area_code", "household_type_code", "year"],
+    ),
+    # === labor_force（労働力状態3区分×男女別人口）================================
+    # 就業状態等基本集計の時系列データ製品「労働力状態(3区分)，男女別人口及び労働力率」（全国
+    # 0003412175 / 都道府県 0003412176、1950〜2020）。population 族とは別の親（就業状態等基本集計）
+    # だが構造は population_by_age5 と同型＝単一 ID で全年・47県固定＝合併なし＝area master 不要。
+    # 2表は軸完全同型で全国表も実 area 軸(00000/level1)を持つため cleaner は両表 1 個（labor_force.py 参照）。
+    "labor_force_national": Dataset(
+        key="labor_force_national",
+        source="estat",
+        source_params={"stats_data_id": "0003412175"},
+        cleaner=labor_force.clean_labor_force,
+        stem="census_labor_force_national",
+        table_name="labor_force",
+        index_columns=["sex_code", "labor_status_code", "year"],
+    ),
+    "labor_force_prefecture": Dataset(
+        key="labor_force_prefecture",
+        source="estat",
+        source_params={"stats_data_id": "0003412176"},
+        cleaner=labor_force.clean_labor_force,
+        stem="census_labor_force_prefecture",
+        table_name="labor_force",
+        index_columns=["area_code", "sex_code", "labor_status_code", "year"],
+    ),
+    # 派生（射影フロー）: 全国＋47都道府県を area 軸で縦結合した 1950〜2020 の労働力状態時系列（配布正典）。
+    # 各 upstream が既に全年を持つ既製時系列＝disjoint な 00000＋47県の単純 union（合併 rollup 不要）。
+    "labor_force_timeseries": ProjectedDataset(
+        key="labor_force_timeseries",
+        upstreams=["labor_force_national", "labor_force_prefecture"],
+        title="国勢調査 労働力状態3区分×男女別人口 全国・都道府県別時系列（1950年〜2020年 5年間隔）",
+        stem="census_labor_force_timeseries",
+        table_name="labor_force",
+        index_columns=["area_code", "sex_code", "labor_status_code", "year"],
+        grain=["area_code", "sex_code", "labor_status_code", "year"],
     ),
 }
 
