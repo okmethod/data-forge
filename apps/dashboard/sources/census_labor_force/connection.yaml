@@ -1,0 +1,6 @@
+name: census_labor_force
+type: sqlite
+options:
+  # 労働力状態(3区分)，男女別人口及び労働力率（全国・都道府県／1950〜2020）。市区町村は持たない（就業状態等基本集計・単一 ID 時系列）。
+  # 全国 0003412175 ＋ 都道府県 0003412176 を union した配布正典。data/ は非コミットのためローカル出力前提。
+  filename: ../../../../data/processed/census_labor_force_timeseries.sqlite
