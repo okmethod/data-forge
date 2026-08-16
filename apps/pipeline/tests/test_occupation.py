@@ -68,7 +68,7 @@ def _tidy() -> pl.DataFrame:
 
 
 def test_schema_and_mapping():
-    df = occupation.clean_prefecture(_tidy())
+    df = occupation.clean_major12_prefecture(_tidy())
     assert df.columns == _COLUMNS
     total = df.filter((pl.col("sex_code") == "0") & (pl.col("occupation_code") == "100")).row(0, named=True)
     assert total["area_code"] == "01000"
@@ -80,14 +80,14 @@ def test_schema_and_mapping():
 
 
 def test_drops_rate_and_imputed():
-    df = occupation.clean_prefecture(_tidy())
+    df = occupation.clean_major12_prefecture(_tidy())
     # 構成比tab は列に残らない・不詳補完値(time000010)を混ぜていない
     kanri = df.filter((pl.col("sex_code") == "0") & (pl.col("occupation_code") == "110")).row(0, named=True)
     assert kanri["workers"] == 40
 
 
 def test_no_unknown_injection_and_conservation():
-    df = occupation.clean_prefecture(_tidy())
+    df = occupation.clean_major12_prefecture(_tidy())
     # 分類不能が実カテゴリなので導出注入(999)は無い
     assert df.filter(pl.col("occupation_code") == "999").height == 0
     # 保存則: 総数(100) == Σ大分類(110〜220、分類不能含む)
@@ -97,7 +97,7 @@ def test_no_unknown_injection_and_conservation():
 
 
 def test_sex_conservation():
-    df = occupation.clean_prefecture(_tidy())
+    df = occupation.clean_major12_prefecture(_tidy())
     by_sex = {r["sex_code"]: r["workers"] for r in df.filter(pl.col("occupation_code") == "100").iter_rows(named=True)}
     assert by_sex["1"] + by_sex["2"] == by_sex["0"]  # 男60 + 女40 == 総数100
 
@@ -109,10 +109,37 @@ def test_national_synthesizes_area():
             {"tab_code": "334", "cat01_code": "100", "cat02_code": "100", "time_code": "1995000000", "value": "500"},
         ]
     )
-    df = occupation.clean_national(tidy)
+    df = occupation.clean_major12_national(tidy)
     row = df.row(0, named=True)
     assert row["area_code"] == "00000"
     assert row["area_name"] == "全国"
     assert row["area_level"] == 1
     assert row["year"] == 1995
     assert row["workers"] == 500
+
+
+def _tidy_major10() -> pl.DataFrame:
+    # major10（呼称定義は docs occupation.md SSoT）。総数100=100 = 専門技術110:40 + 事務130:35 + 分類不能200:25。
+    # 再掲(210〜240)は class map 非収載で除外される（Σ大分類に二重計上しないこと）。
+    rows = [
+        _row(sex="総数", occ="100", value=100, time="1980000000"),
+        _row(sex="総数", occ="110", value=40, time="1980000000"),
+        _row(sex="総数", occ="130", value=35, time="1980000000"),
+        _row(sex="総数", occ="200", value=25, time="1980000000"),  # J分類不能（実カテゴリ）
+        _row(sex="総数", occ="210", value=999, time="1980000000"),  # （再掲）→ 除外
+        _row(sex="総数", occ="240", value=999, time="1980000000"),  # （再掲）→ 除外
+    ]
+    return pl.DataFrame(rows)
+
+
+def test_major10_drops_recategorized_and_conserves():
+    df = occupation.clean_major10_prefecture(_tidy_major10())
+    # 再掲(210/240)は残らない
+    assert df.filter(pl.col("occupation_code").is_in(["210", "240"])).height == 0
+    # 旧分類名が引かれる（同符号でも major12 と別体系: 110=専門的・技術的）
+    senmon = df.filter(pl.col("occupation_code") == "110").row(0, named=True)
+    assert senmon["occupation"] == "Ａ専門的・技術的職業従事者"
+    # 保存則: 総数(100) == Σ大分類(110〜200・分類不能含む、再掲は除く)
+    parts = df.filter((pl.col("sex_code") == "0") & (pl.col("occupation_code") != "100"))["workers"].sum()
+    total = df.filter((pl.col("sex_code") == "0") & (pl.col("occupation_code") == "100"))["workers"][0]
+    assert parts == total  # 40 + 35 + 25 == 100（再掲は入らない）

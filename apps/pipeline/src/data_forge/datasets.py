@@ -461,37 +461,72 @@ DATASETS: dict[str, Dataset | StitchedDataset | ProjectedDataset] = {
         index_columns=["area_code", "sex_code", "industry_code", "year"],
         grain=["area_code", "sex_code", "industry_code", "year"],
     ),
-    # === occupation（職業大分類×男女別就業者数）==================================
-    # 就業状態等基本集計の時系列データ製品「職業(大分類)，男女別就業者数及び人口構成比」（全国
-    # 0003410408＝1995-2020 / 都道府県 0003410411＝2005-2020）。industry と軸構造が完全同型
-    # （全国表が area 軸を持たない → 全国合成 clean_national と実 area clean_prefecture の2 cleaner）。
-    # 職業は（再掲）中間集計が無く大分類フラット12区分（occupation.py 参照）。
-    "occupation_national": Dataset(
-        key="occupation_national",
+    # === occupation major12（職業大分類・12区分）======================================
+    # 呼称 major12/major10 の定義は docs/datasets/occupation.md「分類体系の呼称（SSoT）」が正典。
+    # 就業状態等基本集計の時系列データ製品「職業(大分類)，男女別就業者数及び人口構成比」
+    # （全国 0003410408＝1995-2020 / 都道府県 0003410411＝2005-2020）。industry と軸構造が完全同型
+    # （全国表が area 軸を持たない → 全国合成 clean_major12_national と実 area clean_major12_prefecture）。
+    # 職業は（再掲）中間集計が無く大分類フラット（occupation.py 参照）。10区分版は major10（後述）。
+    "occupation_major12_national": Dataset(
+        key="occupation_major12_national",
         source="estat",
         source_params={"stats_data_id": "0003410408"},
-        cleaner=occupation.clean_national,
-        stem="census_occupation_national",
-        table_name="occupation",
+        cleaner=occupation.clean_major12_national,
+        stem="census_occupation_major12_national",
+        table_name="occupation_major12",
         index_columns=["sex_code", "occupation_code", "year"],
     ),
-    "occupation_prefecture": Dataset(
-        key="occupation_prefecture",
+    "occupation_major12_prefecture": Dataset(
+        key="occupation_major12_prefecture",
         source="estat",
         source_params={"stats_data_id": "0003410411"},
-        cleaner=occupation.clean_prefecture,
-        stem="census_occupation_prefecture",
-        table_name="occupation",
+        cleaner=occupation.clean_major12_prefecture,
+        stem="census_occupation_major12_prefecture",
+        table_name="occupation_major12",
         index_columns=["area_code", "sex_code", "occupation_code", "year"],
     ),
     # 派生（射影フロー）: 全国(1995-2020)＋47都道府県(2005-2020)を area 軸で縦結合した就業者数時系列。
     # industry_timeseries と同様、年カバレッジ非対称（全国のみ 1995/2000）を union が許容する。
-    "occupation_timeseries": ProjectedDataset(
-        key="occupation_timeseries",
-        upstreams=["occupation_national", "occupation_prefecture"],
-        title="国勢調査 職業大分類×男女別就業者数 全国・都道府県別時系列（全国1995年〜/都道府県2005年〜2020年）",
-        stem="census_occupation_timeseries",
-        table_name="occupation",
+    "occupation_major12_timeseries": ProjectedDataset(
+        key="occupation_major12_timeseries",
+        upstreams=["occupation_major12_national", "occupation_major12_prefecture"],
+        title="国勢調査 職業大分類(12区分)×男女別就業者数 全国・都道府県別時系列（全国1995〜/都道府県2005〜2020）",
+        stem="census_occupation_major12_timeseries",
+        table_name="occupation_major12",
+        index_columns=["area_code", "sex_code", "occupation_code", "year"],
+        grain=["area_code", "sex_code", "occupation_code", "year"],
+    ),
+    # === occupation major10（職業大分類・10区分／1980延伸）============================
+    # 同じ職業軸を分類改訂前へ延伸する別セグメント（呼称定義は occupation.md「分類体系の呼称（SSoT）」）。
+    # e-Stat 原題は「職業(旧大分類)…」（全国 0003410409＝1950-2005 / 都道府県 0003410412＝1980-2005）。
+    # major12 とは大分類が 10↔12 でコード写像不能（同符号でも中身が違う）ゆえ別テーブルにする。cleaner は
+    # major12 と共通本体で class map（OCCUPATION_MAJOR10）だけ差し替え、原表の（再掲）210〜240 は非収載で自動除外する。
+    "occupation_major10_national": Dataset(
+        key="occupation_major10_national",
+        source="estat",
+        source_params={"stats_data_id": "0003410409"},
+        cleaner=occupation.clean_major10_national,
+        stem="census_occupation_major10_national",
+        table_name="occupation_major10",
+        index_columns=["sex_code", "occupation_code", "year"],
+    ),
+    "occupation_major10_prefecture": Dataset(
+        key="occupation_major10_prefecture",
+        source="estat",
+        source_params={"stats_data_id": "0003410412"},
+        cleaner=occupation.clean_major10_prefecture,
+        stem="census_occupation_major10_prefecture",
+        table_name="occupation_major10",
+        index_columns=["area_code", "sex_code", "occupation_code", "year"],
+    ),
+    # 派生（射影フロー）: 全国(1950-2005)＋47都道府県(1980-2005)を area 軸で縦結合。全国は県より
+    # 年カバレッジが広い（1950-1975 は全国のみ）が union は area×職業×year の disjoint で成立する。
+    "occupation_major10_timeseries": ProjectedDataset(
+        key="occupation_major10_timeseries",
+        upstreams=["occupation_major10_national", "occupation_major10_prefecture"],
+        title="国勢調査 職業大分類(10区分)×男女別就業者数 全国・都道府県別時系列（全国1950〜/都道府県1980〜2005）",
+        stem="census_occupation_major10_timeseries",
+        table_name="occupation_major10",
         index_columns=["area_code", "sex_code", "occupation_code", "year"],
         grain=["area_code", "sex_code", "occupation_code", "year"],
     ),

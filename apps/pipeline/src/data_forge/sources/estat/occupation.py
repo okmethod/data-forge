@@ -1,20 +1,33 @@
 """国勢調査 職業（大分類）×男女別就業者数 固有のクレンジング。
 
 就業状態等基本集計の時系列データ製品「職業（大分類），男女別就業者数及び人口構成比
-［職業別］（15歳以上就業者）」（全国 0003410408＝平成7年〜令和2年／都道府県 0003410411＝
-平成17年〜令和2年）を配布用の1枚テーブルへ整形する。産業（industry.py）と軸構造が完全同型
-（tab=334就業者数/構成比・cat01=大分類2015・cat02=男女・全国表 area 軸なし）で、
+［職業別］（15歳以上就業者）」を配布用の1枚テーブルへ整形する。産業（industry.py）と軸構造が
+完全同型（tab=334就業者数/構成比・cat01=職業大分類・cat02=男女・全国表 area 軸なし）で、
 本モジュールは industry.py を職業向けに写したもの。設計思想の詳細は industry.py と共通。
 
-**age5 と同型（全国表が area 軸を持たない）**：全国表(0003410408)は area 軸なし→00000/全国/level1 を
-合成し、都道府県表(0003410411)は area=47都道府県(level2)をそのまま採る。差は area のコード集合と年の
-カバレッジ（全国 1995-2020／県 2005-2020）だけなので **cleaner 本体は共通・national フラグで分岐**。
+**分類改訂で2セグメント併存（コード写像不能ゆえ別テーブル）**：職業大分類は分類改訂で 2 系統に分かれる。
+呼称 major12/major10 の定義（正式分類・区分数・statsDataId・改訂）は docs/datasets/occupation.md
+「分類体系の呼称（SSoT）」が正典で、本モジュールもその呼称に従う（区分数で命名）：
+
+- **major12**: 全国 0003410408（1995-2020）／都道府県 0003410411（2005-2020）
+- **major10**: 全国 0003410409（1950-2005）／都道府県 0003410412（1980-2005）
+
+同符号でも大分類の中身が違うため 10↔12 はコード写像できず union しない。2005 は両版に存在するが総数が
+一致しない（再集計で境界ケースが移動。2005全国=major10:61,505,973/major12:61,530,202）ため橋渡しできず、
+連続系列にはせず別セグメントとして扱う。
+
+**age5 と同型（全国表が area 軸を持たない）**：全国表は area 軸なし→00000/全国/level1 を合成し、
+都道府県表は area=47都道府県(level2)をそのまま採る。
+差は area のコード集合・年カバレッジ・分類だけなので**cleaner 本体は共通**とし、
+`national` フラグと `classes`（採用する大分類コード→名称）で分岐する。
 
 tab は 334(就業者数)のみ採り、構成比(2020_45)は捨てる（構成比 = 各職業÷総数 で count から導出可能）。
 
-職業大分類(cat01)は 総数(100) と大分類12区分(110〜220。220=分類不能の職業)。産業と違い（再掲）の
-中間集計は無く、大分類はフラットな12区分。「分類不能」が実カテゴリとして存在する＝**不詳の導出注入は
-不要**で「総数 == Σ大分類（分類不能含む）」が原資料で恒等成立する（保存則として検証する）。
+職業大分類(cat01)は 総数(100) と大分類区分（major12=110〜220／major10=110〜200）。
+major10 表には（再掲）行(210〜240)が併存するが class map に載せない＝自動除外する
+（industry の中間集計と同方針）。
+両版とも「分類不能の職業」が実カテゴリで存在＝**不詳の導出注入は不要**で
+「総数 == Σ大分類」が原資料で恒等成立する（保存則として検証する）。
 
 出力スキーマ（industry と同型の10列。industry を occupation に差し替えただけ）:
     area_code(str) / area_name(str) / area_level(int) /
@@ -33,9 +46,9 @@ _TAB_WORKERS = "334"
 # cat02（男女_時系列）→ (sex_code, sex名称)。コード体系は industry.SEX と同じ 100/110/120。
 SEX = {"100": ("0", "総数"), "110": ("1", "男"), "120": ("2", "女")}
 
-# cat01（職業大分類2015）→ 名称。総数(100)＋大分類12区分(110〜220)。220=分類不能の職業（実カテゴリ）。
-# 産業と違い（再掲）の中間集計は無い。コードは e-Stat のまま採る。
-OCCUPATION = {
+# cat01 職業大分類（major12。定義は docs occupation.md SSoT）→ 名称。総数(100)＋大分類(110〜220)。
+# 220=分類不能の職業（実カテゴリ）。中間集計（再掲）は無くフラット。コードは e-Stat のまま採る。
+OCCUPATION_MAJOR12 = {
     "100": "総数",
     "110": "Ａ管理的職業従事者",
     "120": "Ｂ専門的・技術的職業従事者",
@@ -51,22 +64,42 @@ OCCUPATION = {
     "220": "Ｌ分類不能の職業",
 }
 
+# cat01 職業大分類（major10。定義は docs occupation.md SSoT）→ 名称。総数(100)＋大分類(110〜200)。
+# 200=分類不能の職業（実カテゴリ）。
+# 原表には（再掲）1〜4(210〜240)が併存するが、class map に載せない＝Σ大分類で二重計上しないよう自動除外する。
+# 同符号でも major12 と中身が違う（A=専門技術等）。
+OCCUPATION_MAJOR10 = {
+    "100": "総数",
+    "110": "Ａ専門的・技術的職業従事者",
+    "120": "Ｂ管理的職業従事者",
+    "130": "Ｃ事務従事者",
+    "140": "Ｄ販売従事者",
+    "150": "Ｅサービス職業従事者",
+    "160": "Ｆ保安職業従事者",
+    "170": "Ｇ農林漁業作業者",
+    "180": "Ｈ運輸・通信従事者",
+    "190": "Ｉ生産工程・労務作業者",
+    "200": "Ｊ分類不能の職業",
+}
 
-def clean_occupation(tidy: pl.DataFrame, *, national: bool) -> pl.DataFrame:
-    """職業大分類×男女別就業者数の tidy → 配布用10列へ写像する（全国/都道府県 共通）。
+
+def clean_occupation(tidy: pl.DataFrame, *, national: bool, classes: dict[str, str]) -> pl.DataFrame:
+    """職業大分類×男女別就業者数の tidy → 配布用10列へ写像する（全国/都道府県・major12/10 共通）。
 
     引数:
-        national … True で全国表(0003410408, area軸なし)＝00000/全国/level1 を合成。
-                   False で都道府県表(0003410411)＝area軸(47県, level2)をそのまま採る。
+        national … True で全国表(area軸なし)＝00000/全国/level1 を合成。
+                   False で都道府県表＝area軸(47県, level2)をそのまま採る。
+        classes  … 採用する職業大分類コード→名称（OCCUPATION_MAJOR12 or OCCUPATION_MAJOR10）。
+                   ここに無いコード（major10 表の再掲210〜240 等）は filter で自動除外される。
 
     手順: tab=334(就業者数。構成比は捨てる) で絞り、cat01→職業大分類・cat02→男女へ写像する。
     2015/2020 は「不詳補完値」版(time_code 末尾 000010)が併存するため通常版(000000)に統一する
-    （industry・age5・labor_force と同方針）。分類不能(220)を含む大分類で「総数 == Σ大分類」が
-    閉じるため不詳の導出注入は行わない（industry と同じ）。
+    （industry・age5・labor_force と同方針。major10 表には不詳補完値版は無いが無害）。分類不能を含む
+    大分類で「総数 == Σ大分類」が閉じるため不詳の導出注入は行わない（industry と同じ）。
     """
     df = (
         tidy.filter(pl.col("tab_code") == _TAB_WORKERS)
-        .filter(pl.col("cat01_code").is_in(list(OCCUPATION)))  # 職業大分類
+        .filter(pl.col("cat01_code").is_in(list(classes)))  # 職業大分類（再掲は非収載＝除外）
         .filter(pl.col("cat02_code").is_in(list(SEX)))  # 男女
         .filter(pl.col("time_code").str.slice(4) == "000000")  # 不詳補完値版を除外
     )
@@ -87,7 +120,7 @@ def clean_occupation(tidy: pl.DataFrame, *, national: bool) -> pl.DataFrame:
         pl.col("cat02_code").replace_strict({k: v[0] for k, v in SEX.items()}).alias("sex_code"),
         pl.col("cat02_code").replace_strict({k: v[1] for k, v in SEX.items()}).alias("sex"),
         pl.col("cat01_code").alias("occupation_code"),
-        pl.col("cat01_code").replace_strict(OCCUPATION).alias("occupation"),
+        pl.col("cat01_code").replace_strict(classes).alias("occupation"),
         # time_code 例: "2020000000" の先頭4桁が年
         pl.col("time_code").str.slice(0, 4).cast(pl.Int16).alias("year"),
         # value は文字列。数字以外（"-" 等の欠損記号）は null に落とす
@@ -95,11 +128,21 @@ def clean_occupation(tidy: pl.DataFrame, *, national: bool) -> pl.DataFrame:
     ).with_columns((pl.col("area_level") != _OBSOLETE_AREA_LEVEL).alias("is_current"))
 
 
-def clean_national(tidy: pl.DataFrame) -> pl.DataFrame:
-    """全国表(0003410408)用 cleaner（area 軸なし → 全国行を合成、1995-2020）。"""
-    return clean_occupation(tidy, national=True)
+def clean_major12_national(tidy: pl.DataFrame) -> pl.DataFrame:
+    """major12 全国表(0003410408)用 cleaner（area 軸なし → 全国行を合成、1995-2020）。"""
+    return clean_occupation(tidy, national=True, classes=OCCUPATION_MAJOR12)
 
 
-def clean_prefecture(tidy: pl.DataFrame) -> pl.DataFrame:
-    """都道府県表(0003410411)用 cleaner（area=47都道府県、2005-2020）。"""
-    return clean_occupation(tidy, national=False)
+def clean_major12_prefecture(tidy: pl.DataFrame) -> pl.DataFrame:
+    """major12 都道府県表(0003410411)用 cleaner（area=47都道府県、2005-2020）。"""
+    return clean_occupation(tidy, national=False, classes=OCCUPATION_MAJOR12)
+
+
+def clean_major10_national(tidy: pl.DataFrame) -> pl.DataFrame:
+    """major10 全国表(0003410409)用 cleaner（area 軸なし → 全国合成、1950-2005）。"""
+    return clean_occupation(tidy, national=True, classes=OCCUPATION_MAJOR10)
+
+
+def clean_major10_prefecture(tidy: pl.DataFrame) -> pl.DataFrame:
+    """major10 都道府県表(0003410412)用 cleaner（area=47都道府県、1980-2005）。"""
+    return clean_occupation(tidy, national=False, classes=OCCUPATION_MAJOR10)
