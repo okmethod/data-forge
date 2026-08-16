@@ -11,7 +11,7 @@ from typing import Any
 
 import polars as pl
 
-from data_forge.sources.estat import age5, daynight, households, labor_force, population
+from data_forge.sources.estat import age5, daynight, households, industry, labor_force, population
 
 
 @dataclass(frozen=True)
@@ -425,6 +425,41 @@ DATASETS: dict[str, Dataset | StitchedDataset | ProjectedDataset] = {
         table_name="labor_force",
         index_columns=["area_code", "sex_code", "labor_status_code", "year"],
         grain=["area_code", "sex_code", "labor_status_code", "year"],
+    ),
+    # === industry（産業大分類×男女別就業者数）====================================
+    # 就業状態等基本集計の時系列データ製品「産業(大分類)，男女別就業者数及び人口構成比」（全国
+    # 0003410395＝1995-2020 / 都道府県 0003410398＝2005-2020）。labor_force と同じ別の親だが構造は
+    # age5 と同型＝全国表が area 軸を持たない → 全国合成の clean_national と実 area の clean_prefecture の
+    # 2 cleaner（industry.py 参照）。全国は県より年カバレッジが広い（1995/2000 は全国のみ）。
+    "industry_national": Dataset(
+        key="industry_national",
+        source="estat",
+        source_params={"stats_data_id": "0003410395"},
+        cleaner=industry.clean_national,
+        stem="census_industry_national",
+        table_name="industry",
+        index_columns=["sex_code", "industry_code", "year"],
+    ),
+    "industry_prefecture": Dataset(
+        key="industry_prefecture",
+        source="estat",
+        source_params={"stats_data_id": "0003410398"},
+        cleaner=industry.clean_prefecture,
+        stem="census_industry_prefecture",
+        table_name="industry",
+        index_columns=["area_code", "sex_code", "industry_code", "year"],
+    ),
+    # 派生（射影フロー）: 全国(1995-2020)＋47都道府県(2005-2020)を area 軸で縦結合した就業者数時系列。
+    # 各 upstream が既に全年を持つ既製時系列＝disjoint な 00000＋47県の単純 union（合併 rollup 不要）。
+    # 年カバレッジは非対称（全国のみ 1995/2000 を持つ）だが union は area×分類×year の disjoint で成立する。
+    "industry_timeseries": ProjectedDataset(
+        key="industry_timeseries",
+        upstreams=["industry_national", "industry_prefecture"],
+        title="国勢調査 産業大分類×男女別就業者数 全国・都道府県別時系列（全国1995年〜/都道府県2005年〜2020年）",
+        stem="census_industry_timeseries",
+        table_name="industry",
+        index_columns=["area_code", "sex_code", "industry_code", "year"],
+        grain=["area_code", "sex_code", "industry_code", "year"],
     ),
 }
 
