@@ -21,7 +21,16 @@ from typing import Any
 
 import polars as pl
 
-from data_forge.sources.estat import age5, daynight, households, industry, labor_force, occupation, population
+from data_forge.sources.estat import (
+    age5,
+    daynight,
+    family_type,
+    households,
+    industry,
+    labor_force,
+    occupation,
+    population,
+)
 
 
 @dataclass(frozen=True)
@@ -396,6 +405,22 @@ _HOUSEHOLDS: dict[str, DatasetEntry] = {
 }
 
 
+# === family_type（世帯の家族類型16区分別 世帯数・世帯人員）====================
+# 軸構造＝family_type.py／一覧＝docs/datasets/family_type.md。
+# households(0003410420) と同型の single-ID fact（全国＋47県＋全年）。分類軸が20コードの4階層ツリー。
+_FAMILY_TYPE: dict[str, DatasetEntry] = {
+    "family_type": Dataset(
+        key="family_type",
+        source="estat",
+        source_params={"stats_data_id": "0003414255"},
+        cleaner=family_type.clean_family_type,
+        stem="census_family_type",
+        table_name="family_type",
+        index_columns=["area_code", "family_type_code", "year"],
+    ),
+}
+
+
 # === labor_force（労働力状態3区分×男女別人口）================================
 # 軸構造＝labor_force.py／一覧＝docs/datasets/labor_force.md。
 # 単一 ID で全年・47県固定＝合併なし。両表とも実 area 軸を持つため cleaner は 1 個共用。
@@ -544,6 +569,7 @@ DATASETS: dict[str, DatasetEntry] = {
     **_DAYNIGHT_POPULATION,
     **_POPULATION_BY_AGE5,
     **_HOUSEHOLDS,
+    **_FAMILY_TYPE,
     **_LABOR_FORCE,
     **_INDUSTRY,
     **_OCCUPATION_MAJOR12,
@@ -556,6 +582,7 @@ _SUBREGISTRIES = (
     _DAYNIGHT_POPULATION,
     _POPULATION_BY_AGE5,
     _HOUSEHOLDS,
+    _FAMILY_TYPE,
     _LABOR_FORCE,
     _INDUSTRY,
     _OCCUPATION_MAJOR12,
