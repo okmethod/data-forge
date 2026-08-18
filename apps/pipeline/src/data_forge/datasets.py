@@ -23,6 +23,7 @@ import polars as pl
 
 from data_forge.sources.estat import (
     age5,
+    age5_municipality,
     daynight,
     family_type,
     households,
@@ -389,6 +390,37 @@ _POPULATION_BY_AGE5: dict[str, DatasetEntry] = {
 }
 
 
+# === population_by_age5_municipality（年齢5歳階級×男女別人口・市区町村版）====
+# 軸構造＝age5_municipality.py／一覧＝docs/datasets/population_by_age5.md。
+# 系統A（各回別 statsDataId・市区町村まで）。M1=2010/2015/2020（平成・令和型）を year 軸で縫合。
+# 合併畳込あり＝StitchedDataset（aggregate_to_base）。1980-2005 は後続。
+_POPULATION_BY_AGE5_MUNI: dict[str, DatasetEntry] = {}
+for _year, (_sid, _cleaner) in {
+    2010: ("0003038591", age5_municipality.clean_2010),
+    2015: ("0003149862", age5_municipality.clean_2015),
+    2020: ("0003445162", age5_municipality.clean_2020),
+}.items():
+    _POPULATION_BY_AGE5_MUNI[f"population_by_age5_municipality_{_year}"] = Dataset(
+        key=f"population_by_age5_municipality_{_year}",
+        source="estat",
+        source_params={"stats_data_id": _sid},
+        cleaner=_cleaner,
+        stem=f"census_population_by_age5_municipality_{_year}",
+        table_name="population_by_age5_municipality",
+        index_columns=["area_code", "sex_code", "age_class_code", "year"],
+    )
+_POPULATION_BY_AGE5_MUNI["population_by_age5_municipality_timeseries"] = StitchedDataset(
+    key="population_by_age5_municipality_timeseries",
+    upstreams=[f"population_by_age5_municipality_{y}" for y in (2010, 2015, 2020)],
+    title="国勢調査 年齢5歳階級×男女別人口 市区町村別時系列（2010年〜2020年 5年間隔・合併補正済み）",
+    stem="census_population_by_age5_municipality_timeseries",
+    table_name="population_by_age5_municipality",
+    index_columns=["area_code", "sex_code", "age_class_code", "year"],
+    grain=["area_code", "sex_code", "age_class_code", "year"],
+    default_join="aggregate_to_base",
+)
+
+
 # === households（世帯の種類別 世帯数・世帯人員）==============================
 # 軸構造＝households.py／一覧＝docs/datasets/households.md。
 # 単一 ID に全国＋47都道府県＋全年を含む＝合併なし・射影不要で単独 Dataset 完結（sex 軸なし）。
@@ -568,6 +600,7 @@ DATASETS: dict[str, DatasetEntry] = {
     **_POPULATION_BY_AGE,
     **_DAYNIGHT_POPULATION,
     **_POPULATION_BY_AGE5,
+    **_POPULATION_BY_AGE5_MUNI,
     **_HOUSEHOLDS,
     **_FAMILY_TYPE,
     **_LABOR_FORCE,
@@ -581,6 +614,7 @@ _SUBREGISTRIES = (
     _POPULATION_BY_AGE,
     _DAYNIGHT_POPULATION,
     _POPULATION_BY_AGE5,
+    _POPULATION_BY_AGE5_MUNI,
     _HOUSEHOLDS,
     _FAMILY_TYPE,
     _LABOR_FORCE,
