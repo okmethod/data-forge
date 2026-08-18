@@ -1,6 +1,6 @@
 ---
 title: 職業
-sidebar_position: 8
+sidebar_position: 9
 ---
 
 データセット: **職業（大分類）別 就業者数**。
