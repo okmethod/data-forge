@@ -7,6 +7,7 @@
 
 from data_forge.datasets import (
     DATASETS,
+    FAMILIES,
     Dataset,
     ProjectedDataset,
     StitchedDataset,
@@ -59,16 +60,29 @@ def test_preliminary_upstreams_reference_existing_base_datasets() -> None:
             assert isinstance(up, Dataset), f"{ds.key}: 速報 upstream {key!r} は基底 Dataset 必須"
 
 
-def test_age5_timeseries_is_projected_flow() -> None:
-    """5歳階級時系列は射影フロー（ProjectedDataset）＝縫合専用の機構を持たない。
+def test_all_table_names_are_registered_families() -> None:
+    """全 table_name はファミリー台帳 FAMILIES の要素（＝閉じた語彙・幽霊テーブル/タイポ検知）。"""
+    unknown = {ds.table_name for ds in DATASETS.values()} - FAMILIES
+    assert not unknown, f"FAMILIES 未登録の table_name: {unknown}"
 
-    既製の時系列帳票を area union するだけなので、default_join（正規化モード）も
+
+def test_age5_prefecture_timeseries_is_projected_flow() -> None:
+    """5歳階級の県世紀時系列は射影フロー（ProjectedDataset）＝縫合専用の機構を持たない。
+
+    既製の時系列帳票（系統B・全国＋県）を area union するだけなので、default_join（正規化モード）も
     preliminary_upstreams（速報 splice）も持たないことを固定する。
+    市区町村旗艦（population_by_age5_timeseries）は逆に合併畳込 Stitched（aggregate_to_base）である。
     """
-    ds = get_dataset("population_by_age5_timeseries")
+    ds = get_dataset("population_by_age5_prefecture_timeseries")
     assert isinstance(ds, ProjectedDataset)
     assert not hasattr(ds, "default_join")
     assert not hasattr(ds, "preliminary_upstreams")
+
+    flagship = get_dataset("population_by_age5_timeseries")
+    assert isinstance(flagship, StitchedDataset)
+    assert flagship.default_join == "aggregate_to_base"
+    # 2系列は同じ table_name（bare）を共有する＝1 family・N:1 ハブ。
+    assert ds.table_name == flagship.table_name == "population_by_age5"
 
 
 def test_projected_datasets_reference_existing_base_upstreams() -> None:

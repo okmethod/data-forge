@@ -13,6 +13,18 @@
 
 レジストリはファミリー単位のサブ辞書（_POPULATION 等）に分け、末尾の DATASETS で束ねる。
 サブ辞書の区切りは cleaner モジュール／table_name のまとまりに対応し、将来のファイル分割の縫い目でもある。
+
+命名規約（family / key / stem / table_name の関係）:
+- **family名 ＝ table_name**。粒度（市区町村/都道府県/全国）や来歴（系統A/B・Stitched/Projected）を
+  suffix に含めない「その fact の論理名」。カバレッジ年次は名前でなく docs/title で明示する。
+- **family : key = 1:N**。key は family名 ＋ 役割/粒度 suffix（_national/_prefecture/_timeseries/_<year> 等）で
+  一意化する。同一 fact の別パーティション/別ビュー（全国 base・県 base・縫合・県ロールアップ）が同じ
+  table_name を共有する（N:1 のハブ）。**基底 key は table_name と決して一致しない**。
+- **key : stem = 1:1**（stem = "census_" ＋ key が慣習・test で一意性を担保）。stem は出力ファイル名＝物理 identity。
+- 分類改訂等で「同名では畳めない別 fact」になる場合のみ、**粒度語でない弁別子**で別 family を立てる
+  （例: occupation_major12 / occupation_major10）。粒度語（_prefecture 等）を family名に入れると
+  key の area suffix と衝突するため避ける。
+- family名の閉じた語彙は下記 FAMILIES に集約し、test で全 table_name ∈ FAMILIES を強制する。
 """
 
 from collections.abc import Callable
@@ -103,6 +115,25 @@ class ProjectedDataset:
 
 # 各サブ辞書・DATASETS・get_dataset で共有するエントリ型。
 DatasetEntry = Dataset | StitchedDataset | ProjectedDataset
+
+
+# ファミリー台帳＝table_name の閉じた語彙（＝出力される論理 fact の一覧）。
+# 各エントリの table_name は必ずこの集合の要素（test_datasets で強制）。
+# 新 family 追加時のみここに1語足す。命名規約はモジュール docstring を参照。
+FAMILIES: frozenset[str] = frozenset(
+    {
+        "population",  # 男女別人口
+        "population_by_age",  # 年齢3区分×男女別人口
+        "population_by_age5",  # 年齢5歳階級×男女別人口（市区町村=旗艦／県世紀=companion 同居）
+        "daynight_population",  # 昼夜間人口
+        "households",  # 世帯の種類別 世帯数・世帯人員
+        "family_type",  # 家族類型16区分別 世帯数・世帯人員
+        "labor_force",  # 労働力状態3区分×男女別人口
+        "industry",  # 産業大分類×男女別就業者数
+        "occupation_major12",  # 職業大分類（12区分）×就業者数
+        "occupation_major10",  # 職業大分類（旧10区分）×就業者数
+    }
+)
 
 
 # === population（男女別人口）================================================
@@ -356,8 +387,13 @@ _DAYNIGHT_POPULATION: dict[str, DatasetEntry] = {
 
 
 # === population_by_age5（年齢5歳階級×男女別人口）============================
-# 軸構造＝age5.py／一覧＝docs/datasets/population_by_age5.md。
-# 単一 ID で一世紀を提供＝合併なし＝area master 不要。全国表は area 軸なし→合成（clean_national）。
+# 1 family に2系列が同居する（table_name はどちらも bare "population_by_age5"）:
+#   (1) 市区町村＝旗艦（系統A・各回別 statsDataId・2010-2020・合併畳込）… _<year> base ＋ _timeseries
+#   (2) 全国/都道府県＝世紀 companion（系統B・単一 ID・1920-2020）… _national/_prefecture base ＋ _prefecture_timeseries
+# 粒度は key suffix で表し family名（table_name）には持たせない（命名規約＝モジュール docstring）。
+# 2010-2020 では両系列の県値が重なる＝物理2重保存せず、系統A→県 rollup==系統B県 を検算オラクル(test)で照合する。
+
+# --- (2) 世紀 companion（系統B）: 単一 ID で一世紀。全国表は area 軸なし→合成（clean_national）。--------------
 _POPULATION_BY_AGE5: dict[str, DatasetEntry] = {
     "population_by_age5_national": Dataset(
         key="population_by_age5_national",
@@ -377,12 +413,12 @@ _POPULATION_BY_AGE5: dict[str, DatasetEntry] = {
         table_name="population_by_age5",
         index_columns=["area_code", "sex_code", "age_class_code", "year"],
     ),
-    # 派生（射影フロー）: 全国＋47都道府県を area 軸で縦結合した 1920〜2020 時系列（配布正典）。
-    "population_by_age5_timeseries": ProjectedDataset(
-        key="population_by_age5_timeseries",
+    # 派生（射影フロー）: 全国＋47都道府県を area 軸で縦結合した県粒度 1920〜2020 時系列（世紀 companion の配布正典）。
+    "population_by_age5_prefecture_timeseries": ProjectedDataset(
+        key="population_by_age5_prefecture_timeseries",
         upstreams=["population_by_age5_national", "population_by_age5_prefecture"],
         title="国勢調査 年齢5歳階級×男女別人口 全国・都道府県別時系列（1920年〜2020年 5年間隔）",
-        stem="census_population_by_age5_timeseries",
+        stem="census_population_by_age5_prefecture_timeseries",
         table_name="population_by_age5",
         index_columns=["area_code", "sex_code", "age_class_code", "year"],
         grain=["area_code", "sex_code", "age_class_code", "year"],
@@ -390,31 +426,29 @@ _POPULATION_BY_AGE5: dict[str, DatasetEntry] = {
 }
 
 
-# === population_by_age5_municipality（年齢5歳階級×男女別人口・市区町村版）====
-# 軸構造＝age5_municipality.py／一覧＝docs/datasets/population_by_age5.md。
-# 系統A（各回別 statsDataId・市区町村まで）。M1=2010/2015/2020（平成・令和型）を year 軸で縫合。
-# 合併畳込あり＝StitchedDataset（aggregate_to_base）。1980-2005 は後続。
+# --- (1) 市区町村＝旗艦（系統A）: 各回別 statsDataId・市区町村まで。M1=2010/2015/2020 を year 軸で縫合。-------
+# 合併畳込あり＝StitchedDataset（aggregate_to_base）。1980-2005 は後続。cleaner=age5_municipality。
 _POPULATION_BY_AGE5_MUNI: dict[str, DatasetEntry] = {}
 for _year, (_sid, _cleaner) in {
     2010: ("0003038591", age5_municipality.clean_2010),
     2015: ("0003149862", age5_municipality.clean_2015),
     2020: ("0003445162", age5_municipality.clean_2020),
 }.items():
-    _POPULATION_BY_AGE5_MUNI[f"population_by_age5_municipality_{_year}"] = Dataset(
-        key=f"population_by_age5_municipality_{_year}",
+    _POPULATION_BY_AGE5_MUNI[f"population_by_age5_{_year}"] = Dataset(
+        key=f"population_by_age5_{_year}",
         source="estat",
         source_params={"stats_data_id": _sid},
         cleaner=_cleaner,
-        stem=f"census_population_by_age5_municipality_{_year}",
-        table_name="population_by_age5_municipality",
+        stem=f"census_population_by_age5_{_year}",
+        table_name="population_by_age5",
         index_columns=["area_code", "sex_code", "age_class_code", "year"],
     )
-_POPULATION_BY_AGE5_MUNI["population_by_age5_municipality_timeseries"] = StitchedDataset(
-    key="population_by_age5_municipality_timeseries",
-    upstreams=[f"population_by_age5_municipality_{y}" for y in (2010, 2015, 2020)],
+_POPULATION_BY_AGE5_MUNI["population_by_age5_timeseries"] = StitchedDataset(
+    key="population_by_age5_timeseries",
+    upstreams=[f"population_by_age5_{y}" for y in (2010, 2015, 2020)],
     title="国勢調査 年齢5歳階級×男女別人口 市区町村別時系列（2010年〜2020年 5年間隔・合併補正済み）",
-    stem="census_population_by_age5_municipality_timeseries",
-    table_name="population_by_age5_municipality",
+    stem="census_population_by_age5_timeseries",
+    table_name="population_by_age5",
     index_columns=["area_code", "sex_code", "age_class_code", "year"],
     grain=["area_code", "sex_code", "age_class_code", "year"],
     default_join="aggregate_to_base",

@@ -1,8 +1,9 @@
-"""国勢調査 年齢（5歳階級）×男女別人口 市区町村版（population_by_age5_municipality）のクレンジング。
+"""国勢調査 年齢（5歳階級）×男女別人口 市区町村版（population_by_age5 の旗艦系列）のクレンジング。
 
-各回の基本集計（系統A）の市区町村5歳階級表。全国／都道府県のみの population_by_age5
-（系統B・単一ID・1920-2020）と対をなし、市区町村（旧市区町村 level7 を含む年もある）まで
-下りる代わりに、年ごとに別 statsDataId・別軸交差で不揃い（census_source_tables §3-3）。
+各回の基本集計（系統A）の市区町村5歳階級表。同じ table_name "population_by_age5" に同居する
+全国／都道府県のみの世紀 companion（系統B・単一ID・1920-2020／key は _national/_prefecture/
+_prefecture_timeseries）と対をなし、市区町村（旧市区町村 level7 を含む年もある）まで下りる代わりに、
+年ごとに別 statsDataId・別軸交差で不揃い（census_source_tables §3-3）。
 
 M1 対象＝2010/2015/2020。各年の生表は年齢5歳階級のほかに国籍・出生の月・全域/人口集中地区(DID)
 の軸を持ち、**どの catNN が男女／年齢か（軸割当）もコード体系も年ごとに違う**（特に 2015 は
