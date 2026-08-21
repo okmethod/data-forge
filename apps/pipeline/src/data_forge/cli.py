@@ -38,7 +38,7 @@ def _cmd_fetch(ds: Dataset | StitchedDataset | ProjectedDataset, args: argparse.
             _cmd_fetch(get_dataset(key), args)
         return
     stats_data_id = ds.source_params["stats_data_id"]
-    raw = estat_fetch.fetch(stats_data_id, refresh=args.refresh)
+    raw = estat_fetch.fetch(stats_data_id, refresh=args.refresh, filters=ds.source_params.get("filters"))
     n = len(raw["GET_STATS_DATA"]["STATISTICAL_DATA"]["DATA_INF"]["VALUE"])
     print(f"[fetch] {ds.key}: statsDataId={stats_data_id} → {n:,} 行をキャッシュ")
 

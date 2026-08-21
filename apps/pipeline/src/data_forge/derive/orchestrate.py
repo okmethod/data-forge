@@ -35,7 +35,9 @@ JOIN_CHOICES = [*_COMBINE_JOINS, *_TIME_ROLLUP_JOINS, *_SPACE_ROLLUP_JOINS]
 
 def _load_base(ds: Dataset, *, refresh: bool = False) -> tuple[pl.DataFrame, SourceMeta]:
     """基底データセットを fetch→clean し、配布用 DF と出典メタを返す。"""
-    raw = estat_fetch.fetch(ds.source_params["stats_data_id"], refresh=refresh)
+    raw = estat_fetch.fetch(
+        ds.source_params["stats_data_id"], refresh=refresh, filters=ds.source_params.get("filters")
+    )
     df = ds.cleaner(transform.to_tidy(raw))
     return df, transform.extract_meta(raw)
 
@@ -72,11 +74,13 @@ def _atom_upstreams(ds: StitchedDataset, *, refresh: bool) -> tuple[list[pl.Data
         up = get_dataset(key)
         if not isinstance(up, Dataset):
             raise TypeError(f"upstream {key!r} は基底データセットである必要があります")
-        raw = estat_fetch.fetch(up.source_params["stats_data_id"], refresh=refresh)
+        raw = estat_fetch.fetch(
+            up.source_params["stats_data_id"], refresh=refresh, filters=up.source_params.get("filters")
+        )
         fact = up.cleaner(transform.to_tidy(raw))
         hierarchy = transform.extract_area_hierarchy(raw)
         year = int(fact.get_column("year").unique().item())
-        atom_frames.append(area_atoms.extract_atoms(fact, hierarchy, year=year))
+        atom_frames.append(area_atoms.extract_atoms(fact, hierarchy, year=year, muni_levels=up.muni_levels))
         # 全国行はそのまま渡す（reconcile が分類軸コードで総数スライスを絞るため列を落とさない）。
         nationals.append(fact.filter(pl.col("area_code") == "00000"))
         metas.append(transform.extract_meta(raw))

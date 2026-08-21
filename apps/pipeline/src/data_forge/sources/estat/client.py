@@ -37,13 +37,20 @@ def _fetch_data_page(
     stats_data_id: str,
     *,
     start_position: int | None,
+    filters: dict[str, str] | None = None,
 ) -> dict[str, Any]:
-    """getStatsData の1ページ分を取得する（NEXT_KEY ページングの1単位）。"""
+    """getStatsData の1ページ分を取得する（NEXT_KEY ページングの1単位）。
+
+    `filters` はサーバ側の絞り込みパラメータ（例: `{"cdCat03": "T01,200,201"}`）。
+    巨大表を必要なコードだけに絞って取得件数を抑えるのに使う。
+    """
     params: dict[str, Any] = {
         "appId": app_id,
         "statsDataId": stats_data_id,
         "limit": _LIMIT,
     }
+    if filters:
+        params.update(filters)
     if start_position is not None:
         params["startPosition"] = start_position
 
@@ -102,22 +109,25 @@ def get_stats_list(
     return _as_list(tables) if tables else []
 
 
-def get_stats_data(stats_data_id: str, *, timeout: float = 60.0) -> dict[str, Any]:
+def get_stats_data(
+    stats_data_id: str, *, timeout: float = 60.0, filters: dict[str, str] | None = None
+) -> dict[str, Any]:
     """statsDataId を指定して統計データを全件取得し、生レスポンス dict を返す。
 
     総件数が1リクエスト上限を超える場合は `NEXT_KEY` で追従し、
     追加ページの VALUE を1つ目のレスポンスにマージして返す。
+    `filters` はサーバ側の絞り込みパラメータ（`_fetch_data_page` 参照）。
     """
     app_id = get_estat_app_id()
 
     with httpx.Client(timeout=timeout) as client:
-        first = _fetch_data_page(client, app_id, stats_data_id, start_position=None)
+        first = _fetch_data_page(client, app_id, stats_data_id, start_position=None, filters=filters)
         stat_data = first["GET_STATS_DATA"]["STATISTICAL_DATA"]
         values = _as_list(stat_data["DATA_INF"]["VALUE"])
 
         next_key = stat_data["RESULT_INF"].get("NEXT_KEY")
         while next_key:
-            page = _fetch_data_page(client, app_id, stats_data_id, start_position=next_key)
+            page = _fetch_data_page(client, app_id, stats_data_id, start_position=next_key, filters=filters)
             page_stat = page["GET_STATS_DATA"]["STATISTICAL_DATA"]
             values.extend(_as_list(page_stat["DATA_INF"]["VALUE"]))
             next_key = page_stat["RESULT_INF"].get("NEXT_KEY")
