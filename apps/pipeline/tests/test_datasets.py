@@ -85,6 +85,22 @@ def test_age5_prefecture_timeseries_is_projected_flow() -> None:
     assert ds.table_name == flagship.table_name == "population_by_age5"
 
 
+def test_age5_municipality_reiwa_tables_override_muni_levels() -> None:
+    """令和型 level4/6 の各回 age5 表（1980-2005）は muni_levels={4,6} を必ず明示上書きする。
+
+    これらの年はグローバル _MUNI_LEVELS が {3}（人口時系列製品向け）だが、各回基本集計の
+    5歳/各歳表は市/区=level4・町村=level6・level3=支庁の中間集計、という令和型グレイン。
+    override を欠くと extract_atoms が level3 の支庁だけを葉に拾い市区町村フル（level4/6）を全て
+    落とす（＝日本人カバレッジが壊れた 1990/1995 のバグ）。この不変条件を設定レベルで固定する。
+    2010/2015/2020 はグローバル既定が {4,6} ゆえ override 不要（muni_levels=None 可）。
+    """
+    keys = [f"population_by_age5_{y}" for y in (1980, 1985, 1990, 1995, 2000, 2005)]
+    keys += ["population_by_age5_1990_total", "population_by_age5_1995_total"]
+    for key in keys:
+        ds = get_dataset(key)
+        assert ds.muni_levels == frozenset({4, 6}), f"{key}: 令和型表は muni_levels={{4,6}} 必須"
+
+
 def test_projected_datasets_reference_existing_base_upstreams() -> None:
     """射影データセットの upstream は実在する基底 Dataset（既製時系列の area パーティション）。"""
     for ds in DATASETS.values():

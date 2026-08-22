@@ -140,6 +140,7 @@ uv run data-forge crossfact-check <dataset>   # 総人口スライスを populat
 | **新年度スキーマ**          | 確定版投入時は手動で cleaner 追加＝一時的にテスト空白     | スキーマ差分の自動検出                                                                                   |
 | **CI 不在**                 | ローカル `poe check` 頼み                                 | GitHub Actions で `poe check` 自動化                                                                     |
 | **クロスファクト検算 C2**   | age5→3区分畳込 vs population_by_age は未実装              | by_age(系統B)の年齢不詳の帰属を `getStatsData` 実測→照合式・畳込後アトムで比較・diff は KNOWN_DIFFS 登録 |
+| **日本人スライスの検算**    | C1〜C5 は総人口(nationality=0)のみ照合＝日本人(=1)は検証網の外。旗艦 age5 の 1990/1995 日本人が支庁 level3 混入で壊れていた事故を C1 は検知できず（`muni_levels` 設定の契約テストで別途ガード） | 日本人版の照合オラクル（例: 県 rollup vs 系統B の日本人表・年齢/男女保存）を crossfact に追加 |
 
 ## 10. 関連
 

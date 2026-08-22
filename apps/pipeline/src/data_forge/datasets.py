@@ -435,20 +435,26 @@ _POPULATION_BY_AGE5: dict[str, DatasetEntry] = {
 # 2000/2005 は各歳表（0000032965/0000033783・同型）から 5歳再掲を抽出。cleaner=age5_municipality。
 _POPULATION_BY_AGE5_MUNI_YEARS = (1980, 1985, 1990, 1995, 2000, 2005, 2010, 2015, 2020)
 _POPULATION_BY_AGE5_MUNI_GRAIN = ["area_code", "sex_code", "nationality_code", "age_class_code", "year"]
-# 2000/2005 は各歳の巨大表から 5歳階級の再掲コードだけを拾う。全域(cdCat01=00700)＋5歳コード
-# (cdCat03) にサーバ側絞り込みして行数を抑える（census_source_tables §3-3）。同年の人口時系列製品が
-# level3=市区町村なのに対しこれらの表は令和型 level4/6 なので muni_levels={4,6} を明示上書きする。
+# 2000/2005 は各歳の巨大表から 5歳階級の再掲コードだけを拾う。
+# 全域(cdCat01=00700)＋5歳コード(cdCat03) にサーバ側絞り込みして行数を抑える（census_source_tables §3-3）。
+# 同年の人口時系列製品がlevel3=市区町村なのに対し、
+# これらの表は令和型 level4/6 なので muni_levels={4,6} を明示上書きする。
 # 2005 は「年齢不詳を除く」表ゆえ不詳(900)コードが無い（2000 は 900 を含む）。
 # 1980/1985 も同様に令和型 level4/6 の各歳表（市/区=level4・町村=level6）なので muni_levels={4,6} を
 # 明示上書きする（グローバル _MUNI_LEVELS[1980/85]={3} は人口時系列製品向けで、この表には当たらない）。
+# 1990/1995 の日本人 5歳階級表 006（0000031405/0000032223）も令和型 level4/6
+# （市/区=level4・行政区=level5・町村=level6・level3=支庁の中間集計）。
+# グローバル _MUNI_LEVELS[1990/95]={3} のままだと extract_atoms が
+# level3 の支庁だけを葉に拾い市区町村フル（level4/6）を全て落とす（日本人カバレッジが 37 コードへ壊れる）ため
+# muni_levels={4,6} を明示上書きする。総数版（1990/1995_total＝各歳表00401）は既に {4,6}（下記）。
 _AGE5_2000_CODES = ",".join(["T01", *[str(200 + i) for i in range(20)], "500", "900"])
 _AGE5_2005_CODES = ",".join(["T01", *[str(200 + i) for i in range(20)], "500"])
 _POPULATION_BY_AGE5_MUNI: dict[str, DatasetEntry] = {}
 for _year, _sid, _cleaner, _params, _levels in (
     (1980, "0000030127", age5_municipality.clean_1980, {}, {4, 6}),
     (1985, "0000030449", age5_municipality.clean_1985, {}, {4, 6}),
-    (1990, "0000031405", age5_municipality.clean_1990, {}, None),
-    (1995, "0000032223", age5_municipality.clean_1995, {}, None),
+    (1990, "0000031405", age5_municipality.clean_1990, {}, {4, 6}),
+    (1995, "0000032223", age5_municipality.clean_1995, {}, {4, 6}),
     (2000, "0000032965", age5_municipality.clean_2000, {"cdCat01": "00700", "cdCat03": _AGE5_2000_CODES}, {4, 6}),
     (2005, "0000033783", age5_municipality.clean_2005, {"cdCat01": "00700", "cdCat03": _AGE5_2005_CODES}, {4, 6}),
     (2010, "0003038591", age5_municipality.clean_2010, {}, None),
