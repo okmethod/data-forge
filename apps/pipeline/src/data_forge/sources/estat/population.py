@@ -225,3 +225,78 @@ def _inject_age_unknown(fact: pl.DataFrame) -> pl.DataFrame:
         .select(fact.columns)
     )
     return pl.concat([fact, unknown]).sort("area_code", "sex_code", "age_class_code")
+
+
+# --- population_by_age 世紀 companion（系統B・都道府県・1920〜2020）--------------------
+# 系統B時系列「年齢（3区分）別人口及び年齢別割合 － 全国，都道府県（大正9年～令和2年）」0003410383。
+# 旗艦 clean_population_by_age（市区町村・各回別ID・1980〜）とは別ソースの都道府県 companion で、
+# age5.clean_prefecture と同じ役回り（系統B raw を1920まで遡る世紀 companion）。差の要点:
+#   - 本表は **男女軸を持たない**（総数のみ）→ sex は総数固定。aging（高齢化率）物語は総数ベースで充足。
+#   - tab=1060(実数)/105(割合)。cat01=年齢3区分(100総数/105:0-14/120:15-64/130:65+)。DID 軸なし。
+#   - 2015/2020 は不詳補完版(time 末尾000010)が併存 → 通常版(000000)へ統一（age5/by_age 旗艦と同方針）。
+#   - 全国(00000)行は落とし **47都道府県のみ**を出す（配布・ダッシュボードは全国=Σ47県で復元＝
+#     空間rollup 版と同一シェイプ＝ドロップイン）。
+# age_class_code は旗艦 AGE_TS と同一ターゲット('0'/'1'/'2'/'3'/'9')へ揃える（cat01 の 0-14 は
+# 旗艦=110・本表=105 とコードは違うが写像先は共通）＝ダッシュボード／クロスファクト検算が旗艦と一致。
+AGE_3CLASS_LT: SexMap = {
+    "100": ("0", "総数"),
+    "105": ("1", "年少人口(0-14)"),
+    "120": ("2", "生産年齢人口(15-64)"),
+    "130": ("3", "老年人口(65+)"),
+}
+
+
+def clean_by_age_prefecture(tidy: pl.DataFrame) -> pl.DataFrame:
+    """系統B長期表(0003410383) → 年齢3区分×都道府県 companion（総数のみ・47県・1920〜2020）。
+
+    旗艦 clean_population_by_age と同じ10列スキーマへ寄せる（sex は総数固定）。手順:
+        1. tab=1060（実数。割合105は導出可で捨てる）で絞り、不詳補完版(000010)を除外。
+        2. cat01（年齢3区分）→ age_class_code / age_class（旗艦 AGE_TS と同一ターゲット）。
+        3. sex は本表に軸が無い＝総数固定（sex_code='0' / sex='総数'）。
+        4. 全国(00000)を落とし 47都道府県のみ（全国=Σ県で復元）。
+        5. 年齢不詳（age_class_code=9）= 総数−(年少+生産+老年) を導出注入。
+    """
+    fact = (
+        tidy.filter(pl.col("tab_code") == "1060")
+        .filter(pl.col("cat01_code").is_in(list(AGE_3CLASS_LT)))
+        .filter(pl.col("time_code").str.slice(4) == "000000")
+        .filter(pl.col("area_code") != "00000")
+        .select(
+            pl.col("area_code"),
+            pl.col("area_name"),
+            pl.col("area_level").cast(pl.Int8, strict=False).alias("area_level"),
+            pl.lit("0").alias("sex_code"),
+            pl.lit("総数").alias("sex"),
+            pl.col("cat01_code").replace_strict({k: v[0] for k, v in AGE_3CLASS_LT.items()}).alias("age_class_code"),
+            pl.col("cat01_code").replace_strict({k: v[1] for k, v in AGE_3CLASS_LT.items()}).alias("age_class"),
+            pl.col("time_code").str.slice(0, 4).cast(pl.Int16).alias("year"),
+            pl.col("value").str.replace_all(r"[^0-9-]", "").cast(pl.Int64, strict=False).alias("population"),
+        )
+        .with_columns((pl.col("area_level") != _OBSOLETE_AREA_LEVEL).alias("is_current"))
+    )
+    return _inject_age_unknown(fact)
+
+
+# --- population 世紀 companion（系統B・都道府県・1920〜2020）--------------------------
+# 系統B時系列「男女別人口及び人口性比 － 全国，都道府県（大正9年～令和2年）」0003410379。
+# 旗艦 population（市区町村・各回別ID・1980〜＋2025速報）とは別ソースの都道府県 companion で、
+# age5.clean_prefecture と同じ役回り（系統B raw を1920まで遡る）。要点:
+#   - tab=020(人口)/1120(性比)。cat01=男女(100総数/110男/120女＝SEX_2005)。年齢軸なし。
+#   - area=全国(00000)＋人口集中地区(00100/00200)＋47県。全国と DID を落とし **47都道府県のみ**
+#     （配布・ダッシュボードは全国=Σ47県で復元＝旧・空間rollup 版と同一シェイプ＝ドロップイン）。
+#   - 本表に不詳補完版(time 末尾000010)は無い。将来混入しても年重複は combine_years の grain 検査が弾く。
+# 2025速報は本 companion には無いため、時系列側（population_prefecture_timeseries）で
+# preliminary_upstreams により継ぎ足す（旗艦と同じ splice 機構）。
+def clean_population_prefecture(tidy: pl.DataFrame) -> pl.DataFrame:
+    """系統B長期表(0003410379) → 男女別総人口×都道府県 companion（47県・1920〜2020）。
+
+    旗艦 population と同一8列スキーマ。clean_population（tab=020 で人口のみ・性比1120は除外）を
+    流用し、全国(00000)と人口集中地区(00100/00200)を落として47都道府県だけを残す。
+    """
+    fact = clean_population(
+        tidy,
+        sex_axis="cat01",
+        sex_by_code=SEX_2005,
+        filters=[("tab_code", "020")],
+    )
+    return fact.filter(~pl.col("area_code").is_in(["00000", "00100", "00200"]))

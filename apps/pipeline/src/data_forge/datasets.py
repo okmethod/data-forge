@@ -276,14 +276,31 @@ _POPULATION: dict[str, DatasetEntry] = {
         default_join="union",
     ),
     # 派生（空間軸）: 都道府県別。upstreams は上と同じで default_join=prefecture のみ違える。
+    # 世紀 companion（系統B）: 単一 ID「男女別人口 － 全国，都道府県（大正9年～令和2年）」0003410379。
+    # 旗艦（市区町村・各回別ID・1980〜）とは別ソースの都道府県 companion（age5 の _prefecture と同型）。
+    # 全国と人口集中地区を落とし47県のみ出す（cleaner 参照）。
+    "population_prefecture": Dataset(
+        key="population_prefecture",
+        source="estat",
+        source_params={"stats_data_id": "0003410379"},
+        cleaner=population.clean_population_prefecture,
+        stem="census_population_prefecture",
+        table_name="population",
+        index_columns=["area_code", "sex_code", "year"],
+    ),
+    # 派生: 都道府県 世紀 companion の配布正典（1920〜2020 ＋ 2025速報）。
+    # 戦略B: 旧・空間rollup 版（市区町村旗艦→県・1980〜）から系統B raw 長期へ張り替え済。
+    # 出力シェイプ（47県・全国行なし）は旧版と同一＝ダッシュボードはドロップイン。
+    # 単一 upstream を union（year 軸は既に全年揃い）し、後段で 2025速報を splice する
+    # （＝preliminary を持つため ProjectedDataset ではなく StitchedDataset(union)）。
     "population_prefecture_timeseries": StitchedDataset(
         key="population_prefecture_timeseries",
-        upstreams=[f"population_{y}" for y in (1980, 1985, 1990, 1995, 2000, 2005, 2010, 2015, 2020)],
-        title="国勢調査 男女別人口 都道府県別時系列（1980年〜2020年 5年間隔）",
+        upstreams=["population_prefecture"],
+        title="国勢調査 男女別人口 都道府県別時系列（1920年〜2020年 5年間隔 ＋2025速報）",
         stem="census_population_prefecture_timeseries",
         table_name="population",
         index_columns=["area_code", "sex_code", "year"],
-        default_join="prefecture",
+        default_join="union",
         preliminary_upstreams=["population_2025_preliminary"],
     ),
 }
@@ -326,16 +343,29 @@ _POPULATION_BY_AGE: dict[str, DatasetEntry] = {
         grain=["area_code", "sex_code", "age_class_code", "year"],
         default_join="aggregate_to_base",
     ),
-    # 派生（空間軸）: 都道府県別。
-    "population_by_age_prefecture_timeseries": StitchedDataset(
+    # 世紀 companion（系統B）: 単一 ID「年齢（3区分）別人口 － 全国，都道府県（大正9年～令和2年）」。
+    # 旗艦（市区町村・各回別ID・1980〜）とは別ソースの都道府県 companion（age5 の _prefecture と同型）。
+    # 本表は男女軸を持たない（総数のみ）。全国は落とし47県のみ出す（cleaner 参照）。
+    "population_by_age_prefecture": Dataset(
+        key="population_by_age_prefecture",
+        source="estat",
+        source_params={"stats_data_id": "0003410383"},
+        cleaner=population.clean_by_age_prefecture,
+        stem="census_population_by_age_prefecture",
+        table_name="population_by_age",
+        index_columns=["area_code", "sex_code", "age_class_code", "year"],
+    ),
+    # 派生（射影フロー）: 都道府県 世紀 companion の配布正典（1920〜2020・総数のみ）。
+    # 旧・空間rollup 版（市区町村旗艦→県・1980〜）から系統B raw 長期へ張り替え済（戦略B）。
+    # 出力シェイプ（47県・全国行なし・総数のみ）は旧版と同一＝ダッシュボードはドロップイン。
+    "population_by_age_prefecture_timeseries": ProjectedDataset(
         key="population_by_age_prefecture_timeseries",
-        upstreams=[f"population_by_age_{y}" for y in (1980, 1985, 1990, 1995, 2000, 2005, 2010, 2015, 2020)],
-        title="国勢調査 年齢3区分×男女別人口 都道府県別時系列（1980年〜2020年 5年間隔）",
+        upstreams=["population_by_age_prefecture"],
+        title="国勢調査 年齢3区分別人口（総数）都道府県別時系列（1920年〜2020年 5年間隔）",
         stem="census_population_by_age_prefecture_timeseries",
         table_name="population_by_age",
         index_columns=["area_code", "sex_code", "age_class_code", "year"],
         grain=["area_code", "sex_code", "age_class_code", "year"],
-        default_join="prefecture",
     ),
 }
 

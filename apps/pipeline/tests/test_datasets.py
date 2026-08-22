@@ -14,11 +14,7 @@ from data_forge.datasets import (
     get_dataset,
 )
 
-_PREFECTURE_KEYS = (
-    "population_prefecture_timeseries",
-    "population_by_age_prefecture_timeseries",
-    "daynight_population_prefecture_timeseries",
-)
+_PREFECTURE_KEYS = ("daynight_population_prefecture_timeseries",)
 
 
 def test_all_stems_unique() -> None:
@@ -39,8 +35,6 @@ def test_prefecture_datasets_default_to_prefecture_join() -> None:
 def test_prefecture_datasets_share_upstreams_with_municipality_view() -> None:
     """県粒度ビューは市区町村時系列と同一 upstream（同じ素材を粒度違いで出すだけ）。"""
     pairs = {
-        "population_prefecture_timeseries": "population_timeseries",
-        "population_by_age_prefecture_timeseries": "population_by_age_timeseries",
         "daynight_population_prefecture_timeseries": "daynight_population_timeseries",
     }
     for pref_key, muni_key in pairs.items():
@@ -83,6 +77,44 @@ def test_age5_prefecture_timeseries_is_projected_flow() -> None:
     assert flagship.default_join == "aggregate_to_base"
     # 2系列は同じ table_name（bare）を共有する＝1 family・N:1 ハブ。
     assert ds.table_name == flagship.table_name == "population_by_age5"
+
+
+def test_population_prefecture_timeseries_is_longterm_companion() -> None:
+    """総人口の県時系列は系統B世紀 companion（union＋2025速報 splice・1920〜2020＋速報）。
+
+    戦略B: 旧・空間rollup 版から系統B raw 長期へ張り替え。2025速報を持つため ProjectedDataset
+    ではなく StitchedDataset(default_join="union") で組み、preliminary_upstreams で速報を継ぐ。
+    """
+    ds = get_dataset("population_prefecture_timeseries")
+    assert isinstance(ds, StitchedDataset)
+    assert ds.default_join == "union"
+    assert ds.upstreams == ["population_prefecture"]
+    assert ds.preliminary_upstreams == ["population_2025_preliminary"]
+
+    base = get_dataset("population_prefecture")
+    assert isinstance(base, Dataset)
+    assert base.source_params["stats_data_id"] == "0003410379"
+    assert ds.table_name == base.table_name == "population"
+
+
+def test_by_age_prefecture_timeseries_is_projected_companion() -> None:
+    """3区分の県時系列は系統B世紀 companion＝射影フロー（ProjectedDataset・1920〜2020）。
+
+    戦略B: 旧・空間rollup 版（市区町村旗艦→県・1980〜）から系統B raw 長期へ張り替えた。
+    旗艦（population_by_age_timeseries）は逆に合併畳込 Stitched のまま。table_name は共有。
+    """
+    ds = get_dataset("population_by_age_prefecture_timeseries")
+    assert isinstance(ds, ProjectedDataset)
+    assert ds.upstreams == ["population_by_age_prefecture"]
+
+    base = get_dataset("population_by_age_prefecture")
+    assert isinstance(base, Dataset)
+    assert base.source_params["stats_data_id"] == "0003410383"
+
+    flagship = get_dataset("population_by_age_timeseries")
+    assert isinstance(flagship, StitchedDataset)
+    assert flagship.default_join == "aggregate_to_base"
+    assert ds.table_name == flagship.table_name == base.table_name == "population_by_age"
 
 
 def test_age5_municipality_reiwa_tables_override_muni_levels() -> None:
