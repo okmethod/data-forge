@@ -62,6 +62,9 @@ class Dataset:
     stem: str  # 出力ファイル名の語幹
     table_name: str  # SQLite テーブル名
     index_columns: list[str] = field(default_factory=list)
+    # アトム抽出時の市区町村レベルの明示上書き（None なら年から自動判定）。同じ年でも
+    # e-Stat 製品ごとに level の意味が違う表（例: age5 旗艦の 2000＝令和型 level4/6）で使う。
+    muni_levels: frozenset[int] | None = None
 
 
 @dataclass(frozen=True)
@@ -426,31 +429,72 @@ _POPULATION_BY_AGE5: dict[str, DatasetEntry] = {
 }
 
 
-# --- (1) 市区町村＝旗艦（系統A）: 各回別 statsDataId・市区町村まで。M1=2010/2015/2020 を year 軸で縫合。-------
-# 合併畳込あり＝StitchedDataset（aggregate_to_base）。1980-2005 は後続。cleaner=age5_municipality。
+# --- (1) 市区町村＝旗艦（系統A）: 各回別 statsDataId・市区町村まで。取れる年を year 軸で縫合。--------------------
+# 合併畳込あり＝StitchedDataset（aggregate_to_base）。
+# nationality 軸あり（総数=1980/85/2000-20・日本人=1990/95/2000-20）＝grain に nationality_code を含める。
+# 2000/2005 は各歳表（0000032965/0000033783・同型）から 5歳再掲を抽出。cleaner=age5_municipality。
+_POPULATION_BY_AGE5_MUNI_YEARS = (1980, 1985, 1990, 1995, 2000, 2005, 2010, 2015, 2020)
+_POPULATION_BY_AGE5_MUNI_GRAIN = ["area_code", "sex_code", "nationality_code", "age_class_code", "year"]
+# 2000/2005 は各歳の巨大表から 5歳階級の再掲コードだけを拾う。全域(cdCat01=00700)＋5歳コード
+# (cdCat03) にサーバ側絞り込みして行数を抑える（census_source_tables §3-3）。同年の人口時系列製品が
+# level3=市区町村なのに対しこれらの表は令和型 level4/6 なので muni_levels={4,6} を明示上書きする。
+# 2005 は「年齢不詳を除く」表ゆえ不詳(900)コードが無い（2000 は 900 を含む）。
+_AGE5_2000_CODES = ",".join(["T01", *[str(200 + i) for i in range(20)], "500", "900"])
+_AGE5_2005_CODES = ",".join(["T01", *[str(200 + i) for i in range(20)], "500"])
 _POPULATION_BY_AGE5_MUNI: dict[str, DatasetEntry] = {}
-for _year, (_sid, _cleaner) in {
-    2010: ("0003038591", age5_municipality.clean_2010),
-    2015: ("0003149862", age5_municipality.clean_2015),
-    2020: ("0003445162", age5_municipality.clean_2020),
-}.items():
-    _POPULATION_BY_AGE5_MUNI[f"population_by_age5_{_year}"] = Dataset(
-        key=f"population_by_age5_{_year}",
+for _year, _sid, _cleaner, _params, _levels in (
+    (1980, "0000030127", age5_municipality.clean_1980, {}, None),
+    (1985, "0000030449", age5_municipality.clean_1985, {}, None),
+    (1990, "0000031405", age5_municipality.clean_1990, {}, None),
+    (1995, "0000032223", age5_municipality.clean_1995, {}, None),
+    (2000, "0000032965", age5_municipality.clean_2000, {"cdCat01": "00700", "cdCat03": _AGE5_2000_CODES}, {4, 6}),
+    (2005, "0000033783", age5_municipality.clean_2005, {"cdCat01": "00700", "cdCat03": _AGE5_2005_CODES}, {4, 6}),
+    (2010, "0003038591", age5_municipality.clean_2010, {}, None),
+    (2015, "0003149862", age5_municipality.clean_2015, {}, None),
+    (2020, "0003445162", age5_municipality.clean_2020, {}, None),
+):
+    _key = f"population_by_age5_{_year}"
+    _source_params: dict[str, Any] = {"stats_data_id": _sid}
+    if _params:
+        _source_params["filters"] = _params
+    _POPULATION_BY_AGE5_MUNI[_key] = Dataset(
+        key=_key,
         source="estat",
-        source_params={"stats_data_id": _sid},
+        source_params=_source_params,
         cleaner=_cleaner,
         stem=f"census_population_by_age5_{_year}",
         table_name="population_by_age5",
-        index_columns=["area_code", "sex_code", "age_class_code", "year"],
+        index_columns=_POPULATION_BY_AGE5_MUNI_GRAIN,
+        muni_levels=frozenset(_levels) if _levels else None,
+    )
+# 1990/1995 の**総数**（各歳表 00401・国籍軸なし＝nat_const=0）。日本人版（population_by_age5_1990/1995＝
+# 5歳階級表 006）とは別ソースで、同年に総数(nat=0)・日本人(nat=1)を別 Dataset で持つ（表形式の非対称＝
+# census_source_tables §3-3。2000/2005 は単一表に国籍軸ありで両出しだったのと構造が違う）。令和型 level4/6・
+# 巨大各歳表ゆえサーバ側絞り込み（cdCat01=00700・cdCat02=5歳コード〈900不詳あり＝_AGE5_2000_CODES と同一〉）を掛ける。
+for _year, _sid in ((1990, "0000031401"), (1995, "0000032219")):
+    _key = f"population_by_age5_{_year}_total"
+    _POPULATION_BY_AGE5_MUNI[_key] = Dataset(
+        key=_key,
+        source="estat",
+        source_params={
+            "stats_data_id": _sid,
+            "filters": {"cdCat01": "00700", "cdCat02": _AGE5_2000_CODES},
+        },
+        cleaner=age5_municipality.clean_1990_1995_total,
+        stem=f"census_population_by_age5_{_year}_total",
+        table_name="population_by_age5",
+        index_columns=_POPULATION_BY_AGE5_MUNI_GRAIN,
+        muni_levels=frozenset({4, 6}),
     )
 _POPULATION_BY_AGE5_MUNI["population_by_age5_timeseries"] = StitchedDataset(
     key="population_by_age5_timeseries",
-    upstreams=[f"population_by_age5_{y}" for y in (2010, 2015, 2020)],
-    title="国勢調査 年齢5歳階級×男女別人口 市区町村別時系列（2010年〜2020年 5年間隔・合併補正済み）",
+    upstreams=[f"population_by_age5_{y}" for y in _POPULATION_BY_AGE5_MUNI_YEARS]
+    + ["population_by_age5_1990_total", "population_by_age5_1995_total"],
+    title="国勢調査 年齢5歳階級×男女別人口 市区町村別時系列（1980年〜2020年 5年間隔・国籍別・合併補正済み）",
     stem="census_population_by_age5_timeseries",
     table_name="population_by_age5",
-    index_columns=["area_code", "sex_code", "age_class_code", "year"],
-    grain=["area_code", "sex_code", "age_class_code", "year"],
+    index_columns=_POPULATION_BY_AGE5_MUNI_GRAIN,
+    grain=_POPULATION_BY_AGE5_MUNI_GRAIN,
     default_join="aggregate_to_base",
 )
 

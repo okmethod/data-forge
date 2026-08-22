@@ -82,6 +82,15 @@ def test_leaf_codes_grain():
     assert leaves == {"01201", "01202", "27100", "13101", "13102"}
 
 
+def test_leaf_codes_muni_levels_override():
+    # 2000 の既定は level3=市区町村（人口時系列製品）。令和型 level4/6 の _HIER では level3 が無く、
+    # 東京特別区（parent=13100）だけが葉に残る（level4 の通常市/政令市は拾われない）。
+    assert set(atoms.leaf_codes(_HIER, year=2000).to_list()) == {"13101", "13102"}
+    # 同じ 2000 でも muni_levels={4,6} を明示上書きすると 2020 と同じアトム集合になる（age5 旗艦の 2000＝32965）。
+    over = set(atoms.leaf_codes(_HIER, year=2000, muni_levels=frozenset({4, 6})).to_list())
+    assert over == {"01201", "01202", "27100", "13101", "13102"}
+
+
 def test_rollup_transitive_and_cutoff():
     ev = pl.DataFrame(
         {

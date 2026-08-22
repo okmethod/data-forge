@@ -54,22 +54,27 @@ def _muni_levels(year: int) -> frozenset[int]:
     return _MUNI_LEVELS.get(year, _DEFAULT_MUNI_LEVELS)
 
 
-def leaf_codes(hierarchy: pl.DataFrame, *, year: int) -> pl.Series:
+def leaf_codes(hierarchy: pl.DataFrame, *, year: int, muni_levels: frozenset[int] | None = None) -> pl.Series:
     """その年の area 階層から finest 分割の葉コード集合を返す。
 
     引数:
-        hierarchy … transform.extract_area_hierarchy の出力
-                    （code / name / level / parent_code）。
-        year      … 国勢調査年（市区町村レベルの解釈に使う）。
+        hierarchy   … transform.extract_area_hierarchy の出力
+                      （code / name / level / parent_code）。
+        year        … 国勢調査年（市区町村レベルの解釈に使う）。
+        muni_levels … 市区町村レベルの明示上書き（None なら年から `_muni_levels` で決める）。
+                      同じ年でも e-Stat 製品ごとに level の意味が違うことがある
+                      （例: 2000 の人口時系列製品は level3=市区町村だが、
+                      同年の人口等基本集計・市規模別2表は令和型 level4/6＝旗艦 age5 の 2000）。
 
     グレインは全年で「標準的な市区町村（政令市=1・東京23特別区=各1）」に統一する。
     2005 は特別区部・政令市がともに level3、23区・行政区がともに level4 で level では
     区別できないため、東京23区（parent=特別区部）を明示的に候補へ加え、集計ノード
     （特別区部・市部・郡部・政令市本体で区を子に持つ場合）は「候補の親」として除外する。
     """
+    levels = muni_levels if muni_levels is not None else _muni_levels(year)
     cand = hierarchy.filter(
         (
-            pl.col("level").is_in(list(_muni_levels(year)))
+            pl.col("level").is_in(list(levels))
             | (pl.col("parent_code") == _SPECIAL_WARD_PARENT)  # 東京23特別区（独立自治体）
         )
         & ~pl.col("name").str.contains("旧", literal=True)
@@ -80,10 +85,13 @@ def leaf_codes(hierarchy: pl.DataFrame, *, year: int) -> pl.Series:
     return pl.Series("code", sorted(codes - used))
 
 
-def extract_atoms(fact_year: pl.DataFrame, hierarchy: pl.DataFrame, *, year: int) -> pl.DataFrame:
+def extract_atoms(
+    fact_year: pl.DataFrame, hierarchy: pl.DataFrame, *, year: int, muni_levels: frozenset[int] | None = None
+) -> pl.DataFrame:
     """1 年分の配布用 fact から、その年のアトム（finest 分割）行だけを残す。
 
-    fact のスキーマ（8 列）はそのまま。旧内訳・政令市の区・集計行などの非葉行を落とすだけ。
+    fact のスキーマはそのまま。旧内訳・政令市の区・集計行などの非葉行を落とすだけ。
+    `muni_levels` は市区町村レベルの明示上書き（`leaf_codes` へそのまま渡す）。
     """
-    leaves = leaf_codes(hierarchy, year=year)
+    leaves = leaf_codes(hierarchy, year=year, muni_levels=muni_levels)
     return fact_year.filter(pl.col("area_code").is_in(leaves))
