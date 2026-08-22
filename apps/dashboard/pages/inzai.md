@@ -129,53 +129,66 @@ _※ 末尾の2025年は**速報値**（人口速報集計）。2020年までは
   xType=category
 />
 
-年齢3区分×男女の構成（簡易人口ピラミッド）を1980年と2020年で比べると、街の規模が約3倍に膨らみ、生産年齢層を厚く保ちつつ **老年層（上段）が男女とも大きく膨らんだ**ことが読みとれる。
+年齢**5歳階級**×男女の人口ピラミッドを1980年と2020年で見比べると、**両年に共通する形**が浮かぶ——**子ども世代（0〜14歳）とその親世代（20〜40代）が厚く、その間の若者（10代後半〜20代）がへこむ**。1980年はうっすらと、2020年にははっきりと現れるこの形は、進学・就職で若者が転出し子育て期の家族が流入する、郊外の子育て世帯の街の断面だ（第4節のベッドタウン構造とも符合する）。  
+40年の変化は、この“子・親のふたこぶと若者のくびれ”を保ったまま **規模が約3倍** に膨らんだことと、2020年には **初期入居世代が高齢化して60〜70代にもう一つのふくらみ** が加わったこと——高齢化そのものは全国と同じ方向だ。3区分では潰れてしまうこの凹凸が、5歳階級だからこそ形として読める。
 
 ```sql pyramid_1980
   select
     age_class,
     sex,
     case when sex_code = '1' then -population else population end as pop
-  from census_age_city.by_age
-  where sex_code in ('1','2') and age_class_code in ('1','2','3') and year = 1980
+  from census_age5_city.by_age5
+  where sex_code in ('1','2') and nationality_code = '0'
+    and age_class_code not in ('100','999') and year = 1980
   order by age_class_code desc
 ```
-
-<BarChart
-  data={pyramid_1980}
-  x=age_class
-  y=pop
-  series=sex
-  title="印西市 年齢3区分×男女人口（1980年）"
-  swapXY=true
-  type=stacked
-  sort=false
-  yMin=-35000
-  yMax=35000
-/>
 
 ```sql pyramid_2020
   select
     age_class,
     sex,
     case when sex_code = '1' then -population else population end as pop
-  from census_age_city.by_age
-  where sex_code in ('1','2') and age_class_code in ('1','2','3') and year = 2020
+  from census_age5_city.by_age5
+  where sex_code in ('1','2') and nationality_code = '0'
+    and age_class_code not in ('100','999') and year = 2020
   order by age_class_code desc
 ```
 
+<Grid cols=2>
+
+<!-- prettier-ignore -->
+<BarChart
+  data={pyramid_1980}
+  x=age_class
+  y=pop
+  series=sex
+  title="印西市 年齢5歳階級×男女人口（1980年）"
+  swapXY=true
+  type=stacked
+  sort=false
+  seriesOrder={['男','女']}
+  yMin=-4000
+  yMax=4000
+/>
+
+<!-- prettier-ignore -->
 <BarChart
   data={pyramid_2020}
   x=age_class
   y=pop
   series=sex
-  title="印西市 年齢3区分×男女人口（2020年）"
+  title="印西市 年齢5歳階級×男女人口（2020年）"
   swapXY=true
   type=stacked
   sort=false
-  yMin=-35000
-  yMax=35000
+  seriesOrder={['男','女']}
+  yMin=-4000
+  yMax=4000
 />
+
+</Grid>
+
+_※ 国籍「総数」で描く。より細かい国籍別（総数／日本人）の対比は [人口ピラミッド](/pyramid) ページを参照。_
 
 ---
 

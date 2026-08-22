@@ -3,10 +3,11 @@ title: 人口ピラミッド
 sidebar_position: 2
 ---
 
-データセット: **年齢5歳階級（0〜4／…／85歳以上）×男女別人口** - 1920〜2020年（21回）・全国＋都道府県。
+データセット: **年齢5歳階級×男女別人口** - 都道府県は 1920〜2020年（21回・85歳以上で終端）、市区町村（サンプル＝印西市）は 1980〜2020年（9回・100歳以上まで）。
 
-このページでは、**一世紀分の5歳階級の年齢構造**を、を全国 → 都道府県のスケールで見ていく。  
-（市区町村粒度は持たないため、印西市を軸にした横断は扱わない）
+このデータは **2つの粒度** を組み合わせて持つ。  
+**都道府県は一世紀（1920〜2020）にわたる長期系列**で年齢構造の大きな転換を俯瞰でき、**市区町村は合併畳み込み済みの近年（1980〜2020）系列**で、都道府県表より細かい **100歳以上まで**の階級を1つの市に絞って追える。  
+このページでは、**長期・広域（全国 → 都道府県）** で構造シフトを見たあと、**近年・細粒度（市区町村＝印西市）** へドリルダウンする流れで、5歳階級の年齢構造をたどる。
 
 ---
 
@@ -87,6 +88,8 @@ _※ 各図は年齢不詳を除いた5歳階級のみを描く（不詳は「�
   yMax=5000000
 />
 
+_※ 男性を左向き（負の値）で描くため、ツールチップの男性は負符号で出る（例：「男 −x」＝男性x人）。値の大きさは絶対値で読む。_
+
 _※ 最上段の「85歳以上」は都道府県表に合わせた終端（全国表の85〜89…110歳以上を集約）。_
 
 ---
@@ -161,6 +164,87 @@ _※ 最上段の「85歳以上」は都道府県表に合わせた終端（全�
   y=pop
   series=sex
   title="{inputs.pref.value} 年齢5歳階級×男女（{inputs.pref_year.value}年）"
+  swapXY=true
+  type=stacked
+  sort=false
+  seriesOrder={['男','女']}
+/>
+
+---
+
+## 市区町村：印西市へドリルダウン（1980〜2020・100歳以上まで）
+
+長期・広域の構造シフトを見たところで、粒度を **市区町村** まで下げ、近年（1980〜2020）を1つの市に絞って追う。  
+市区町村のデータは都道府県表より細かく、**90〜94／95〜99／100歳以上**まで刻む。ここでは合併畳み込み済みの千葉ニュータウンの街・**印西市**を例にとる。
+
+面グラフは各5歳階級を積み上げたもの。  
+1980〜2020年で帯の総厚（＝総人口）が約3倍に伸び、とりわけ上位（高齢）の帯が近年ほど厚みを増していく——街の拡大と高齢化が同時に進んだことが読める。
+
+```sql inzai_age5_area
+  select
+    year,
+    age_class,
+    sum(population) as population
+  from census_age5_city.by_age5
+  where sex_code = '0' and nationality_code = '0'
+    and age_class_code not in ('100','999')
+  group by year, age_class_code, age_class
+  order by year, age_class_code
+```
+
+<!-- prettier-ignore -->
+<AreaChart
+  data={inzai_age5_area}
+  x=year
+  y=population
+  series=age_class
+  title="印西市 年齢5歳階級別人口（1980〜2020・総数）"
+  sort=false
+  colorPalette={['#e8f1fb','#d4e5f6','#c0d9f0','#abccea','#97c0e4','#83b3de','#6fa7d8','#5b9ad2','#478ecc','#3a82c1','#3376ad','#2d6a99','#275e85','#215272','#1b465e','#15394a','#0f2d36','#092138','#06192b','#04121f','#020b13']}
+  yFmt="#,##0"
+  xType=category
+/>
+
+_※ 国籍「総数」で描く（`nationality_code='0'`）。市区町村のデータは年齢不詳（999）を階級外に別途保持するため、ここでは 5歳階級のみを積み上げる。_
+
+### 年を選べる断面：100歳以上まで刻む
+
+同じデータを**断面**で見る。  
+都道府県表は「85歳以上」で終端するが、市区町村のデータは **90〜94／95〜99／100歳以上**まで刻む。  
+年を切り替えると、上の都道府県ピラミッド（85歳以上で終端）では潰れていた高齢層の内訳が、近年・細粒度まで下りて初めて開くのがわかる（たとえば2020年の100歳以上は27人＝女性26人・男性1人）。
+
+<Dropdown
+  data={inzai_year_list}
+  name=inzai_year
+  value=year
+  defaultValue="2020"
+  title="年"
+/>
+
+```sql inzai_year_list
+  select distinct cast(cast(year as integer) as varchar) as year
+  from census_age5_city.by_age5
+  order by year desc
+```
+
+```sql inzai_pyramid_total
+  select
+    age_class,
+    sex,
+    case when sex_code = '1' then -population else population end as pop
+  from census_age5_city.by_age5
+  where sex_code in ('1','2') and nationality_code = '0'
+    and age_class_code not in ('100','999') and year = ${inputs.inzai_year.value}
+  order by age_class_code desc
+```
+
+<!-- prettier-ignore -->
+<BarChart
+  data={inzai_pyramid_total}
+  x=age_class
+  y=pop
+  series=sex
+  title="印西市 年齢5歳階級×男女（{inputs.inzai_year.value}年）"
   swapXY=true
   type=stacked
   sort=false

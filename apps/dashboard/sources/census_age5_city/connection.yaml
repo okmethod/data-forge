@@ -1,0 +1,8 @@
+name: census_age5_city
+type: sqlite
+options:
+  # サンプル市区町村（印西市）抽出用＝市区町村旗艦の年齢5歳階級×男女×国籍別 時系列（1980〜2020）。
+  # 都道府県・全国の 5歳階級は companion 系列 census_age5（census_population_by_age5_prefecture_timeseries）を参照。
+  # ★旗艦は 100歳以上（310）まで細粒度・国籍（総数/日本人）2軸を持つ＝都道府県表（85歳以上終端・総数のみ）より細かい。
+  # data/ は非コミットのためローカル出力前提（uv run data-forge run population_by_age5_timeseries）。
+  filename: ../../../../data/processed/census_population_by_age5_timeseries.sqlite

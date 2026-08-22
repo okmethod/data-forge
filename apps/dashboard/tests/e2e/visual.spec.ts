@@ -45,12 +45,14 @@ test("人口ページ（全国→県→サンプル市）が描画される", as
   await page.screenshot({ path: "test-results/census-full.png", fullPage: true });
 });
 
-test("人口ピラミッドページが描画される", async ({ page }) => {
+test("人口ピラミッドページ（全国→県→サンプル市ドリルダウン）が描画される", async ({ page }) => {
   await page.goto("/pyramid", { waitUntil: "networkidle" });
-  await waitCharts(page, 3);
+  await waitCharts(page, 5);
 
-  await expect(page.getByRole("heading", { name: /年齢ピラミッドの転換/ })).toBeVisible();
-  await expect(page.getByRole("heading", { name: /高齢化率の超長期推移/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /全国：年齢構造の推移/ })).toBeVisible();
+  // 市区町村ドリルダウン段（100歳以上・国籍別）
+  await expect(page.getByRole("heading", { name: /印西市へドリルダウン/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /100歳以上まで刻む/ })).toBeVisible();
 
   await page.screenshot({ path: "test-results/pyramid-full.png", fullPage: true });
 });
