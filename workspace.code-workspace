@@ -35,5 +35,6 @@
     "[dockerfile]": {
       "editor.tabSize": 4,
     },
+    "python.terminal.activateEnvironment": false,
   },
 }
