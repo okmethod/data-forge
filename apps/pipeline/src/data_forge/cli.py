@@ -16,6 +16,7 @@
 
 import argparse
 import sys
+from dataclasses import dataclass, field
 from typing import Any
 
 import polars as pl
@@ -89,6 +90,93 @@ def _cmd_area_check(ds: Dataset | StitchedDataset | ProjectedDataset, args: argp
         print(f"⚠️ 未整備の消滅アトム {orph.height} 件（例: {top}）→ area-orphans で全件確認")
     else:
         print("✅ 孤児アトムなし（全消滅アトムが base_year へ到達）")
+
+
+# クロスファクト検算（§validation.md 三角測量）: 照合相手 ds.key → (共有軸, 総数スライス述語)。
+# ハブ（総人口の正典）は population_timeseries 固定。C1=age5・C3=by_age。
+_CROSSFACT_HUB = "population_timeseries"
+
+
+@dataclass(frozen=True)
+class _CrossFactSpec:
+    """クロスファクト検算1件の仕様。年別の許容カテゴリ（スコープ外・定義差）を同梱する。"""
+
+    keys: list[str]
+    other_slice: pl.Expr
+    scope_years: frozenset[int] = frozenset()  # other 未収録の年（other==0 を許容）
+    known_diff_years: frozenset[int] = frozenset()  # 定義差で diff!=0 が期待される年（diff>=0 を許容）
+    reasons: dict[int, str] = field(default_factory=dict)  # 年 → 許容理由（表示用）
+
+
+_CROSSFACT: dict[str, _CrossFactSpec] = {
+    # C1: age5 の 国籍総数(nat=0)×年齢総数(age_class=100) スライス == population。
+    "population_by_age5_timeseries": _CrossFactSpec(
+        keys=["area_code", "sex_code", "year"],
+        other_slice=(pl.col("nationality_code") == "0") & (pl.col("age_class_code") == "100"),
+        scope_years=frozenset({2025}),
+        known_diff_years=frozenset({2005}),
+        reasons={
+            2025: "age5 未収録（population 速報のみ）＝スコープ外",
+            2005: "各歳表が「年齢不詳を除く」ゆえ age5 総数 = population − 年齢不詳（other ≤ hub）",
+        },
+    ),
+    # C3: by_age の 年齢総数(age_class=0) スライス == population（既存「総数スライス一致」の明文化）。
+    "population_by_age_timeseries": _CrossFactSpec(
+        keys=["area_code", "sex_code", "year"],
+        other_slice=pl.col("age_class_code") == "0",
+        scope_years=frozenset({2025}),  # by_age も 1980-2020＝2025 速報は未収録
+        reasons={2025: "by_age 未収録（population 速報のみ）＝スコープ外"},
+    ),
+}
+
+
+def _cmd_crossfact_check(ds: Dataset | StitchedDataset | ProjectedDataset, args: argparse.Namespace) -> None:
+    """クロスファクト検算: ds の総人口スライスが population ハブと共有軸で一致するか（diff=0）。
+
+    別ソース・別系統から到達した同一の総人口（conformed dimension）を照合する。両ファクトを
+    同じ base_year で aggregate_to_base 畳込してから突合するので、level7 カバレッジ差を吸収する。
+    """
+    spec = _CROSSFACT.get(ds.key)
+    if spec is None:
+        raise SystemExit(f"{ds.key!r} はクロスファクト検算の対象外（対応: {sorted(_CROSSFACT)}）")
+    hub_ds = get_dataset(_CROSSFACT_HUB)
+    other, _ = derive.load(ds, refresh=args.refresh, join="aggregate_to_base", base_year=args.base_year)
+    hub, _ = derive.load(hub_ds, refresh=args.refresh, join="aggregate_to_base", base_year=args.base_year)
+    rep = area_reconcile.cross_fact(
+        hub,
+        other,
+        keys=spec.keys,
+        other_slice=spec.other_slice,
+        scope_years=spec.scope_years,
+        known_diff_years=spec.known_diff_years,
+    )
+    head = f"[crossfact-check] {ds.key} vs {_CROSSFACT_HUB}"
+    if "year" not in spec.keys:  # 年軸を持たない検算は総キーだけ突合
+        n_bad = int(rep.filter(~pl.col("ok")).height)
+        print(f"{head}: {'✅ 全キー一致' if n_bad == 0 else f'⚠️ {n_bad} キーで不一致'}")
+        if n_bad:
+            with pl.Config(tbl_rows=30):
+                print(rep.filter(~pl.col("ok")).sort(pl.col("diff").abs(), descending=True))
+        return
+
+    # 年別サマリ: status（match/known_diff/scope_out/mismatch）別に件数・最大|diff| を集計。
+    summary = (
+        rep.with_columns(bad=~pl.col("ok"), adiff=pl.col("diff").abs())
+        .group_by("year", "status")
+        .agg(keys=pl.len(), bad=pl.col("bad").sum(), max_adiff=pl.col("adiff").max())
+        .sort("year")
+    )
+    n_bad = int(rep.filter(~pl.col("ok")).height)
+    verdict = "✅ 全キー整合" if n_bad == 0 else f"⚠️ 真の不一致 {n_bad} キー"
+    print(f"{head}: {verdict}（match=diff0／known_diff=定義差許容／scope_out=スコープ外許容）")
+    with pl.Config(tbl_rows=40):
+        print(summary)
+    for year in sorted(spec.reasons):
+        print(f"  ・{year}: {spec.reasons[year]}")
+    if n_bad:  # 許容カテゴリに収まらない真の不一致だけを詳細表示
+        with pl.Config(tbl_rows=30):
+            print(rep.filter(~pl.col("ok")).sort(pl.col("diff").abs(), descending=True))
+        raise SystemExit(1)
 
 
 def _cmd_area_ingest(args: argparse.Namespace) -> None:
@@ -217,6 +305,13 @@ def build_parser() -> argparse.ArgumentParser:
         p.add_argument("--refresh", action="store_true", help="キャッシュを無視して再取得")
         p.add_argument("--base-year", type=int, default=None, help="基準年（既定=最新年）")
         p.set_defaults(handler=handler)
+
+    # クロスファクト検算（総人口スライスを population ハブと突合＝§validation.md 三角測量）
+    pc = sub.add_parser("crossfact-check", help="クロスファクト検算: 総人口スライスを population ハブと突合")
+    pc.add_argument("dataset", help="照合相手データセットキー（例: population_by_age5_timeseries）")
+    pc.add_argument("--refresh", action="store_true", help="キャッシュを無視して再取得")
+    pc.add_argument("--base-year", type=int, default=None, help="両ファクトの畳込基準年（既定=最新年）")
+    pc.set_defaults(handler=_cmd_crossfact_check)
 
     return parser
 

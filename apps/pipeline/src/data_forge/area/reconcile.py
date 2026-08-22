@@ -63,6 +63,68 @@ def national_conservation(atom_fact: pl.DataFrame, national: pl.DataFrame) -> pl
     )
 
 
+def cross_fact(
+    hub: pl.DataFrame,
+    other: pl.DataFrame,
+    *,
+    keys: list[str],
+    other_slice: pl.Expr | None = None,
+    value: str = "population",
+    scope_years: frozenset[int] = frozenset(),
+    known_diff_years: frozenset[int] = frozenset(),
+) -> pl.DataFrame:
+    """別ソース由来の 2 ファクトを共有軸 `keys` で突合し diff 表を返す（クロスファクト検算）。
+
+    方針A「重複軸はハブと一致検証して捨てる」の実体化。`hub`（総人口の正典＝population）と
+    `other`（照合相手。`other_slice` で総数スライスへ潰してから keys へ集約）を full-join し、
+    共有軸ごとに `value` の差を出す。**full-join ゆえ片側だけに在るキー（カバレッジ差）も
+    diff!=0 として検出する**（level7 差を見落とさない）。
+
+    引数:
+        hub / other … 畳込後（`derive.load(..., join="aggregate_to_base")`）の配布用 DF。
+        keys        … 共有軸（例 `["area_code", "sex_code", "year"]`）。
+        other_slice … other を総数スライスへ絞る述語（例 age5＝`nationality_code=="0"` かつ
+                      `age_class_code=="100"`／by_age＝`age_class_code=="0"`）。hub 側は
+                      呼び出し前に総数構成であること（population は sex 別の総人口）。
+        scope_years … other が未収録の年（例 age5＝2025 速報）。この年は other==0 が期待で
+                      status="scope_out"・ok=(other==0)＝スコープ外として許容する。
+        known_diff_years … 定義差で diff!=0 が期待される年（例 age5＝2005 各歳表は「年齢不詳を
+                      除く」ゆえ other = hub − 年齢不詳 ≤ hub）。status="known_diff"・
+                      ok=(diff>=0)＝定義差の向き（other ≤ hub）が保たれる限り許容する。
+
+    列: *keys / hub / other / diff / status / ok。
+        status … match（diff==0）／scope_out／known_diff／mismatch。
+        ok     … match、または scope_out(other==0)、または known_diff(diff>=0)。
+    """
+    h = hub.group_by(keys).agg(pl.col(value).fill_null(0).sum().alias("hub"))
+    o = other.filter(other_slice) if other_slice is not None else other
+    o = o.group_by(keys).agg(pl.col(value).fill_null(0).sum().alias("other"))
+    rep = (
+        h.join(o, on=keys, how="full", coalesce=True)
+        .with_columns(pl.col("hub").fill_null(0), pl.col("other").fill_null(0))
+        .with_columns((pl.col("hub") - pl.col("other")).alias("diff"))
+    )
+    if "year" in keys:
+        status = (
+            pl.when(pl.col("year").is_in(list(scope_years)))
+            .then(pl.lit("scope_out"))
+            .when(pl.col("year").is_in(list(known_diff_years)))
+            .then(pl.lit("known_diff"))
+            .when(pl.col("diff") == 0)
+            .then(pl.lit("match"))
+            .otherwise(pl.lit("mismatch"))
+        )
+    else:
+        status = pl.when(pl.col("diff") == 0).then(pl.lit("match")).otherwise(pl.lit("mismatch"))
+    return rep.with_columns(status.alias("status")).with_columns(
+        (
+            (pl.col("status") == "match")
+            | ((pl.col("status") == "scope_out") & (pl.col("other") == 0))
+            | ((pl.col("status") == "known_diff") & (pl.col("diff") >= 0))
+        ).alias("ok")
+    ).sort(keys)
+
+
 def orphans(atom_fact: pl.DataFrame, events: pl.DataFrame, *, base_year: int | None = None) -> pl.DataFrame:
     """rollup 後も base_year に存在しないアトム（＝イベント未整備）を人口降順で返す。
 
