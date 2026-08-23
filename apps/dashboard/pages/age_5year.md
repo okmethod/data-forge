@@ -249,3 +249,7 @@ _※ 国籍「総数」で描く（`nationality_code='0'`）。市区町村の�
   sort=false
   seriesOrder={['男','女']}
 />
+
+---
+
+<small>出典：政府統計の総合窓口（e-Stat）の国勢調査を加工して作成。データセット別の詳細な出典は <a href="/sources">出典・ライセンス</a> を参照。</small>

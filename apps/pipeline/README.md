@@ -8,6 +8,11 @@ e-Stat のデータを利用。
 出力物には出典表記（`_source_meta` / `*.meta.json` に自動埋め込み済み）を明示すること。  
 データソースの商用可否は [docs/datasets/data_catalog.md](../../docs/datasets/data_catalog.md) を参照。
 
+データ取得は e-Stat API 経由のため、以下2つの規約に従う。
+
+- コンテンツ利用条件: [e-Stat 利用規約](https://www.e-stat.go.jp/terms-of-use)（政府標準利用規約 2.0 準拠・CC BY 4.0 互換）
+- API 取得条件: [e-Stat API 利用規約](https://www.e-stat.go.jp/api/terms-of-use)（要利用登録。アプリケーションID は各自 [取得](https://www.e-stat.go.jp/api/) し `.env` の `ESTAT_APP_ID` に設定＝第三者提供禁止のためコミット不可）
+
 ---
 
 ## 使い方
