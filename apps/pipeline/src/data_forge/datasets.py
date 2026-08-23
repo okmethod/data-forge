@@ -372,7 +372,8 @@ _POPULATION_BY_AGE: dict[str, DatasetEntry] = {
 
 # === daynight_population（昼夜間人口＝従業地・通学地集計）====================
 # 軸構造＝daynight.py／一覧＝docs/datasets/daynight_population.md。
-# 1990〜2020（1980/1985 は該当表なし）。grain は sex ではなく daynight_code。cleaner は全年 1 個。
+# 1990〜2020（1990 が最古。それ以前へ遡れない根拠＝e-Stat 実検索結果は docs 参照）。
+# grain は sex ではなく daynight_code。cleaner は全年 1 個。
 _DAYNIGHT_POPULATION: dict[str, DatasetEntry] = {
     **{
         f"daynight_population_{year}": Dataset(
