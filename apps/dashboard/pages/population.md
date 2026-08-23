@@ -3,16 +3,16 @@ title: 人口
 sidebar_position: 1
 ---
 
-データセット: **合併畳み込み済みの市区町村別 男女別人口** - 1980〜2020年・全9回分（＋2025速報）
+データセット: **男女別人口** - 都道府県は長期系列（1920〜2020＋2025速報）、市区町村は合併畳み込み済み（1980〜2020＋2025速報）
 
-このページは **全国 → 都道府県の偏在 → ドリルダウン → サンプル市** の順に同じデータを見ていく。  
-（印西市を軸にした横断的な読み解きは [印西市ケーススタディ](/inzai) を参照）
+このページは **全国 → 都道府県の偏在 → 都道府県ドリルダウン → サンプル市（印西市）ドリルダウン** の順に同じデータを見ていく。  
+（人口を**年齢で切った**先の高齢化・年齢構造は [高齢化率](/age_3class) と [人口ピラミッド](/age_5year) を、印西市を軸にした横断的な読み解きは [印西市ケーススタディ](/inzai) を参照）
 
 ---
 
 ## 全国：総人口の推移
 
-全国総人口は **2010年の約1億2,806万人をピークに減少局面** へ入った。
+全国総人口は一世紀で **約5,600万人（1920年）→ 約1億2,806万人（2010年）へ倍増** し、その **2010年をピークに減少局面** へ入った（都道府県の長期系列を全県合計）。
 
 ```sql national
   select year, sum(population) as population
@@ -26,29 +26,43 @@ sidebar_position: 1
   data={national}
   x=year
   y=population
-  title="全国総人口"
+  title="全国総人口（1920〜2025）"
   yFmt="#,##0"
-  yMin=110000000
-  yMax=130000000
-  xType=category
+  xFmt="####"
 />
 
 _※ 末尾の2025年は**速報値**（人口速報集計）。2020年までは確定値。_
 
 ---
 
-## 都道府県の偏在：人口増減ランキング
+## 都道府県の偏在：人口増減ランキング（1920→2020）
 
-全国では2010年以降減少に転じたが、長期では **増えた地域と減った地域に大きく分かれる**。  
-傾向としては東京圏（埼玉・神奈川・千葉）と沖縄が増え、その他地方が減っている。
+1920→2020 の一世紀では **ほぼ全県が増加**（減少は島根県のみ）。
+ただし伸び幅は大きく異なり、**神奈川・埼玉・千葉・東京の東京圏が数倍規模で突出**し、地方ほど伸びが小さい。  
+一方、**起点を1980以降に切り替える**と様相が変わる。
+全国が2010年以降の減少に向かう近年は **増える地域と減る地域に分岐**し、東京圏（埼玉・神奈川・千葉）と沖縄が増え、その他地方が減っている。
 
 **起点年・終点年を切り替えて**、期間ごとに分岐がどう変わるかを確認できる。
 
 <!--
+都道府県は census_prefecture（長期系列）を参照するため 1920〜2020 まで遡れる（市区町村=1980〜 とは別系列）。
 単一選択 Dropdown は先頭オプションが既定になる。defaultValue/ default 属性は非先頭では効かない。
-そのため既定にしたい年を先頭に置く: 起点=1980 昇順 / 終点=2020 降順。
+そのため既定にしたい年を先頭に置く: 起点=1920 昇順 / 終点=2020 降順。
+※1945 は沖縄が null（米軍統治下で未実施）。1945 が起点/終点だと沖縄は増減計算が null になり棒が出ない。
 -->
 <Dropdown name=from_year title="起点年">
+  <DropdownOption value=1920/>
+  <DropdownOption value=1925/>
+  <DropdownOption value=1930/>
+  <DropdownOption value=1935/>
+  <DropdownOption value=1940/>
+  <DropdownOption value=1945/>
+  <DropdownOption value=1950/>
+  <DropdownOption value=1955/>
+  <DropdownOption value=1960/>
+  <DropdownOption value=1965/>
+  <DropdownOption value=1970/>
+  <DropdownOption value=1975/>
   <DropdownOption value=1980/>
   <DropdownOption value=1985/>
   <DropdownOption value=1990/>
@@ -69,6 +83,18 @@ _※ 末尾の2025年は**速報値**（人口速報集計）。2020年までは
   <DropdownOption value=1990/>
   <DropdownOption value=1985/>
   <DropdownOption value=1980/>
+  <DropdownOption value=1975/>
+  <DropdownOption value=1970/>
+  <DropdownOption value=1965/>
+  <DropdownOption value=1960/>
+  <DropdownOption value=1955/>
+  <DropdownOption value=1950/>
+  <DropdownOption value=1945/>
+  <DropdownOption value=1940/>
+  <DropdownOption value=1935/>
+  <DropdownOption value=1930/>
+  <DropdownOption value=1925/>
+  <DropdownOption value=1920/>
 </Dropdown>
 
 ```sql pref_change
@@ -110,7 +136,7 @@ _※ 末尾の2025年は**速報値**（人口速報集計）。2020年までは
 
 ---
 
-## ドリルダウン：都道府県別 総人口の推移
+## 都道府県ドリルダウン：都道府県別 総人口の推移
 
 <Dropdown data={pref_list} name=pref value=pref_name defaultValue="千葉県" title="都道府県" />
 
@@ -131,16 +157,16 @@ _※ 末尾の2025年は**速報値**（人口速報集計）。2020年までは
   data={pref_trend}
   x=year
   y=population
-  title="{inputs.pref.value} の総人口推移"
+  title="{inputs.pref.value} の総人口推移（1920〜2025）"
   yFmt="#,##0"
-  xType=category
+  xFmt="####"
 />
 
 _※ 末尾の2025年は**速報値**。2020年までは確定値。_
 
 ---
 
-## サンプル市：千葉県印西市（合併畳み込みの考慮）
+## サンプル市ドリルダウン：千葉県印西市（合併畳み込みの考慮）
 
 市区町村粒度でしか描けないミクロの一例。  
 印西市は**1996年に市制施行**され、**2010年に印旛村・本埜村を編入**した。
