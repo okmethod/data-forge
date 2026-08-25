@@ -17,6 +17,7 @@
 import argparse
 import sys
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 import polars as pl
@@ -26,6 +27,7 @@ from data_forge.area import reconcile as area_reconcile
 from data_forge.area.history import ingest as area_ingest
 from data_forge.datasets import Dataset, ProjectedDataset, StitchedDataset, get_dataset
 from data_forge.output import export_all
+from data_forge.public_scope import PublicScopePolicy, find_violations
 from data_forge.sources.estat import fetch as estat_fetch
 from data_forge.sources.estat.client import get_stats_list
 
@@ -179,6 +181,27 @@ def _cmd_crossfact_check(ds: Dataset | StitchedDataset | ProjectedDataset, args:
         raise SystemExit(1)
 
 
+def _cmd_public_scope_check(args: argparse.Namespace) -> None:
+    """公開範囲の流出ゲート: build/data に公開範囲外の市区町村コードが無いか検査する。
+
+    検査対象は SQL 絞り込み後の公開物（build/data）に限る。pipeline の生成物は全部入りが
+    正常なので流出は build にしか発生しない。許可値の正典は public_scope.yaml（SSoT）。
+    """
+    policy = PublicScopePolicy.load(args.policy)
+    build_data = Path(args.build_data)
+    if not any(build_data.glob("**/*.parquet")):
+        raise SystemExit(f"[public-scope-check] 検査対象の parquet が無い（{build_data}）。先にビルドが必要。")
+    allow = sorted(policy.allow_municipalities)
+    violations = find_violations(build_data, policy)
+    if violations:
+        print(f"[public-scope-check] ✗ 公開範囲外の市区町村コードを検出（policy allow={allow}）")
+        for code, sample in sorted(violations.items()):
+            print(f"  - {code}  (例: {sample})")
+        print("  → SQL の絞り込みかポリシーのどちらかが不整合。修正するまでデプロイ不可。")
+        raise SystemExit(1)
+    print(f"[public-scope-check] ✓ 市区町村粒度コードは許可分のみ {allow}")
+
+
 def _cmd_area_ingest(args: argparse.Namespace) -> None:
     """廃置分合の生CSV を正規化イベント（events_parsed.csv）へ変換して保存する。"""
     src = args.path
@@ -254,6 +277,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="生CSVのエンコーディング（既定 utf8。Shift-JIS 版なら shift-jis）",
     )
     pi.set_defaults(handler=lambda ds, args: _cmd_area_ingest(args))
+
+    # 公開範囲の流出ゲート（ダッシュボード公開ビルドを SSoT ポリシーと照合。データセット非依存）
+    pp = sub.add_parser("public-scope-check", help="公開範囲の流出ゲート: build/data を public_scope.yaml と照合")
+    pp.add_argument("--policy", required=True, help="公開範囲ポリシー public_scope.yaml のパス")
+    pp.add_argument("--build-data", required=True, help="検査対象ディレクトリ（例: build/data）")
+    pp.set_defaults(handler=lambda ds, args: _cmd_public_scope_check(args))
 
     # 帳票リスト検索（getStatsList）＝目当ての statsDataId を探す探索ツール
     ps = sub.add_parser("estat-search", help="帳票リストを検索し statsDataId を一覧表示")

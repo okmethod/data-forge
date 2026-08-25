@@ -9,7 +9,10 @@
     "sources": "evidence sources",
     "sources:strict": "evidence sources --strict",
     "preview": "evidence preview",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "check:leak": "uv run --project ../pipeline data-forge public-scope-check --policy public_scope.yaml --build-data build/data",
+    "predeploy": "npm run build:strict && npm run check:leak",
+    "deploy": "wrangler pages deploy"
   },
   "engines": {
     "npm": ">=7.0.0",
@@ -39,6 +42,7 @@
     "axios": "^1.7.4"
   },
   "devDependencies": {
-    "@playwright/test": "^1.62.1"
+    "@playwright/test": "^1.62.1",
+    "wrangler": "^4.125.0"
   }
 }
