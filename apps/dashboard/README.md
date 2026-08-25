@@ -2,7 +2,27 @@
 
 [Evidence](https://evidence.dev/) による可視化ダッシュボード。  
 SQL + Markdown で記述し、静的サイト（`build/`）を生成する。  
-Cloudflare Pages へ配信する（[デプロイ](#デプロイcloudflare-pages)参照）。
+静的サイトを Cloudflare Pages へ、DuckDB-WASM のみ R2 から配信する。
+
+公開URL: https://data-forge-dashboard.pages.dev/
+
+---
+
+## ディレクトリ構成
+
+```text
+apps/dashboard/
+├── pages/                # ダッシュボードのページ（.md）
+├── sources/              # Evidence データソース（fact×粒度で分割）
+├── scripts/
+│   └── offload-wasm.mjs  # deploy 前に DuckDB-WASM を R2 へ退避（25MiB 制限回避）
+├── public_scope.yaml     # 公開範囲ポリシー（SSoT。検査は pipeline の public-scope-check）
+├── r2-cors.json          # R2 バケットの CORS 設定
+├── wrangler.toml         # Cloudflare Pages デプロイ設定
+└── evidence.config.yaml
+```
+
+---
 
 ## データソース
 
@@ -45,6 +65,8 @@ uv run data-forge export daynight_population_timeseries  # census_daynight_popul
 uv run data-forge export population_timeseries_raw       # census_population_timeseries_raw.sqlite
 ```
 
+---
+
 ## 使い方
 
 ```bash
@@ -58,6 +80,8 @@ npm run build:strict # クエリ/描画エラーを失敗扱いにしてビル�
 
 データソースを更新したら `npm run sources` を再実行する。
 
+---
+
 ## デプロイ（Cloudflare Pages）
 
 静的サイト（`build/`）を Cloudflare Pages へ手元から直接アップする（CI は使わない）。
@@ -67,14 +91,34 @@ npm run build:strict # クエリ/描画エラーを失敗扱いにしてビル�
 cd apps/dashboard
 npm install                # 初回のみ（wrangler を含む devDependencies を取得）
 npx wrangler login         # 初回のみ（Cloudflare 認証）
-npm run deploy             # predeploy が自動で走る → build → 流出ゲート → deploy
+npm run deploy             # predeploy が自動で走る → build → 流出ゲート → wasm退避 → deploy
 ```
 
 `npm run deploy` は npm の `predeploy` フックにより、必ず以下の順で実行される:
 
 1. `build:strict` — クエリ/描画エラーを失敗扱いにして `build/` を再生成
 2. `check:leak` — **流出ゲート**（下記「公開範囲ポリシー」参照）。1件でも違反があれば非ゼロ終了しデプロイを中断する。
-3. `wrangler pages deploy` — Pages へアップロード
+3. `offload:wasm` — **DuckDB-WASM を R2 へ退避**（下記「DuckDB-WASM の R2 退避」参照）
+4. `wrangler pages deploy` — Pages へアップロード
+
+### DuckDB-WASM の R2 退避（Cloudflare 25MiB 制限の回避）
+
+Evidence がブラウザ用に同梱する DuckDB-WASM（`duckdb-eh` / `duckdb-mvp`）は各 33〜38MiB で、Cloudflare Pages / Workers の **1ファイル 25MiB 上限**を超えて deploy が弾かれる。
+これを回避するため [scripts/offload-wasm.mjs](scripts/offload-wasm.mjs) が deploy 直前に wasm を R2 へ退避する。
+仕組みの詳細は同ファイル冒頭参照。
+
+R2 公開URLは同スクリプトの `R2_PUBLIC_BASE` 既定値に焼き込み済み（非機密・バケット単位で不変）のため、通常のデプロイに env 設定は不要。以下は別バケットで一から構築する場合のみ:
+
+```bash
+# Cloudflare ダッシュボードで R2 を有効化した後
+npx wrangler r2 bucket create <bucket>
+npx wrangler r2 bucket dev-url enable <bucket>          # 表示された https://pub-*.r2.dev を既定値へ反映
+npx wrangler r2 bucket cors set <bucket> --file r2-cors.json
+# offload-wasm.mjs の R2_PUBLIC_BASE 既定値を上記URLに、必要なら R2_BUCKET 既定値も更新すること
+```
+
+- CORS 設定は [r2-cors.json](r2-cors.json)（public wasm なので GET/HEAD を全 Origin 許可）。
+- 別バケットを一時利用するだけなら env `R2_PUBLIC_BASE` / `R2_BUCKET` で既定値を上書きできる。
 
 ### 公開範囲ポリシー（SSoT）
 
@@ -90,21 +134,3 @@ npm run deploy             # predeploy が自動で走る → build → 流出�
   ゲートはルールの写しを持たず YAML を読むだけなので、定義と検査がドリフトしない。
 - **公開範囲を変えるときは `allow_municipalities` を編集する**。SQL 側が追随していなければゲートが検出する。
 - 単体実行は `npm run check:leak`（要ビルド済 `build/`）＝pipeline の uv 環境でコマンドを呼ぶ薄いラッパー。
-
-## 構成
-
-```text
-apps/dashboard/
-├── pages/                              # ダッシュボードのページ（.md）
-├── sources/                           # Evidence データソース（fact×粒度で分割）
-│   ├── census_prefecture/             # 都道府県別 男女別人口
-│   ├── census_age_prefecture/         # 都道府県別 年齢3区分×男女別人口
-│   ├── census_daynight_prefecture/    # 都道府県別 昼夜間人口
-│   ├── census_city/                   # サンプル市 男女別人口
-│   ├── census_city_raw/               # サンプル市 合併畳み込み無し版（比較用）
-│   ├── census_age_city/               # サンプル市 年齢3区分×男女別人口
-│   └── census_daynight_city/          # サンプル市 昼夜間人口
-├── public_scope.yaml                  # 公開範囲ポリシー（SSoT。検査は pipeline の public-scope-check）
-├── wrangler.toml                      # Cloudflare Pages デプロイ設定
-└── evidence.config.yaml
-```

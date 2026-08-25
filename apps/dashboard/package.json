@@ -11,7 +11,8 @@
     "preview": "evidence preview",
     "test:e2e": "playwright test",
     "check:leak": "uv run --project ../pipeline data-forge public-scope-check --policy public_scope.yaml --build-data build/data",
-    "predeploy": "npm run build:strict && npm run check:leak",
+    "offload:wasm": "node scripts/offload-wasm.mjs",
+    "predeploy": "npm run build:strict && npm run check:leak && npm run offload:wasm",
     "deploy": "wrangler pages deploy"
   },
   "engines": {
