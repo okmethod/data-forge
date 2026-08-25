@@ -28,9 +28,7 @@ sidebar_position: 99
   y=population
   title="全国総人口"
   yFmt="#,##0"
-  yMin=110000000
-  yMax=130000000
-  xType=category
+  xFmt="####"
 />
 
 _※ 末尾の2025年は**速報値**（人口速報集計）。2020年までは確定値。_
@@ -64,7 +62,7 @@ _※ 末尾の2025年は**速報値**（人口速報集計）。2020年までは
   series=region
   title="人口指数（1980年=100）"
   yFmt="0.0"
-  xType=category
+  xFmt="####"
 />
 
 _※ 末尾の2025年は**速報値**。2020年までは確定値。_
@@ -108,12 +106,12 @@ _※ 末尾の2025年は**速報値**（人口速報集計）。2020年までは
   select '印西市' as region, year,
     round(sum(case when age_class_code = '3' then population end) * 100.0
       / sum(case when age_class_code in ('1','2','3') then population end), 1) as aging_pct
-  from census_age_city.by_age where sex_code = '0' group by year
+  from census_age_city.by_age where sex_code = '0' and year >= 1980 group by year
   union all
   select '全国' as region, year,
     round(sum(case when age_class_code = '3' then population end) * 100.0
       / sum(case when age_class_code in ('1','2','3') then population end), 1) as aging_pct
-  from census_age_prefecture.by_age where sex_code = '0' group by year
+  from census_age_prefecture.by_age where sex_code = '0' and year >= 1980 group by year
   order by region, year
 ```
 
