@@ -43,8 +43,7 @@ data-forge/
 ├── data/            # .gitignore 対象
 │   ├── raw/         # 取得した生データ
 │   └── processed/   # 精製済みデータ
-└── docs/
-    └── datasets/    # データソース・データセットの説明
+└── docs/            # ドキュメント（索引 = docs/README.md）
 ```
 
 ---
