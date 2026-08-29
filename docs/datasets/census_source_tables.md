@@ -2,7 +2,7 @@
 
 **このドキュメントの役割：** 精製の**取得元**である e-Stat（国勢調査, `statsCode=00200521`）にどんな帳票（統計表）があり、どういう構造を持ち、**どの帳票がどのデータセットのソースになるか**を 1 枚に集約する。ソースの対応づけは帳票の構造（粒度・カバレッジの非対称）で決まり、その根拠を §2・§4 に示す。  
 **精製後データの仕様**（出力スキーマ・データセット一覧・利用方法）は各データセット docs（[population.md](population.md) / [population_by_age.md](population_by_age.md) / [population_by_age5.md](population_by_age5.md) / [daynight_population.md](daynight_population.md) / [households.md](households.md) / [family_type.md](family_type.md)）が正典。  
-ライセンス・商用可否は[data_catalog.md](data_catalog.md)。
+ライセンス・商用可否は[data_catalog.md](../sources/data_catalog.md)。
 地域集約の仕組みは [area_master.md](area_master.md)。
 
 > **読み分けの指針：** 「statsDataId・帳票の粒度・年ごとのクセ・ソース対応の根拠」を知りたい → 本書。

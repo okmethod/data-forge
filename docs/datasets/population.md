@@ -4,7 +4,7 @@
 単年のクロスセクションと、それらを結合した時系列（派生データセット）を提供する。
 
 - パイプラインの使い方は [apps/pipeline/README.md](../../apps/pipeline/README.md)、全体設計は [docs/pipeline-architecture.md](../pipeline-architecture.md) を参照。
-- データソースの利用規約・商用可否は [data_catalog.md](data_catalog.md) を参照。
+- データソースの利用規約・商用可否は [data_catalog.md](../sources/data_catalog.md) を参照。
 
 ---
 
