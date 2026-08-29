@@ -5,7 +5,7 @@
 （[population](population.md) / [population_by_age](population_by_age.md) / 将来の兄弟ファクト）から参照される。
 
 - 実装は [src/data_forge/area/](../../apps/pipeline/src/data_forge/area/)。
-- 依存の向きの原則・全体設計は [apps/pipeline/README.md](../../apps/pipeline/README.md) を参照。
+- 依存の向きの原則・全体設計は [docs/pipeline-architecture.md](../pipeline-architecture.md) を参照。
 
 > **なぜファクトから独立させるか:** 地域集合が年で変わる問題（合併・政令市移行・DID等）は
 > どのファクト（総人口・年齢別・世帯…）にも共通で、grain に依存しない。1 ファクトの doc に
@@ -199,7 +199,7 @@ uv run data-forge area-orphans population_timeseries  # 未整備の消滅アト
 area 層は combine と同格の**データセット非依存**の参照層（population 固有でない）。`combine`（縦結合）と
 `area.aggregate`（基準年集約）は相互に依存させず、`cli.py` が clean→atoms→combine(union)→aggregate と配線する
 （集約を combine に埋め込まない＝合成層を特定の参照データに縛らない）。詳細は
-[apps/pipeline/README.md](../../apps/pipeline/README.md) の「依存の向きの原則」を参照。
+[docs/pipeline-architecture.md](../pipeline-architecture.md) の「依存の向きの原則」を参照。
 
 > **再利用の範囲（重要）:** area 層は「ソース非依存」ではない。アトム抽出は各ソースの area 表現に
 > 依存する（今は e-Stat の area 階層前提）。ソースをまたいで再利用できるのはコード軸が

@@ -11,9 +11,9 @@
 | **全国・都道府県＝companion** | 全国＋47都道府県・1920〜2020（一世紀・総人口）           | B    | `population_by_age5_prefecture_timeseries` | `age5`              |
 
 > **ステータス:** 全国/県版 実装済み（2026-08-15）／市区町村版 M1 実装済み（2026-08-18）。
-> 両系列は別 statsDataId・別 stem（別配布ファイル）だが同じ table_name `population_by_age5` を共有する
-> （N:1 ハブ）。2010-2020 では県値が重なるため物理2重保存せず、市区町村→県 rollup==県 companion を
-> **検算オラクル**（test）で照合する。パイプライン全体設計は [apps/pipeline/README.md](../../apps/pipeline/README.md)。
+> 両系列は別 statsDataId・別 stem（別配布ファイル）だが同じ table_name `population_by_age5` を共有する（N:1 ハブ）。
+> 2010-2020 では県値が重なるため物理2重保存せず、市区町村→県 rollup==県 companion を**検算オラクル**（test）で照合する。
+> パイプライン全体設計は [docs/pipeline-architecture.md](../pipeline-architecture.md)。
 
 ---
 

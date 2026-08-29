@@ -2,10 +2,14 @@
 
 2つの処理フローを持つ:
 
-    縫合（StitchedDataset）… 各回帳票（年ごと別 ID）を year 軸で結合し時系列化。
-        合併畳込（aggregate_to_base）・空間集約（prefecture/region）・速報 splice を持つ。
-    射影（ProjectedDataset）… e-Stat 既製の時系列帳票（1 ID が全年）を area 軸で
-        union するだけ。年の縫合も area master も持たない。
+- 縫合（StitchedDataset）
+    各回帳票（年ごと別 ID）を year 軸で結合し時系列化。
+    速報 splice まではこの段が持つ（area 非依存）。
+    合併畳込（aggregate_to_base）・空間集約（prefecture/region）は area/（参照層）の
+    責務で、orchestrate が縫合の後に別ステップとして配線する（この段には埋め込まない）。
+- 射影（ProjectedDataset）
+    e-Stat 既製の時系列帳票（1 ID が全年）を area 軸で union するだけ。
+    年の縫合も area master も持たない。
 
 構成:
     combine.py    … 純粋な DataFrame 変換（combine_years / union_areas）

@@ -8,7 +8,7 @@
 > **ステータス:** 実装済み（2026-08-16）。**単一 ID に全国・都道府県・全年を含む最小構成**
 > （age5 のような射影も、population のような合併畳み込みも不要）。単独 `Dataset` ＝ cleaner
 > `clean_households` 1 個のみで完結し、combine・area master・reconcile は一切通らない。
-> パイプライン全体設計は [apps/pipeline/README.md](../../apps/pipeline/README.md) を参照。
+> パイプライン全体設計は [docs/pipeline-architecture.md](../pipeline-architecture.md) を参照。
 > 帳票の位置づけ（系統B・世帯系の全体像）は [census_source_tables.md](census_source_tables.md)。
 
 ---

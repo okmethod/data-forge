@@ -7,7 +7,7 @@
 > **ステータス:** **Phase 1・2 実装済み（2026-08-10）**。既存 `population` の資産を再利用した。
 > 「兄弟ファクト」として並置（[population.md](population.md) はそのまま据え置き）。
 > cleaner=`clean_population_by_age`（全年1個）／datasets 9表＋`population_by_age_timeseries`／combine は `grain` 引数で、area 集約（`aggregate_to_base` / `crosswalk`）は分類軸コード列（`*_code`）の自動判別で後方互換に一般化。`--join aggregate_to_base` / `crosswalk` が by_age でも通り、集約後も年齢保存・男女保存が実データで違反0（2020 総人口 126,146,099 一致）。
-> パイプライン全体設計は [apps/pipeline/README.md](../../apps/pipeline/README.md) を参照。
+> パイプライン全体設計は [docs/pipeline-architecture.md](../pipeline-architecture.md) を参照。
 
 ---
 

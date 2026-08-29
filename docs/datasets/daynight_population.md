@@ -12,7 +12,7 @@
 > combine・area 集約（`aggregate_to_base` / `crosswalk`）・reconcile は分類軸コード列（`*_code`）の
 > 自動判別で吸収され、[population.md](population.md) / [population_by_age.md](population_by_age.md) と
 > 同じコードパスに乗る（共有インフラへの変更ゼロ・追加は cleaner ＋ datasets エントリのみ）。
-> パイプライン全体設計は [apps/pipeline/README.md](../../apps/pipeline/README.md) を参照。
+> パイプライン全体設計は [docs/pipeline-architecture.md](../pipeline-architecture.md) を参照。
 
 ---
 
