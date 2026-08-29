@@ -14,12 +14,12 @@
 
 下表は4つのゲートの概観（何を守るか・どの手段で検証するか）。各ゲートの**恒等式・規約**は続く小節、担う関数・テスト・コマンドの具体は「検証手段の索引」と各正典に置く。
 
-| ゲート                 | 何を守るか                             | 検証手段  |
-| ---------------------- | -------------------------------------- | --------- |
-| **保存則（恒等式）**   | 数値の正しさ（合計の一致）             | CLI＋TEST |
-| **クロスファクト検算** | 別ソース由来の同一軸(総人口)の相互整合 | CLI＋TEST |
-| **粒度ガード**         | 二重計上の防止                         | TEST      |
-| **出典同梱**           | 全成果物への citation 同梱             | TEST      |
+| ゲート                 | 何を守るか                             | 検証手段   |
+| ---------------------- | -------------------------------------- | ---------- |
+| **保存則（恒等式）**   | 数値の正しさ（合計の一致）             | TEST & CLI |
+| **クロスファクト検算** | 別ソース由来の同一軸(総人口)の相互整合 | TEST & CLI |
+| **粒度ガード**         | 二重計上の防止                         | TEST       |
+| **出典同梱**           | 全成果物への citation 同梱             | TEST       |
 
 ### 保存則（恒等式）
 
@@ -38,13 +38,13 @@
 別ソース・別系統から同じ総人口へ到達することを相互照合し、方針A「重複軸はハブと一致検証して捨てる」をテストで実体化する。  
 ハブ（正典）は総人口をアトム粒度まで完全に持つ **population**。系統は A＝各回基本集計 / B＝派生表。期待は全て **diff=0**（C2 のみ未実装＝「未カバー領域」）。
 
-| #   | 恒等式                                         | 粒度              | 系統 |
-| --- | ---------------------------------------------- | ----------------- | ---- |
-| C1  | age5(nat=0・年齢総数) == population            | 市区町村×year×sex | A×A  |
-| C2  | age5(nat=0)を3区分へ畳込 == population_by_age  | 市区町村×year×sex | A×B  |
-| C3  | population_by_age(年齢総数) == population      | 市区町村×year×sex | B×A  |
-| C4  | age5→県rollup == population_by_age5_prefecture | 県×year           | A×B  |
-| C5  | daynight(夜間) == population                   | 全国              | −×A  |
+| #      | 恒等式                                         | 粒度              | 系統 |
+| ------ | ---------------------------------------------- | ----------------- | ---- |
+| **C1** | age5(nat=0・年齢総数) == population            | 市区町村×year×sex | A×A  |
+| **C2** | age5(nat=0)を3区分へ畳込 == population_by_age  | 市区町村×year×sex | A×B  |
+| **C3** | population_by_age(年齢総数) == population      | 市区町村×year×sex | B×A  |
+| **C4** | age5→県rollup == population_by_age5_prefecture | 県×year           | A×B  |
+| **C5** | daynight(夜間) == population                   | 全国              | −×A  |
 
 - **C1 が最も堅い**: population も age5 も同じ各回基本集計（系統A・同一調査母集団）ゆえ厳密 diff=0 が期待できる。実測ステータスは「検証手段の索引」の crossfact 検証で得る。
   - **粒度指定の落とし穴**（C1 が顕在化させた知見）: 一部の各歳表は市区町村を持つのに、既定の粒度指定のままだと中間集計（郡／支庁）を葉に拾って粒度が非対称になる。該当年は粒度指定を明示上書きして市区町村フルへ揃える（具体年は population_by_age5 / census_source_tables の各 doc が正典）。
@@ -59,16 +59,16 @@
 
 grain 列の組で重複がないことを保証し、静かに通さず reject する。
 
-- **合成時** … union / intersection / grid の各合成モードで grain 重複を拒否。
-- **来歴付与時** … 確定（confirmed）と速報（preliminary）で同一セルの重複を禁止。
+- **合成時**: union / intersection / grid の各合成モードで grain 重複を拒否。
+- **来歴付与時**: 確定（confirmed）と速報（preliminary）で同一セルの重複を禁止。
 
 ### 出典同梱
 
 全成果物に citation が入ったかを出力段で検証し、欠ければ**出荷をブロック**する。
 
-- Parquet … フッター key-value メタ
-- SQLite / DuckDB … `_source_meta` テーブル
-- CSV … 併設 `<stem>.meta.json` サイドカー
+- **Parquet**: フッター key-value メタ
+- **SQLite / DuckDB**: `_source_meta` テーブル
+- **CSV**: 併設 `<stem>.meta.json` サイドカー
 
 ---
 
@@ -94,21 +94,24 @@ grain 列の組で重複がないことを保証し、静かに通さず reject 
 | **occupation (major10)** | 職業内訳保存（県版）・総数保存（内訳は分類境界差を doc に明記） | [occupation.md](datasets/occupation.md)                     |
 | **census ソース表**      | 統一案の全年突合せ（値一致・部分集合の発見）                    | [census_source_tables.md](datasets/census_source_tables.md) |
 
+### TEST: 自動テスト
+
+4ゲート全てを常時守る回帰の土台（`poe check` ＝ CI 相当）。
+取得（fixture）→クレンジング→合成→地域参照→出力の全層をカバーする。  
+**層とテストファイルの対応、および各ゲートがどの層で守られるか（ゲート↔層の対応表）は [apps/pipeline/tests/README.md](../apps/pipeline/tests/README.md) が正典**。  
+その表が示すとおり4ゲートは層とほぼ1対1で、唯一クロスファクト検算のみ層を横断する（ゆえにテストも `crossfact/` として独立）。
+
 ### CLI: 検証コマンド
 
-数値の最新実測は各 doc に埋め込まず、CLI 実走で取得する。  
+実データの最新実測・status を随時取る計器で、保存則・クロスファクトの2ゲートを駆動する。  
+数値の最新実測は各 doc に埋め込まず、CLI 実走で取得する。
+
 **コマンド構文・引数は `uv run data-forge --help`（正典＝[cli.py](../apps/pipeline/src/data_forge/cli.py) の argparse）** を参照。  
 本節は各コマンドが検証設計のどのゲートを駆動するかの対応のみを示す。
 
-- `area-check`: 「保存則」の人口保存（`national_conservation`）＋孤児件数の検証。
-- `area-orphans`: 「未カバー領域」の孤児アトムの堀運用。base_year に届かない消滅アトムを列挙し `data/area/events_overrides.csv` の追記候補を示す。
-- `crossfact-check`: 「クロスファクト検算」（三角測量）。総人口スライスを `population` ハブと突合し年別 status（match / known_diff / scope_out / mismatch）に分類、真の mismatch で exit 1。対応キー＝`population_by_age5_timeseries`（C1）/ `population_by_age_timeseries`（C3）。
-
-### TEST: 自動テスト
-
-取得（fixture）→クレンジング→合成→地域参照→出力の全層をカバーする。  
-**層とテストファイルの対応表は [apps/pipeline/tests/README.md](../apps/pipeline/tests/README.md) が正典**（コード密着のためそちらへ集約）。  
-本書は「検証設計」の各ゲートがどのテストで守られるかを設計側から示す。
+- `area-check`: 「保存則」（人口保存）＋孤児件数を検証。
+- `area-orphans`: 「未カバー領域」の孤児アトム運用を駆動（棚卸し。詳細は同節）。
+- `crossfact-check`: 「クロスファクト検算」を実データで走らせ年別 status に分類（自動化済みは C1 / C3）。
 
 ---
 

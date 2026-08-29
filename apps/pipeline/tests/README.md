@@ -12,33 +12,49 @@
 
 ## ディレクトリ構成
 
-取得（transform / tidy）→ クレンジング → 合成 → 地域参照 → 出力の全層をカバーする。
+パイプライン層で分ける（1テスト＝1層ディレクトリ）。  
+ファイル名が対象データセット／コンポーネントを表し、個別仕様は [docs/datasets](../../../docs/datasets/) が正典なので、ここでは層の粒度でのみ説明する。
 
 ```text
 tests/
-├── fixtures/                   # e-Stat 生レスポンス等のテスト入力（tidy 化の起点）
-│   └── estat_population_sample.json
-│
-│   # クレンジング（cleaner）＝年別スキーマ変種・level7・欠損 null 化・保存則（年齢／男女・内訳）
-├── test_population.py          # 男女別人口（年別4変種・全国復元）
-├── test_age5.py                # 5歳階級（全国・都道府県 companion）
-├── test_age5_municipality.py   # 5歳階級 市区町村（旗艦）
-├── test_daynight.py            # 昼夜間人口
-├── test_households.py          # 世帯の種類別
-├── test_family_type.py         # 家族類型16区分
-├── test_labor_force.py         # 労働力状態3区分
-├── test_industry.py            # 産業大分類
-├── test_occupation.py          # 職業大分類
-│                               # ※ 取得・整形（transform: メタ抽出・CLASS_INF+DATA_INF の tidy 化）は
-│                               #    上記 cleaner テストが fixture 経由で併せて検証する
-│
-├── test_combine.py             # 合成：union / intersection / grid・粒度ガード（grain 重複の reject）
-├── test_area.py                # 地域参照：アトム抽出・推移閉包・基準年集約・孤児検出・クロスファクト検算の回帰
-├── test_area_ingest.py         # 地域参照：廃置分合 CSV パーサ
-├── test_datasets.py            # レジストリ契約：family / table_name 一意性
-├── test_provenance.py          # 来歴：data_status 付与・速報 splice
-├── test_export.py              # 出力：citation 同梱・欠損検知（出荷ブロック）
-└── test_public_scope.py        # 公開スコープゲート：流出防止
+├── fixtures/     # テスト入力（e-Stat 生レスポンス等・tidy 化の起点）
+├── cleaners/     # クレンジング：スキーマ変種・欠損 null 化・保存則
+├── combine/      # 合成：union / intersection / grid＋粒度ガード
+├── area/         # 地域参照：rollup・基準年集約・孤児検出・既知差分
+├── crossfact/    # クロスファクト検算（三角測量）：層横断ゆえ独立
+├── output/       # 出力：citation 同梱・欠損検知（出荷ブロック）
+└── governance/   # 契約・ゲート系：レジストリ・来歴・公開スコープ
 ```
 
-TODO: グルーピングしてディレクトリ分けする。
+### ゲート↔層の対応（軸の相関）
+
+4ゲートは層とほぼ1対1に対応する（＝層で切ればゲート区別も付いてくる）。  
+空セルの多くは構造的に必然だが、クロスファクトだけは横断ゲートゆえ独立させ、拡張（C2・日本人版）に備える。
+
+| 層 \ ゲート   | 保存則 | クロスファクト | 粒度ガード | 出典同梱 |
+| ------------- | :----: | :------------: | :--------: | :------: |
+| cleaners      |   ●    |                |            |          |
+| area          |   ●    |                |            |          |
+| combine       |        |                |     ●      |          |
+| provenance    |        |                |     ●      |          |
+| output        |        |                |            |    ●     |
+| **crossfact** |        |       ●        |            |          |
+
+---
+
+## 実行
+
+全体は `uv run poe check`（lint + test）／`uv run poe test`。  
+基本コマンドは [pipeline/README.md](../README.md) の「使い方」が正典。  
+テストスイート固有の狙い撃ち実行のみ、下記に補う（対象は次節「ディレクトリ構成」の層に対応）。
+
+```bash
+# 層ディレクトリ単位で回す（例: クレンジング層のみ）
+uv run poe test tests/cleaners
+
+# クロスファクト検算だけ回す
+uv run poe test tests/crossfact
+
+# 名前で絞る（例: 保存則テスト）
+uv run poe test -k conservation
+```

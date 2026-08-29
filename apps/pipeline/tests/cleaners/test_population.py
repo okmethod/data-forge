@@ -12,7 +12,7 @@ import polars as pl
 
 from data_forge.sources.estat import population, transform
 
-FIXTURE = Path(__file__).parent / "fixtures" / "estat_population_sample.json"
+FIXTURE = Path(__file__).parent.parent / "fixtures" / "estat_population_sample.json"
 
 
 def _load_raw() -> dict:
