@@ -1,0 +1,162 @@
+# 精製データの品質保証
+
+各データセット doc に散在する検証記述を横断で束ねた、確からしさの管理ドキュメント。  
+本書はその中身を「**何をどう検証するか（設計）→ どんな手段で走らせるか（手段の索引）→ 何が穴か（限界）**」の順で展開する。
+
+> **ドリフト防止方針**: 「何を検証済みか」の実測値（件数・年リスト・diff）は本書に埋め込まず、各データセット doc・CLI 実走・`poe test` を正典とする。唯一の例外は `reconcile.py` をミラーする既知差分レジストリ（値を明記するが、コードが正典）。
+
+---
+
+## 検証設計
+
+精製データの確からしさは、次の**4つのゲート**で担保する。  
+人手確認に頼る箇所は「未カバー領域」に明示し、放置しない。
+
+下表は4つのゲートの概観（何を守るか・どの手段で検証するか）。各ゲートの**恒等式・規約**は続く小節、担う関数・テスト・コマンドの具体は「検証手段の索引」と各正典に置く。
+
+| ゲート                 | 何を守るか                             | 検証手段  |
+| ---------------------- | -------------------------------------- | --------- |
+| **保存則（恒等式）**   | 数値の正しさ（合計の一致）             | CLI＋TEST |
+| **クロスファクト検算** | 別ソース由来の同一軸(総人口)の相互整合 | CLI＋TEST |
+| **粒度ガード**         | 二重計上の防止                         | TEST      |
+| **出典同梱**           | 全成果物への citation 同梱             | TEST      |
+
+### 保存則（恒等式）
+
+「部分の合計 == 総数」が全年で成立することを検査する。
+期待は全て **diff=0**、総数スライスのみビット一致。
+
+- **人口保存**: 各年「アトム合計（総数）== 全国 total」
+- **空間集約の保存**: 「県／地方合計 == 全国 total」（基準年集約の前後で同値）
+- **年齢保存**: 年少 + 生産 + 老年 + 不詳 == 総数
+- **男女保存**: 男 + 女 == 総数
+- **総数スライス一致**: 年齢総数 / 夜間のスライスが基底 population とビット一致（各データセット doc で実証）
+
+### クロスファクト検算（conformed dimension の三角測量）
+
+3ファクト（population / population_by_age / population_by_age5）は市区町村×year×sex で、**総人口を共有軸（conformed dimension）として冗長に持つ**。  
+別ソース・別系統から同じ総人口へ到達することを相互照合し、方針A「重複軸はハブと一致検証して捨てる」をテストで実体化する。  
+ハブ（正典）は総人口をアトム粒度まで完全に持つ **population**。系統は A＝各回基本集計 / B＝派生表。期待は全て **diff=0**（C2 のみ未実装＝「未カバー領域」）。
+
+| #   | 恒等式                                         | 粒度              | 系統 |
+| --- | ---------------------------------------------- | ----------------- | ---- |
+| C1  | age5(nat=0・年齢総数) == population            | 市区町村×year×sex | A×A  |
+| C2  | age5(nat=0)を3区分へ畳込 == population_by_age  | 市区町村×year×sex | A×B  |
+| C3  | population_by_age(年齢総数) == population      | 市区町村×year×sex | B×A  |
+| C4  | age5→県rollup == population_by_age5_prefecture | 県×year           | A×B  |
+| C5  | daynight(夜間) == population                   | 全国              | −×A  |
+
+- **C1 が最も堅い**: population も age5 も同じ各回基本集計（系統A・同一調査母集団）ゆえ厳密 diff=0 が期待できる。実測ステータスは「検証手段の索引」の crossfact 検証で得る。
+  - **粒度指定の落とし穴**（C1 が顕在化させた知見）: 一部の各歳表は市区町村を持つのに、既定の粒度指定のままだと中間集計（郡／支庁）を葉に拾って粒度が非対称になる。該当年は粒度指定を明示上書きして市区町村フルへ揃える（具体年は population_by_age5 / census_source_tables の各 doc が正典）。
+- **年別の許容カテゴリ**: 全年が diff=0 とは限らないため年別に status を分類し、**真の不一致のみ**を失敗とする（許容年は年別リストで管理）。
+  - **scope_out**: 照合相手が未収録の年（population 速報のみ等）。照合相手側=0 を期待＝スコープ外として許容。
+  - **known_diff**: 定義差が既知の年。例＝各歳表が「年齢不詳を除く」ゆえ age5 総数 = population − 年齢不詳（照合相手 ≤ ハブ）。差の向き（diff≥0）が保たれる限り許容。※C3 の by_age は不詳を含むソースゆえ同年でも diff=0。
+- **C4/C5** は既存の実装・実証を本枠へ収めたもの（`population_by_age5_prefecture` / `daynight_population` の各 doc が正典）。
+- **C2 は未実装**（「未カバー領域」バックログ）。
+- **実装方式**: 実データ照合が本質（手組みでは自明化する）ため、実データは CLI 検証で回し、照合ロジック（スライス→突合→diff→status 分類）は fixture テストで回帰ガードする（コマンド・テストは「検証手段の索引」）。
+
+### 粒度ガード
+
+grain 列の組で重複がないことを保証し、静かに通さず reject する。
+
+- **合成時** … union / intersection / grid の各合成モードで grain 重複を拒否。
+- **来歴付与時** … 確定（confirmed）と速報（preliminary）で同一セルの重複を禁止。
+
+### 出典同梱
+
+全成果物に citation が入ったかを出力段で検証し、欠ければ**出荷をブロック**する。
+
+- Parquet … フッター key-value メタ
+- SQLite / DuckDB … `_source_meta` テーブル
+- CSV … 併設 `<stem>.meta.json` サイドカー
+
+---
+
+## 検証手段の索引
+
+「設計を実際にどこで走らせ、結果の正典はどこか」を束ねる。
+
+### データセット別の検証観点（索引）
+
+各データセット doc の検証セクションへのリンク集。本表は検証観点の有無のみを示す。
+
+| データセット             | 主な検証観点                                                    | doc                                                         |
+| ------------------------ | --------------------------------------------------------------- | ----------------------------------------------------------- |
+| **地域マスタ（area）**   | 人口保存・孤児検出・既知差分（1980）                            | [area_master.md](datasets/area_master.md)                   |
+| **population**           | 総数スライスで総人口再現・area マスタ依存                       | [population.md](datasets/population.md)                     |
+| **population_by_age**    | 国民保存＋年齢/男女保存・クロスファクト検算 C3                  | [population_by_age.md](datasets/population_by_age.md)       |
+| **population_by_age5**   | 年齢保存・全国＝47県合計・クロスファクト検算 C1 / C4            | [population_by_age5.md](datasets/population_by_age5.md)     |
+| **daynight_population**  | 夜間人口保存・孤児・クロスファクト検算 C5                       | [daynight_population.md](datasets/daynight_population.md)   |
+| **labor_force**          | 3区分保存・労働力率＝公表値一致                                 | [labor_force.md](datasets/labor_force.md)                   |
+| **family_type**          | ツリー保存則・47県合計＝全国・不詳(999)の導出注入               | [family_type.md](datasets/family_type.md)                   |
+| **industry**             | 産業内訳保存（県版）・47県合計＝全国                            | [industry.md](datasets/industry.md)                         |
+| **occupation (major12)** | 職業内訳保存（県版）・47県合計＝全国                            | [occupation.md](datasets/occupation.md)                     |
+| **occupation (major10)** | 職業内訳保存（県版）・総数保存（内訳は分類境界差を doc に明記） | [occupation.md](datasets/occupation.md)                     |
+| **census ソース表**      | 統一案の全年突合せ（値一致・部分集合の発見）                    | [census_source_tables.md](datasets/census_source_tables.md) |
+
+### CLI: 検証コマンド
+
+数値の最新実測は各 doc に埋め込まず、CLI 実走で取得する。  
+**コマンド構文・引数は `uv run data-forge --help`（正典＝[cli.py](../apps/pipeline/src/data_forge/cli.py) の argparse）** を参照。  
+本節は各コマンドが検証設計のどのゲートを駆動するかの対応のみを示す。
+
+- `area-check`: 「保存則」の人口保存（`national_conservation`）＋孤児件数の検証。
+- `area-orphans`: 「未カバー領域」の孤児アトムの堀運用。base_year に届かない消滅アトムを列挙し `data/area/events_overrides.csv` の追記候補を示す。
+- `crossfact-check`: 「クロスファクト検算」（三角測量）。総人口スライスを `population` ハブと突合し年別 status（match / known_diff / scope_out / mismatch）に分類、真の mismatch で exit 1。対応キー＝`population_by_age5_timeseries`（C1）/ `population_by_age_timeseries`（C3）。
+
+### TEST: 自動テスト
+
+取得（fixture）→クレンジング→合成→地域参照→出力の全層をカバーする。  
+**層とテストファイルの対応表は [apps/pipeline/tests/README.md](../apps/pipeline/tests/README.md) が正典**（コード密着のためそちらへ集約）。  
+本書は「検証設計」の各ゲートがどのテストで守られるかを設計側から示す。
+
+---
+
+## 検証の限界
+
+機械検証が「原理的に受容する差分」と「まだ及んでいない穴」。  
+前者はレジストリで固定し、後者はバックログとして埋めていく。
+
+### 既知差分レジストリ（受容する差分）
+
+原資料の真実であり override では解消しない差分は `KNOWN_DIFFS` として受容しテストで固定する。  
+**正典はコード**（`area/reconcile.py` の `KNOWN_DIFFS`）。本節はその要点をミラーするものであり、乖離時はコードを信じる。
+
+現在の登録（詳細・全件は `KNOWN_DIFFS` を参照）:
+
+- **1980（+37 人）** … 東京都特別区部の集計値(8,351,893) が 23 区合計(8,351,856) より 37 人多い＝区に按分されない「区未定分」。市区町村グレインに受け皿が無く、捏造せず保持する。
+
+> 新統計投入時に新規差分が混入した場合、`diff != 既知` として保存則検証が失敗する（見落とし防止）。増えた差分は原資料を確認のうえ本レジストリ（と `KNOWN_DIFFS`）へ追記する。
+
+### 未カバー領域（確からしさの穴）
+
+機械検証が及ばず、人手 or 将来対応に頼っている箇所。  
+各項目は **現状** → **対応方針** の順で記す。
+
+- **実 API 取得（fetch.py）**
+  - 現状: テスト無し（fixture 前提）。ネットワーク/ページング未検証
+  - 対応方針: モック化した単体テスト追加
+- **e-Stat raw JSON 構造**
+  - 現状: `get(..., "")` で黙認。構造崩れを例外化しない
+  - 対応方針: Pydantic による strict スキーマ検証（README ロードマップ Phase 2）
+- **合併 overrides の妥当性**
+  - 現状: 後継先の指定ミスに気づけない
+  - 対応方針: 後継コード実在チェック等の自動検証
+- **孤児アトム**
+  - 現状: 機械検出のみ・修正は人手（件数は `area-orphans` で確認）
+  - 対応方針: overrides 追記運用（`area-orphans` で駆動）
+- **既知差分の網羅性**
+  - 現状: 1980 のみ登録
+  - 対応方針: 新統計投入時に全年洗い出し
+- **新年度スキーマ**
+  - 現状: 確定版投入時は手動で cleaner 追加＝一時的にテスト空白
+  - 対応方針: スキーマ差分の自動検出
+- **CI 不在**
+  - 現状: ローカル `poe check` 頼み
+  - 対応方針: GitHub Actions で `poe check` 自動化
+- **クロスファクト検算 C2**
+  - 現状: age5→3区分畳込 vs population_by_age は未実装
+  - 対応方針: by_age(系統B)の年齢不詳の帰属を `getStatsData` 実測→照合式・畳込後アトムで比較・diff は KNOWN_DIFFS 登録
+- **日本人スライスの検算**
+  - 現状: C1〜C5 は総人口(nationality=0)のみ照合＝日本人(=1)は検証網の外。旗艦 age5 の 1990/1995 日本人が支庁 level3 混入で壊れていた事故を C1 は検知できず（`muni_levels` 設定の契約テストで別途ガード）
+  - 対応方針: 日本人版の照合オラクル（例: 県 rollup vs 系統B の日本人表・年齢/男女保存）を crossfact に追加

@@ -179,7 +179,7 @@ statsDataId は estat-search で洗い出し済み（未記載だった行を 20
 > これらの各歳表（0000030127/0000030449）は **area が令和型 level4/6**（市/区=level4・町村=level6・level3=郡/支庁の
 > 中間集計）だが、グローバル `_MUNI_LEVELS[1980/85]={3}`（人口時系列製品向け）のままだと level3 の粗い集計単位を
 > 葉に拾い市区町村フルに達しない。2000/2005 と同じく Dataset に `muni_levels={4,6}` を明示して解決。**検証**: 修正後
-> C1（age5 総数 == population・市区町村×year×sex）が 1980/1985 とも diff=0 で一致（`crossfact-check`・validation.md §2）。
+> C1（age5 総数 == population・市区町村×year×sex）が 1980/1985 とも diff=0 で一致（`crossfact-check`・[data-quality-assurance.md](../data-quality-assurance.md) §クロスファクト検算）。
 > 旧「1980/1985=市区町村・検証済」は県内合算で通る検証で、市区町村粒度の一致は C1 が初めて実証した。
 
 > ⚠ **1990/1995 の日本人 5歳階級表 006（0000031405/0000032223）も同じ override が必須だった（2026-08-22 追補）**:
@@ -187,7 +187,7 @@ statsDataId は estat-search で洗い出し済み（未記載だった行を 20
 > だが Dataset が `muni_levels=None` のままだったため extract_atoms が level3 の支庁（北海道 14 件）だけを葉に拾い、
 > level4/6 の市区町村フルを全て落としていた（**日本人カバレッジが 37 area・940万人に壊れ**、支庁が name/level=null の
 > 孤児として混入）。C1 は総数(nationality=0)スライスだけを照合するため**この日本人スライスの破損を検知できなかった**
-> （＝validation.md §9 の穴。総数版 1990/1995_total は各歳表 00401 で既に {4,6} ゆえ無傷）。1980/1985 と同じく
+> （＝[data-quality-assurance.md](../data-quality-assurance.md) §未カバー領域 の穴。総数版 1990/1995_total は各歳表 00401 で既に {4,6} ゆえ無傷）。1980/1985 と同じく
 > `muni_levels={4,6}` を上書きして解決（修正後 日本人1990=1,740 市区町村・122,398,413 人／印西市 日本人 1990:54,973→
 > 1995:71,995→2000:79,215 連続）。回帰ガード＝`test_datasets.py::test_age5_municipality_reiwa_tables_override_muni_levels`。
 
@@ -288,7 +288,7 @@ statsDataId は estat-search で洗い出し済み（未記載だった行を 20
   0003410398（2005-2020）。labor_force と同じ別の親だが構造は age5 と同型＝**全国表が area 軸を持たない**ため
   全国合成の `clean_national` と実 area の `clean_prefecture` の2 cleaner。tab=334(就業者数)のみ採り構成比(2020_44)は
   `各産業/総数` で導出可ゆえ捨てる。**「分類不能の産業」が実カテゴリ**のため labor_force のような不詳導出注入は不要で
-  `総数==Σ大分類` が成立（県版は全違反0／全国 1995・2000 のみ原資料の千人丸めで数千人差＝既知差分・[validation.md](validation.md)）。
+  `総数==Σ大分類` が成立（県版は全違反0／全国 1995・2000 のみ原資料の千人丸めで数千人差＝既知差分・[data-quality-assurance.md](../data-quality-assurance.md)）。
   47県合計==全国も差分0で完全一致（検証済）。現行版（2007年11月改訂後）で 2005 以降が連続。
   分類改訂前へ遡るには 0004008861/0004008860 を別セグメント扱いする必要（当面は現行版で 2005-2020 を採る）。
   遡及して分割する際は occupation と同じ **major\<N\>**（大分類の区分数）命名規約に従う（定義は occupation.md「分類体系の呼称（SSoT）」）。
@@ -303,7 +303,7 @@ statsDataId は estat-search で洗い出し済み（未記載だった行を 20
   - **major12**: 県 `総数==Σ大分類` 全違反0／47県合計==全国も差分0／全国 1995・2000 のみ丸めで ±1人差。
   - **major10**: 県 `総数==Σ大分類` 全違反0（全国は 1965/1975 が丸めで ±5）。⚠ **47県合計==全国は総数では一致するが、
     販売(140)/生産工程(190)の内訳が 1985-1995 で最大 ±224,747 ずれる**（全国長期系列と県系列で 2000 年以前の分類境界が
-    異なる・等量符号逆で総数は保存）。major12 に無い major10 固有の既知差分（[validation.md](validation.md)）。
+    異なる・等量符号逆で総数は保存）。major12 に無い major10 固有の既知差分（[data-quality-assurance.md](../data-quality-assurance.md)）。
 
 ### 3-7. 隣接集計②：移動人口集計 / 人口移動集計（別の親）— 全不採用
 

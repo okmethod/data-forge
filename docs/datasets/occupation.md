@@ -8,7 +8,7 @@
 ## 分類体系の呼称（SSoT）
 
 > **この節が呼称の唯一の定義元。** 職業大分類は分類改訂で 2 系統に分かれる。
-> data-forge では両者を**大分類の区分数**で `major<N>` と命名し、**以降このドキュメント・[census_source_tables.md](census_source_tables.md)・datasets.py・[validation.md](../validation.md)・コード（occupation.py / test_occupation.py）でこの呼称のみを使う**（「2015体系」「旧大分類」「12区分」「改訂前/後」等の別表現は本節以外で使わない）。
+> data-forge では両者を**大分類の区分数**で `major<N>` と命名し、**以降このドキュメント・[census_source_tables.md](census_source_tables.md)・datasets.py・[data-quality-assurance.md](../data-quality-assurance.md)・コード（occupation.py / test_occupation.py）でこの呼称のみを使う**（「2015体系」「旧大分類」「12区分」「改訂前/後」等の別表現は本節以外で使わない）。
 
 | 呼称（canonical） | table_name           | 正式分類（＝定義）                                 | 大分類 | ソース 全国 / 都道府県  | 期間 全国 / 都道府県    |
 | ----------------- | -------------------- | -------------------------------------------------- | ------ | ----------------------- | ----------------------- |
@@ -121,7 +121,7 @@ grain = **area × sex × occupation × year**（major12/major10 とも同型10�
     厳密一致させられない**（総数は一致）。ダッシュボード等で「県積み上げ＝全国」を前提にしないこと。
 - **男女保存**: 各 area×occupation×year で `男(1) + 女(2) == 総数(0)`（丸め由来の全国数件を除き成立）。
 
-詳細は [validation.md](../validation.md)。
+詳細は [data-quality-assurance.md](../data-quality-assurance.md)。
 
 ---
 

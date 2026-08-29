@@ -212,4 +212,4 @@ uv run data-forge export population_by_age5_timeseries --join aggregate_to_base 
 
 - 兄弟ファクト（年齢3区分・市区町村まで）… [population_by_age.md](population_by_age.md)
 - ソース選定の全体像・系統A/B・未使用ポテンシャル … [census_source_tables.md](census_source_tables.md)
-- 検証の横断管理 … [validation.md](../validation.md)
+- 検証の横断管理 … [data-quality-assurance.md](../data-quality-assurance.md)

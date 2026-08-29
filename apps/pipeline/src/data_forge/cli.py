@@ -94,7 +94,7 @@ def _cmd_area_check(ds: Dataset | StitchedDataset | ProjectedDataset, args: argp
         print("✅ 孤児アトムなし（全消滅アトムが base_year へ到達）")
 
 
-# クロスファクト検算（§validation.md 三角測量）: 照合相手 ds.key → (共有軸, 総数スライス述語)。
+# クロスファクト検算（§data-quality-assurance.md 三角測量）: 照合相手 ds.key → (共有軸, 総数スライス述語)。
 # ハブ（総人口の正典）は population_timeseries 固定。C1=age5・C3=by_age。
 _CROSSFACT_HUB = "population_timeseries"
 
@@ -335,7 +335,7 @@ def build_parser() -> argparse.ArgumentParser:
         p.add_argument("--base-year", type=int, default=None, help="基準年（既定=最新年）")
         p.set_defaults(handler=handler)
 
-    # クロスファクト検算（総人口スライスを population ハブと突合＝§validation.md 三角測量）
+    # クロスファクト検算（総人口スライスを population ハブと突合＝§data-quality-assurance.md 三角測量）
     pc = sub.add_parser("crossfact-check", help="クロスファクト検算: 総人口スライスを population ハブと突合")
     pc.add_argument("dataset", help="照合相手データセットキー（例: population_by_age5_timeseries）")
     pc.add_argument("--refresh", action="store_true", help="キャッシュを無視して再取得")
