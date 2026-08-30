@@ -4,6 +4,20 @@ tab=334(就業者数)への絞り込み（構成比の除外）・cat01→産業
 （再掲）第1/2/3次産業の除外・不詳補完値(time 000010)の除外・全国合成(national=True で
 00000/全国/level1)を手組み tidy で検証する。分類不能(330)が実カテゴリのため不詳注入は無く、
 「総数(100) == Σ大分類(120〜330)」が保存則として閉じることを確認する。
+
+検証項目（関数名 ⇄ 何を確かめるか）:
+    test_no_unknown_injection_and_conservation
+        産業内訳保存（不詳注入なし）。各 area×sex×year で Σ大分類(120〜330・分類不能含む) == 総数(100)。
+    test_sex_conservation
+        男女保存。各 area×industry×year で 男(1) + 女(2) == 総数(0)。
+    test_national_synthesizes_area
+        全国合成。全国表(area 軸なし)から 00000/全国/level1 を合成。
+    test_schema_and_mapping
+        スキーマ・写像。10列・コード写像・総数行の値。
+    test_drops_recap_rate_and_imputed
+        不要行の除去。（再掲）第1/2/3次産業・構成比(tab)・不詳補完値(time 000010)を落とす。
+
+全国=47県合計の一致・全国 1995/2000 の丸め由来既知差分は保存則ブロック（実データ）に記録。
 """
 
 import polars as pl

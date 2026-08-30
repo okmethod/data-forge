@@ -2,7 +2,20 @@
 
 一般世帯数(tab=6)・一般世帯人員(tab=7)の横並び束ね／1世帯当たり人員(1390)・世帯数割合(1930)の除外／
 家族類型の写像と family_type_level の付与／家族類型不詳(999)の導出注入と保存則
-（総数=110+280+290+不詳）を手組み tidy で検証する。
+（総数=110+280+290+不詳）を手組み tidy で検証する。households と同型の低コスト fact。
+
+検証項目（関数名 ⇄ 何を確かめるか）:
+    test_family_type_tree_conservation
+        保存則（ツリー）。各 area×year で 総数(100) == 110 + 280 + 290 + 999 かつ
+        サブツリー 110 == 120 + 170 等（世帯数・世帯人員とも）。
+    test_injects_unknown_and_closes_total
+        不詳注入で総数を閉じる。999 = 総数 − (110 + 280 + 290) の導出注入。
+    test_schema_and_two_measures
+        スキーマ・2測度。9列・households/household_members の同時保持と family_type_level 付与。
+    test_drops_ratio_rows
+        不要行の除去。1世帯当たり人員(tab 1390)・世帯数割合(tab 1930)行を落とす。
+    test_prefecture_keeps_area_and_null_on_missing_measure
+        欠損の null 化。県で欠測測度・欠損記号 "-" を左結合で null にする。
 """
 
 import polars as pl
@@ -93,8 +106,7 @@ def test_injects_unknown_and_closes_total():
 def test_family_type_tree_conservation():
     df = family_type.clean_family_type(_tidy())
     hh = {
-        r["family_type_code"]: r["households"]
-        for r in df.filter(pl.col("area_code") == "00000").iter_rows(named=True)
+        r["family_type_code"]: r["households"] for r in df.filter(pl.col("area_code") == "00000").iter_rows(named=True)
     }
     # 総数(100) == 親族のみ(110) + 非親族(280) + 単独(290) + 不詳(999)
     assert hh["110"] + hh["280"] + hh["290"] + hh["999"] == hh["100"]

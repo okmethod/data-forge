@@ -130,18 +130,3 @@ uv run data-forge run population_timeseries --join grid          # 欠損をnull
 
 年をまたぐと市町村合併・政令市移行で地域集合が変わるため、実用グレードの連続時系列には**地域マスタ（アトム軸スタースキーマ）** が必要になる。
 これは総人口に限らず全ファクトが共有する**conformed dimension** なので、設計・運用は独立の正典 [area_master.md](area_master.md) にまとめた（`population_timeseries --join aggregate_to_base / crosswalk`、人口保存・孤児検証、堀＝overrides 運用など）。
-
----
-
-## 検証
-
-年別4変種の cleaner は共通8列への写像を単体テスト（`tests/cleaners/test_population.py`）で担保し、合併集約・人口保存・速報 splice は共有インフラ側のテストへ委譲する。
-
-- **出典メタ抽出:** statsDataId・提供者・調査名・引用文＝ `test_extract_meta`。
-- **tidy 化（軸解決）:** 各軸の code/name/level 解決＝ `test_to_tidy_resolves_names`。
-- **スキーマ・写像:** 8列・全国総数（2020=126,146,099）＝ `test_clean_from_fixture`。2015 平成型 → 共通8列（人口性比・人口集中地区を拾わない）＝ `test_clean_2015_maps_to_shared_schema`。
-- **階層・欠損:** level7 の is_current=false・欠損記号 `-` の null 化＝ `test_clean_handles_levels_and_missing`。
-- **都道府県マクロ（回次跨帳票の射影）:** 世紀マクロ cleaner の写像＝ `test_clean_population_prefecture_companion`。
-- **人口保存・合併集約:** 「アトム合計 == 全国total」（全9年 diff=0・1980 のみ 37 人差＝特別区部の区未定分を `KNOWN_DIFFS` で受容）と合併畳込は共有ディメンションの [area_master.md](area_master.md)（`tests/area/test_area.py`）が正典。
-- **速報 splice:** 速報 → 確定の来歴列 `data_status` と area scope の intersection scoping は [provenance.py](../../apps/pipeline/src/data_forge/provenance.py) が正典。
-- **クロスファクト検算:** 男女別人口の全国値・県 rollup は他ファクト（age/daynight の総数スライス）の頂点＝conformed dimension として一致する。横断検算 C1-C5 の方針は data-quality-assurance.md が正典。

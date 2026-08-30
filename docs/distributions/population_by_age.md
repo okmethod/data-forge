@@ -124,18 +124,6 @@ SQLite テーブル名は `population_by_age`。
 
 ---
 
-## 検証
-
-本表は合併畳込を伴うミクロ fact ゆえ、cleaner の単体テスト（`tests/cleaners/test_population.py`）＋ area module のテスト（`tests/area/test_area.py`）で担保する。年齢保存は不詳の導出注入で恒等成立させ、回帰検知用のガードに固定する。
-
-- **スキーマ・全国復元:** 年齢軸を保持した10列への写像と、全国行を都道府県合計から復元＝ `test_clean_population_by_age_schema_and_national_restore`。
-- **年齢保存（不詳導出注入）:** 全地域・全年で `年少 + 生産 + 老年 + 不詳 == 総数`（不詳 = 総数 − 3区分で注入）＝ `test_clean_population_by_age_conservation`。併せて男女保存（男 + 女 == 総数）も確認する。
-- **人口保存（合併集約）:** 年齢×男女を保ったまま合併畳込し、総数スライス（全 `*_code`=="0"）で全国値を保存＝ `test_aggregate_by_age_folds_and_conserves_age` / `test_national_conservation_by_age_uses_total_slice` / `test_orphans_by_age_dedups_to_total`（`tests/area/test_area.py`）。総人口は `population` と同値なので 1980 の 37 人差（特別区部・区未定分）も `KNOWN_DIFFS` で受容。
-- **都道府県マクロ（回次跨帳票の射影）:** 世紀マクロ cleaner の写像＝ `test_clean_by_age_prefecture_companion`。
-- **クロスファクト検算:** 1980-2020 の重複年で市区町村ミクロの県 rollup == 都道府県マクロ（上記「都道府県 世紀マクロ」節に実測・唯一差＝東京都1980 の +37人）。横断検算 C1-C5 の方針は data-quality-assurance.md が正典。
-
----
-
 ## 将来: population との一本化（consolidation メモ）
 
 `population_by_age` の `age_class_code=0`（総数）スライスは現行 `population` と一致する（全9年で全国値 diff=0 を実証済み）。

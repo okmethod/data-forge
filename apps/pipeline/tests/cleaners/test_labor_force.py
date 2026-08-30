@@ -4,6 +4,19 @@ tab=320(人口)への絞り込み（率1240の除外）・cat01→労働力状�
 不詳補完値(time 000010)の除外・労働力状態不詳の導出注入（労働力人口+非労働力人口+不詳==総数）・
 就業者/完全失業者が労働力人口の再掲である点（不詳の減算に含めない）を手組み tidy で検証する。
 全国表・都道府県表は同一 cleaner なので area 軸ありの tidy 1 本で確認する。
+
+検証項目（関数名 ⇄ 何を確かめるか）:
+    test_injects_labor_unknown_and_conservation
+        3区分保存（不詳導出注入）。労働力人口(110) + 非労働力人口(140) + 不詳(999) == 総数(100)、
+        不詳(999)=総数−110−140 の導出。
+    test_labor_force_subtotal_conservation
+        労働力人口内訳保存。就業者(120) + 完全失業者(130) == 労働力人口(110)（再掲を減算に含めない）。
+    test_sex_conservation
+        男女保存。各 area×labor_status×year で 男(1) + 女(2) == 総数(0)。
+    test_schema_and_mapping
+        スキーマ・写像。10列・コード写像・総数行の値。
+    test_drops_rate_tab_and_imputed
+        不要行の除去。労働力率(tab 1240)・不詳補完値(time 000010)を落とす。
 """
 
 import polars as pl

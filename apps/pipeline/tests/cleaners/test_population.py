@@ -2,7 +2,37 @@
 
 汎用 transform（コード名称解決）は実サンプル fixture で、
 population 固有のクレンジング（level→is_current・int化・欠損処理）は
-手組みの tidy DF で検証する。
+手組みの tidy DF で検証する。年別4変種の cleaner は共通8列への写像をここで担保し、
+合併集約・人口保存・速報 splice は共有インフラ側（area / provenance）へ委譲する。
+年齢軸を保持する population_by_age（10列）の cleaner も本ファイルで併せて検証する。
+
+検証項目（関数名 ⇄ 何を確かめるか）:
+    test_extract_meta
+        出典メタ抽出。statsDataId・提供者・調査名・引用文。
+    test_to_tidy_resolves_names
+        tidy 化（軸解決）。各軸の code/name/level 解決。
+    test_clean_from_fixture
+        スキーマ・写像。8列・全国総数（2020=126,146,099）。
+    test_clean_2015_maps_to_shared_schema
+        2015 平成型 → 共通8列（人口性比・人口集中地区を拾わない）。
+    test_clean_handles_levels_and_missing
+        階層・欠損。level7 の is_current=false・欠損記号 "-" の null 化。
+    test_clean_population_prefecture_companion
+        都道府県マクロ（回次跨帳票の射影）。世紀マクロ cleaner の写像。
+    test_clean_population_by_age_schema_and_national_restore
+        （by_age）年齢軸を保持した10列への写像・全国行を都道府県合計から復元。
+    test_clean_population_by_age_conservation
+        （by_age）年齢保存。年少+生産+老年+不詳 == 総数（不詳=総数−3区分で注入）。男女保存も確認。
+    test_clean_by_age_prefecture_companion
+        （by_age）都道府県マクロ（回次跨帳票の射影）の写像。
+
+共有インフラ側の委譲先:
+    人口保存・合併集約 … tests/area/test_area.py（アトム合計 == 全国total・全9年 diff=0、
+        1980 のみ 37 人差＝特別区部の区未定分を KNOWN_DIFFS で受容）。by_age は
+        test_aggregate_by_age_folds_and_conserves_age /
+        test_national_conservation_by_age_uses_total_slice /
+        test_orphans_by_age_dedups_to_total で年齢×男女を保ったまま総数スライスで全国値保存。
+    速報 splice … provenance.py（data_status 来歴列・area scope の intersection scoping）。
 """
 
 import json
@@ -274,11 +304,29 @@ def _by_age_longterm_tidy() -> pl.DataFrame:
                 }
             )
     # 割合(tab=105)の混入 → 捨てられる
-    rows.append({"tab_code": "105", "cat01_code": "130", "area_code": "01000",
-                 "area_name": "県01000", "area_level": "2", "time_code": "2020000000", "value": "25.0"})
+    rows.append(
+        {
+            "tab_code": "105",
+            "cat01_code": "130",
+            "area_code": "01000",
+            "area_name": "県01000",
+            "area_level": "2",
+            "time_code": "2020000000",
+            "value": "25.0",
+        }
+    )
     # 不詳補完版(time 末尾000010) → 除外される（採ると二重計上）
-    rows.append({"tab_code": "1060", "cat01_code": "100", "area_code": "01000",
-                 "area_name": "県01000", "area_level": "2", "time_code": "2020000010", "value": "999999"})
+    rows.append(
+        {
+            "tab_code": "1060",
+            "cat01_code": "100",
+            "area_code": "01000",
+            "area_name": "県01000",
+            "area_level": "2",
+            "time_code": "2020000010",
+            "value": "999999",
+        }
+    )
     return pl.DataFrame(rows)
 
 
@@ -286,8 +334,16 @@ def test_clean_by_age_prefecture_companion():
     df = population.clean_by_age_prefecture(_by_age_longterm_tidy())
     # 旗艦 by_age と同一10列スキーマ
     assert df.columns == [
-        "area_code", "area_name", "area_level", "sex_code", "sex",
-        "age_class_code", "age_class", "year", "population", "is_current",
+        "area_code",
+        "area_name",
+        "area_level",
+        "sex_code",
+        "sex",
+        "age_class_code",
+        "age_class",
+        "year",
+        "population",
+        "is_current",
     ]
     # 全国(00000)は落とし、47県相当のみ（ここでは2県）
     assert df.filter(pl.col("area_code") == "00000").height == 0
@@ -306,7 +362,8 @@ def test_clean_by_age_prefecture_companion():
     # 年齢保存: 年少+生産+老年+不詳 == 総数
     parts = (
         df.filter(pl.col("age_class_code").is_in(["1", "2", "3", "9"]))
-        .group_by("area_code").agg(pl.col("population").sum().alias("s"))
+        .group_by("area_code")
+        .agg(pl.col("population").sum().alias("s"))
     )
     tot = df.filter(pl.col("age_class_code") == "0").select("area_code", pl.col("population").alias("t"))
     m = tot.join(parts, on="area_code")
@@ -316,23 +373,45 @@ def test_clean_by_age_prefecture_companion():
 def _pop_longterm_tidy() -> pl.DataFrame:
     """系統B長期表 0003410379 を模した tidy（全国+DID+2県・tab020人口/1120性比・cat01=男女100/110/120）。"""
     rows: list[dict] = []
-    areas = {"00000": "全国", "00100": "人口集中地区", "00200": "人口集中地区以外の地区",
-             "13000": "東京都", "27000": "大阪府"}
+    areas = {
+        "00000": "全国",
+        "00100": "人口集中地区",
+        "00200": "人口集中地区以外の地区",
+        "13000": "東京都",
+        "27000": "大阪府",
+    }
     for area, name in areas.items():
         for sex, val in {"100": 1000, "110": 490, "120": 510}.items():
-            rows.append({"tab_code": "020", "cat01_code": sex, "area_code": area, "area_name": name,
-                         "area_level": "1" if area == "00000" else "2", "time_code": "2020000000", "value": str(val)})
+            rows.append(
+                {
+                    "tab_code": "020",
+                    "cat01_code": sex,
+                    "area_code": area,
+                    "area_name": name,
+                    "area_level": "1" if area == "00000" else "2",
+                    "time_code": "2020000000",
+                    "value": str(val),
+                }
+            )
     # 性比(tab=1120)の混入 → 捨てられる
-    rows.append({"tab_code": "1120", "cat01_code": "100", "area_code": "13000", "area_name": "東京都",
-                 "area_level": "2", "time_code": "2020000000", "value": "96.1"})
+    rows.append(
+        {
+            "tab_code": "1120",
+            "cat01_code": "100",
+            "area_code": "13000",
+            "area_name": "東京都",
+            "area_level": "2",
+            "time_code": "2020000000",
+            "value": "96.1",
+        }
+    )
     return pl.DataFrame(rows)
 
 
 def test_clean_population_prefecture_companion():
     df = population.clean_population_prefecture(_pop_longterm_tidy())
     # 旗艦 population と同一8列スキーマ
-    assert df.columns == ["area_code", "area_name", "area_level", "sex_code", "sex",
-                          "year", "population", "is_current"]
+    assert df.columns == ["area_code", "area_name", "area_level", "sex_code", "sex", "year", "population", "is_current"]
     # 全国(00000)・DID(00100/00200)を落とし47県相当のみ（ここでは2県）
     assert sorted(df["area_code"].unique().to_list()) == ["13000", "27000"]
     # 性比(1120)は採られない（総数は人口1000のまま）・男女写像

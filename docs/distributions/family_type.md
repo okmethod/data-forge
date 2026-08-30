@@ -78,15 +78,3 @@ households の8列に `family_type_level` を足した9列。
   | 年 | 1995 | 2000 | 2005 | 2010 | 2015 | 2020 |
   | --------------- | ---- | ---- | ---- | ------ | ------- | ------- |
   | 全国 不詳世帯数 | 0 | 0 | 0 | 85,798 | 135,238 | 160,120 |
-
----
-
-## 検証
-
-本表は households と同型の低コスト fact ゆえ、cleaner の単体テスト（`tests/cleaners/test_family_type.py`）で担保する。
-
-- **保存則（ツリー）:** 各 area×year で `総数(100) == 110 + 280 + 290 + 999` かつサブツリー `110 == 120 + 170` 等（世帯数・世帯人員とも）＝ `test_family_type_tree_conservation`。
-- **不詳注入で総数を閉じる:** 999 = 総数 − (110 + 280 + 290) の導出注入を検証＝ `test_injects_unknown_and_closes_total`。
-- **スキーマ・2測度:** 9列・`households`/`household_members` の同時保持と `family_type_level` 付与＝ `test_schema_and_two_measures`。
-- **不要行の除去:** 1世帯当たり人員(tab 1390)・世帯数割合(tab 1930)行を落とす＝ `test_drops_ratio_rows`。
-- **欠損の null 化:** 県で欠測測度・欠損記号 `-` を左結合で null にする＝ `test_prefecture_keeps_area_and_null_on_missing_measure`。

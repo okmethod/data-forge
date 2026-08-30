@@ -69,15 +69,3 @@ grain = **area × sex × labor_status × year**。
 原表は総数(100)＝労働力人口(110)＋非労働力人口(140) では閉じず、差分＝**労働力状態不詳**が暗黙に存在する（近年は無視できず 2020 全国は約1,170万人）。
 cat01 に不詳コードが無いため、各 area×sex×year で**不詳(999) = 総数(100) − 労働力人口(110) − 非労働力人口(140)** を導出注入する（就業者(120)/完全失業者(130)は 110 の再掲なので減算に含めない）。
 age5 の年齢不詳と同じ閉じ方。
-
----
-
-## 検証
-
-本表は area master 不要の低コスト fact ゆえ、cleaner の単体テスト（`tests/cleaners/test_labor_force.py`）で担保する。
-
-- **3区分保存（不詳導出注入）:** `労働力人口(110) + 非労働力人口(140) + 不詳(999) == 総数(100)` と 不詳(999)=総数−110−140 の導出＝ `test_injects_labor_unknown_and_conservation`。
-- **労働力人口内訳保存:** `就業者(120) + 完全失業者(130) == 労働力人口(110)`（再掲を減算に含めない）＝ `test_labor_force_subtotal_conservation`。
-- **男女保存:** 各 area×labor_status×year で `男(1) + 女(2) == 総数(0)`＝ `test_sex_conservation`。
-- **スキーマ・写像:** 10列・コード写像・総数行の値＝ `test_schema_and_mapping`。
-- **不要行の除去:** 労働力率(tab 1240)・不詳補完値(time 000010)を落とす＝ `test_drops_rate_tab_and_imputed`。

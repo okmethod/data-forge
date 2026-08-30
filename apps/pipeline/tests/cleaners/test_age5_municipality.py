@@ -6,7 +6,21 @@
 そして **nationality 軸**（総数=0/日本人=1）を手組み tidy で検証する。
 特に 2015 は男女=cat03・年齢=cat02 と入れ替わる（getMetaInfo と食い違う実データ形）ため重点的に見る。
 nationality は年で扱いが違う: 1980/1985=総数のみ定数注入・1990/1995=日本人のみ定数注入・
-2010/2015/2020=国籍軸を残して総数と日本人を両方出す。
+2010/2015/2020=国籍軸を残して総数と日本人を両方出す。ミクロ系列は合併畳込を伴うため、
+本 cleaner の年別テスト＋ area module（tests/area/test_area.py）＋実データで担保する。
+
+検証項目（関数名 ⇄ 何を確かめるか）:
+    test_2020_age_unknown_is_real_not_injected / test_1990_japanese_constant_and_no_unknown
+        年齢保存。Σ(5歳階級) + 不詳 == 総数（全 area×sex 違反 0）。
+        不詳は原表の実コードを採用・1990/1995 は原表に不詳無し（導出注入しない）。
+    test_2020_is_current_flags_obsolete_municipality
+        合併畳込。level7 の is_current=false（印西市 12231 総人口 2000:79,780→2020:102,609 と連続）。
+    男女保存（男 + 女 == 総数・全 area×age 違反 0）も併せて確認する。
+
+実データ横断で確認済み（回帰ガード）:
+    全国＝47都道府県合計 … 各回 diff=0（2020=126,146,099 等・公表値一致）。
+    クロスファクト検算（別製品クロス照合）… 市区町村→県 rollup == マクロ系列
+    population_by_age5_prefecture(0003410381) が 47県×各年で diff=0。
 """
 
 import polars as pl

@@ -1,7 +1,21 @@
 """昼夜間人口（従業地・通学地集計）クレンジングの単体テスト。
 
 cat01=100(夜間)/180(昼間) だけを採り daynight_code(0/1) の8列へ写像すること、
-内訳コードや欠損記号の扱い、level7 フラグを手組み tidy で検証する。
+内訳コードや欠損記号の扱い、level7 フラグを手組み tidy で検証する。本表は合併畳込を伴うミクロ fact。
+
+検証項目（関数名 ⇄ 何を確かめるか）:
+    test_clean_daynight_schema_and_axis_mapping
+        スキーマ・軸写像。cat01 100/180 → daynight_code 0/1・8列への写像。
+    test_clean_daynight_levels_and_missing
+        階層・欠損。area_level 判定と欠損の null 化。
+
+合併集約・人口保存は area module（tests/area/test_area.py）が担保する:
+    test_aggregate_daynight_parallel_axis_folds_independently
+        aggregate_to_base / crosswalk とも daynight 軸を保ったまま合併集約が成立。
+    人口保存（各年アトム合計＝夜間総数 == 全国total・全7年 diff=0）／孤児 0 件も同 module。
+
+「総数スライス＝全 *_code=="0"」の前提は、分類軸が並列(daynight)でも入れ子(sex/age)でも
+共有インフラが無改修で乗ることを本ファクトが実証した。
 """
 
 import polars as pl

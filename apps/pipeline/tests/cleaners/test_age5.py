@@ -3,6 +3,20 @@
 全国表(area軸なし→合成)と都道府県表(area軸あり)の写像・共通粒度の絞り込み
 （85+終端／全国のみ細分320-370と再掲380-400を捨てる）・不詳補完値(time 000010)の除外・
 年齢不詳の導出注入（Σ5歳階級+不詳==総数）を手組み tidy で検証する。
+マクロ系列は 47県固定＝合併なし・area master 非経由ゆえ、age5.py が保存則を恒等成立させる。
+
+検証項目（関数名 ⇄ 何を確かめるか）:
+    test_national_schema_and_area_synthesis
+        スキーマ・全国合成。全国表(380)へ 00000/全国/level1 を合成。
+    test_prefecture_keeps_area_and_has_no_national
+        都道府県表(381)は area=47県・全国行なし。
+    test_national_drops_finer_and_recategory_and_imputed
+        不要行の除去。全国のみの細分(320-370)・(再掲)3区分(380-400)・不詳補完値(末尾000010)を落とす。
+    test_national_injects_age_unknown
+        年齢保存（不詳導出注入）。全地域・全年で Σ(5歳階級) + 不詳 == 総数（不詳=総数−Σ）。実データ違反 0。
+    test_national_sex_conservation
+        男女保存。男 + 女 == 総数。実データ違反は広島県 1925 年 80〜84歳の 1 セル（50 人）のみ＝
+        原資料固有の差分（加工由来でない・将来 KNOWN_DIFFS 相当で受容）。
 """
 
 import polars as pl

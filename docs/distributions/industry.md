@@ -64,15 +64,3 @@ grain = **area × sex × industry × year**。[labor_force](labor_force.md) の1
 ### 不詳の扱い（導出注入は無い）
 
 labor_force（労働力状態不詳）・age5（年齢不詳）と違い、**「分類不能の産業」(330) が実カテゴリとして原表に存在する**ため、`総数(100) == Σ大分類(120〜330)` が原資料で恒等成立する（導出注入は不要）。
-
----
-
-## 検証
-
-全国合成・県ベースの低コスト fact ゆえ、cleaner の単体テスト（`tests/cleaners/test_industry.py`）で担保する。実データ横断の全国=47県合計の一致・全国 1995/2000 の丸め由来既知差分は保存則ブロック（上）に記録。
-
-- **産業内訳保存（不詳注入なし）:** 各 area×sex×year で `Σ大分類(120〜330・分類不能含む) == 総数(100)`＝ `test_no_unknown_injection_and_conservation`。
-- **男女保存:** 各 area×industry×year で `男(1) + 女(2) == 総数(0)`＝ `test_sex_conservation`。
-- **全国合成:** 全国表(area 軸なし)から 00000/全国/level1 を合成＝ `test_national_synthesizes_area`。
-- **スキーマ・写像:** 10列・コード写像・総数行の値＝ `test_schema_and_mapping`。
-- **不要行の除去:** （再掲）第1/2/3次産業・構成比(tab)・不詳補完値(time 000010)を落とす＝ `test_drops_recap_rate_and_imputed`。

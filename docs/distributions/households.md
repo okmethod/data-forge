@@ -52,14 +52,3 @@ population 系の8列を土台に、sex→household_type、単一 `population`�
 **保存則:** 各 area×year で `household_type=総数 == 一般世帯 + 施設等の世帯`（世帯数・世帯人員とも）。
 
 **派生指標:** 平均世帯人員は配布側で `household_members / households`（世帯規模の縮小＝核家族化・単身化の指標）として算出する。
-
----
-
-## 検証
-
-本表は area master 不要・不詳注入無しの低コスト fact ゆえ、cleaner の単体テスト（`tests/cleaners/test_households.py`）で担保する。
-
-- **保存則（世帯種別）:** 各 area×year で `総数(100) == 一般世帯(110) + 施設等の世帯(120)`（世帯数・世帯人員とも）＝ `test_household_type_conservation`。
-- **スキーマ・2測度:** 8列・`households`/`household_members` の同時保持と総数行の値＝ `test_schema_and_two_measures`。
-- **不要行の除去:** 1世帯当たり人員(tab 1390)・人口集中地区(area 00100/00200)行を落とす＝ `test_drops_avg_and_did_rows`。
-- **欠損の null 化:** 県で欠測測度・欠損記号 `-` を左結合で null にする＝ `test_prefecture_keeps_area_and_null_on_missing_measure`。

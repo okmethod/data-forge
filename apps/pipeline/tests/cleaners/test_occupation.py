@@ -4,6 +4,25 @@ tab=334(就業者数)への絞り込み（構成比の除外）・cat01→職業
 不詳補完値(time 000010)の除外・全国合成(national=True で 00000/全国/level1)を手組み tidy で
 検証する。分類不能(220)が実カテゴリのため不詳注入は無く、「総数(100) == Σ大分類(110〜220)」が
 保存則として閉じることを確認する（industry と同型・再掲は無い）。
+
+検証項目（関数名 ⇄ 何を確かめるか）:
+    test_no_unknown_injection_and_conservation
+        職業内訳保存（不詳注入なし）。各 area×sex×year で Σ大分類 == 総数(100)
+        （major12=110〜220／major10=110〜200・分類不能含む）。
+    test_major10_drops_recategorized_and_conserves
+        major10 の再掲除外。（再掲）210〜240 を落として二重計上を防ぎ保存則を閉じる。
+    test_sex_conservation
+        男女保存。各 area×occupation×year で 男(1) + 女(2) == 総数(0)。
+    test_national_synthesizes_area
+        全国合成。全国表(area 軸なし)から 00000/全国/level1 を合成。
+    test_schema_and_mapping
+        スキーマ・写像。10列・コード写像・総数行の値。
+    test_drops_rate_and_imputed
+        不要行の除去。構成比(tab)・不詳補完値(time 000010)を落とす。
+
+全国=47県合計の一致／major10 1985-1995 の構造的差分・全国 1995/2000
+の丸め由来既知差分は保存則ブロック（実データ）に記録。
+呼称は occupation.md「分類体系の呼称（SSoT）」に従う。
 """
 
 import polars as pl

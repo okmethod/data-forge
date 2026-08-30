@@ -2,6 +2,18 @@
 
 世帯数(tab=040)・世帯人員(tab=050)の横並び束ね／1世帯当たり人員(1390)と DID 行の除外／
 世帯の種類の写像（総数=一般+施設）を手組み tidy で検証する。
+本表は area master 不要・不詳注入無しの低コスト fact ゆえ、cleaner の単体テストで担保する。
+
+検証項目（関数名 ⇄ 何を確かめるか）:
+    test_household_type_conservation
+        保存則（世帯種別）。各 area×year で 総数(100) == 一般世帯(110) + 施設等の世帯(120)
+        （世帯数・世帯人員とも）。
+    test_schema_and_two_measures
+        スキーマ・2測度。8列・households/household_members の同時保持と総数行の値。
+    test_drops_avg_and_did_rows
+        不要行の除去。1世帯当たり人員(tab 1390)・人口集中地区(area 00100/00200)行を落とす。
+    test_prefecture_keeps_area_and_null_on_missing_measure
+        欠損の null 化。県で欠測測度・欠損記号 "-" を左結合で null にする。
 """
 
 import polars as pl

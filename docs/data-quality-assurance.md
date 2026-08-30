@@ -47,7 +47,7 @@
 | **C5** | daynight(夜間) == population                   | 全国              | −×A  |
 
 - **C1 が最も堅い**: population も age5 も同じ各回基本集計（系統A・同一調査母集団）ゆえ厳密 diff=0 が期待できる。実測ステータスは「検証手段の索引」の crossfact 検証で得る。
-  - **粒度指定の落とし穴**（C1 が顕在化させた知見）: 一部の各歳表は市区町村を持つのに、既定の粒度指定のままだと中間集計（郡／支庁）を葉に拾って粒度が非対称になる。該当年は粒度指定を明示上書きして市区町村フルへ揃える（具体年は population_by_age5 / census_source_tables の各 doc が正典）。
+  - **粒度指定の落とし穴**（C1 が顕在化させた知見）: 一部の各歳表は市区町村を持つのに、既定の粒度指定のままだと中間集計（郡／支庁）を葉に拾って粒度が非対称になる。該当年は粒度指定を明示上書きして市区町村フルへ揃える（具体年は population_by_age5 / estat-census-catalog の各 doc が正典）。
 - **年別の許容カテゴリ**: 全年が diff=0 とは限らないため年別に status を分類し、**真の不一致のみ**を失敗とする（許容年は年別リストで管理）。
   - **scope_out**: 照合相手が未収録の年（population 速報のみ等）。照合相手側=0 を期待＝スコープ外として許容。
   - **known_diff**: 定義差が既知の年。例＝各歳表が「年齢不詳を除く」ゆえ age5 総数 = population − 年齢不詳（照合相手 ≤ ハブ）。差の向き（diff≥0）が保たれる限り許容。※C3 の by_age は不詳を含むソースゆえ同年でも diff=0。
@@ -75,24 +75,6 @@ grain 列の組で重複がないことを保証し、静かに通さず reject 
 ## 検証手段の索引
 
 「設計を実際にどこで走らせ、結果の正典はどこか」を束ねる。
-
-### データセット別の検証観点（索引）
-
-各データセット doc の検証セクションへのリンク集。本表は検証観点の有無のみを示す。
-
-| データセット             | 主な検証観点                                                    | doc                                                         |
-| ------------------------ | --------------------------------------------------------------- | ----------------------------------------------------------- |
-| **地域マスタ（area）**   | 人口保存・孤児検出・既知差分（1980）                            | [area_master.md](datasets/area_master.md)                   |
-| **population**           | 総数スライスで総人口再現・area マスタ依存                       | [population.md](datasets/population.md)                     |
-| **population_by_age**    | 国民保存＋年齢/男女保存・クロスファクト検算 C3                  | [population_by_age.md](datasets/population_by_age.md)       |
-| **population_by_age5**   | 年齢保存・全国＝47県合計・クロスファクト検算 C1 / C4            | [population_by_age5.md](datasets/population_by_age5.md)     |
-| **daynight_population**  | 夜間人口保存・孤児・クロスファクト検算 C5                       | [daynight_population.md](datasets/daynight_population.md)   |
-| **labor_force**          | 3区分保存・労働力率＝公表値一致                                 | [labor_force.md](datasets/labor_force.md)                   |
-| **family_type**          | ツリー保存則・47県合計＝全国・不詳(999)の導出注入               | [family_type.md](datasets/family_type.md)                   |
-| **industry**             | 産業内訳保存（県版）・47県合計＝全国                            | [industry.md](datasets/industry.md)                         |
-| **occupation (major12)** | 職業内訳保存（県版）・47県合計＝全国                            | [occupation.md](datasets/occupation.md)                     |
-| **occupation (major10)** | 職業内訳保存（県版）・総数保存（内訳は分類境界差を doc に明記） | [occupation.md](datasets/occupation.md)                     |
-| **census ソース表**      | 統一案の全年突合せ（値一致・部分集合の発見）                    | [census_source_tables.md](datasets/census_source_tables.md) |
 
 ### TEST: 自動テスト
 
