@@ -71,9 +71,8 @@
 | 2010/2015           | 平成型           | `cat02`（2010=000/001/002・2015=010/020/030）                                                                                                                             |
 | 2020                | 令和型           | `cat01`=男女（0/1/2）                                                                                                                                                     |
 
-パース差は **1つのパラメータ化 cleaner `clean_population`（男女を持つ軸・コード対応・事前フィルタ）**に集約し、年ごとの違いは設定だけで吸収する（year 関数を増やさない）。
-**正規化の契約は「入力パースの共有」ではなく「共通の出力スキーマへの写像」。**
-実装は [src/data_forge/sources/estat/population.py](../../apps/pipeline/src/data_forge/sources/estat/population.py)。
+パース差は 1 つのパラメータ化 cleaner `clean_population`（男女を持つ軸・コード対応・事前フィルタ）に集約し、年ごとの違いは設定だけで吸収する。
+設計契約（入力パース共有でなく出力スキーマへの写像）と実装は [population.py](../../apps/pipeline/src/data_forge/sources/estat/population.py) docstring が正典。
 
 ---
 
@@ -114,11 +113,9 @@ uv run data-forge run population_timeseries --join grid          # 欠損をnull
 | `confirmed`   | 確定値（既定。過去の確定集計）     |
 | `preliminary` | 速報値（後で確定へ置換される暫定） |
 
-- **列は速報が乗った fact にだけ生える**（速報 upstream が無い時は列自体が付かず既存出力と同一）。現状 `population_timeseries` / `population_prefecture_timeseries` が 2025 速報を含み `data_status` を持つ。
-- 速報は最新境界＝合併 rollup 不要なので、確定を集約し終えた**後段**で継ぎ足す（`provenance.splice_preliminary`）。area 集約（共有ディメンション）は無改修。
-- **area scope 自動追従**: 速報表は全国/県/市区町村が混在するが、splice 前に確定ビューに既に在る `area_code` へ intersection scoping する。よって県ビューには県行だけ、市区町村ビューには市区町村行だけが残る（レベル混在・二重計上を防ぐ）。2020→2025 の境界変更で確定側に無い 2025 コードは coverage gap として落ちる（市区町村ビューで全国比 約99.85%、過大計上ではない）。
+- **列は速報が乗った fact にだけ生える**（速報 upstream が無い出力には付かない）。現状 `population_timeseries` / `population_prefecture_timeseries` が 2025 速報を含む。
 - **配布物の利用者は `data_status` を必読**。この列を無視すると速報行を確定と誤認する。
-- 実装: 来歴語彙・検証・splice は [src/data_forge/provenance.py](../../apps/pipeline/src/data_forge/provenance.py)、合成配線は `StitchedDataset.preliminary_upstreams` と `derive._splice_preliminary`。
+- splice の内部（確定を集約し終えた後段で継ぎ足す・area scope 自動追従〈確定ビューの `area_code` へ intersection〉・境界変更の coverage gap）は [provenance.py](../../apps/pipeline/src/data_forge/provenance.py)（`splice_preliminary`・`StitchedDataset.preliminary_upstreams`）が正典。
 
 > 速報は令和7年国勢調査「人口速報集計」（statsDataId `0004050397`、2020 と同型の令和型）。
 > 単体 `population_2025_preliminary` は全国/県/市区町村の8列（`data_status` 無し）を出力する。
