@@ -1,7 +1,9 @@
 # occupation — 国勢調査 職業（大分類）×男女別就業者数
 
-国勢調査（e-Stat）の **職業（大分類），男女別就業者数及び人口構成比［職業別］（15歳以上就業者）**を精製するデータセット。  
+国勢調査（e-Stat）の **職業（大分類），男女別就業者数及び人口構成比［職業別］（15歳以上就業者）**を精製した**データセットの正典**。  
 産業（[industry](industry.md)）と対になる**就業構造の職業軸**を提供し、職業別就業者数・職業構成比（＝各職業÷総数）で「どんな仕事に就いているか」と「職業構成の変化」を描ける。
+
+> 共通の位置づけ・関連ドキュメントは [forged-dataset-catalog.md](forged-dataset-catalog.md)。
 
 ---
 
@@ -23,16 +25,6 @@ union せず別テーブルに分ける。区分数で名付けるのは「新�
 > 産業（[industry](industry.md)）も分類改訂（2007年11月）を持つため、遡及時は同じ **major\<N\>** 規約を適用する。
 > 通称「2015体系」は産業・職業で改訂年が違うのに同名になり紛らわしいので、data-forge では区分数の
 > major\<N\> を正とする。
-
-> **ステータス:** major12・major10 とも実装済み（2026-08-16。major10＝1980延伸）。
-> **[industry](industry.md) と軸構造が完全同型**（tab=334就業者数/構成比・cat01=職業大分類・cat02=男女・
-> 全国表 area 軸なし）。**全国表が area 軸を持たない**ため全国合成の cleaner（00000/全国/level1 を合成）と
-> 実 area の cleaner の2系統で、cleaner 本体は共通・`national` フラグと `classes`（採用する大分類コード→名称）
-> で分岐する（occupation.py 参照）。派生の `*_timeseries` は全国＋47県を area 軸で単純 union するだけ
-> （合併 rollup なし・area master 不要）。帳票の位置づけ（就業状態等基本集計＝人口等基本集計とは別の親）は
-> 収集データカタログ [estat-census-catalog.md](../sources/estat-census-catalog.md) §3-6。
-
----
 
 ## データソース
 
@@ -123,22 +115,4 @@ grain = **area × sex × occupation × year**（major12/major10 とも同型10�
 
 詳細は [data-quality-assurance.md](../data-quality-assurance.md)。
 
----
-
-## 使い方
-
-```bash
-# major12（現行）
-uv run poe run occupation_major12_national     # 全国（0003410408, 1995〜2020）
-uv run poe run occupation_major12_prefecture   # 都道府県（0003410411, 2005〜2020）
-uv run poe run occupation_major12_timeseries   # 全国＋47県を union した配布正典
-
-# major10（1980延伸）
-uv run poe run occupation_major10_national     # 全国（0003410409, 1950〜2005）
-uv run poe run occupation_major10_prefecture   # 都道府県（0003410412, 1980〜2005）
-uv run poe run occupation_major10_timeseries   # 全国＋47県を union した配布正典
-
-uv run poe clean occupation_major12_national   # 先頭を確認（書き出しなし）
-```
-
-職業構成比は配布側で count から算出する（`各職業 workers / 総数(100) の workers`）。
+**派生指標:** 職業構成比は配布側で count から算出する（`各職業 workers / 総数(100) の workers`）。

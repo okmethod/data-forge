@@ -1,15 +1,9 @@
 # households — 国勢調査 世帯の種類別 世帯数・世帯人員
 
-国勢調査（e-Stat）の **世帯の種類別世帯数及び世帯人員 － 全国，都道府県**（時系列データ製品
-`0003410420`、その1＝一般世帯及び施設等の世帯）を、**全国＋47都道府県 × 1960〜2020** の
-1 枚テーブルに精製するデータセット。世帯数・世帯人員という**人口(person)とは別の基幹軸**を提供し、
-平均世帯人員（＝世帯人員÷世帯数、世帯規模の縮小＝核家族化・単身化）を分析できる。
+国勢調査（e-Stat）の **世帯の種類別世帯数及び世帯人員 － 全国，都道府県**（時系列データ製品`0003410420`、その1＝一般世帯及び施設等の世帯）を、**全国＋47都道府県 × 1960〜2020** の 1 枚テーブルに精製した**データセットの正典**。  
+世帯数・世帯人員という**人口(person)とは別の基幹軸**を提供し、平均世帯人員（＝世帯人員÷世帯数、世帯規模の縮小＝核家族化・単身化）を分析できる。
 
-> **ステータス:** 実装済み（2026-08-16）。**単一 ID に全国・都道府県・全年を含む最小構成**
-> （age5 のような射影も、population のような合併畳み込みも不要）。単独 `Dataset` ＝ cleaner
-> `clean_households` 1 個のみで完結し、combine・area master・reconcile は一切通らない。
-> パイプライン全体設計は [docs/pipeline-architecture.md](../pipeline-architecture.md) を参照。
-> 帳票の位置づけ（回次跨帳票・世帯系の全体像）は 収集データカタログ [estat-census-catalog.md](../sources/estat-census-catalog.md)。
+> 共通の位置づけ・関連ドキュメントは [forged-dataset-catalog.md](forged-dataset-catalog.md)。
 
 ---
 
@@ -60,13 +54,4 @@ grain = **area × household_type × year**。population 系の8列を土台に�
 
 **保存則:** 各 area×year で `household_type=総数 == 一般世帯 + 施設等の世帯`（世帯数・世帯人員とも）。
 
----
-
-## 使い方
-
-```bash
-uv run poe run households      # fetch→clean→export（data/processed/ へ3形式出力）
-uv run poe clean households    # 先頭を確認（書き出しなし）
-```
-
-平均世帯人員は配布側で `household_members / households` として算出する。
+**派生指標:** 平均世帯人員は配布側で `household_members / households`（世帯規模の縮小＝核家族化・単身化の指標）として算出する。

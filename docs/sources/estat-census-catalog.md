@@ -6,7 +6,7 @@ e-Stat（国勢調査, `statsCode=00200521`）の各帳票（統計表）の構�
 
 **関連ドキュメント**:
 
-- **精製先＝出力側データセットの正典**: `docs/distributions/`（一覧は [docs/README.md](../README.md)）
+- **精製先＝出力側データセットの正典**: [forged-dataset-catalog.md](../distributions/forged-dataset-catalog.md)
 - **ライセンス・商用可否**: [data-provider-catalog.md](data-provider-catalog.md)
 - **地域集約の仕組み**: [area_master.md](../distributions/area_master.md)
 

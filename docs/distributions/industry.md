@@ -1,20 +1,12 @@
 # industry — 国勢調査 産業（大分類）×男女別就業者数
 
-国勢調査（e-Stat）の **産業（大分類），男女別就業者数及び人口構成比［産業別］（15歳以上就業者）**
-（時系列データ製品 全国 `0003410395` / 都道府県 `0003410398`）を、**全国 1995〜2020／都道府県
-2005〜2020** の 1 枚テーブルに精製するデータセット。人口(person)・世帯(household)・労働力状態
+国勢調査（e-Stat）の **産業（大分類），男女別就業者数及び人口構成比［産業別］（15歳以上就業者）**（時系列データ製品 全国 `0003410395` / 都道府県 `0003410398`）を、**全国 1995〜2020／都道府県2005〜2020** の 1 枚テーブルに精製した**データセットの正典**。  
+人口(person)・世帯(household)・労働力状態
 （[labor_force](labor_force.md)）に続く**就業構造の産業軸**を提供し、産業別就業者数・産業構成比
-（＝各産業÷総数）で「地域の産業の姿」と「産業構造の変化」を描ける。高齢化
-（[population_by_age5](population_by_age5.md)）・労働力率（[labor_force](labor_force.md)）と対にすることで
-「どの産業で働き手が増減しているか」を分析できる。
+（＝各産業÷総数）で「地域の産業の姿」と「産業構造の変化」を描ける。
+高齢化（[population_by_age5](population_by_age5.md)）・労働力率（[labor_force](labor_force.md)）と対にすることで「どの産業で働き手が増減しているか」を分析できる。
 
-> **ステータス:** 実装済み（2026-08-16）。**単一 ID で全年・47県固定＝合併なし＝area master 不要**
-> （[labor_force.md](labor_force.md) と同性格）。ただし**全国表が area 軸を持たない**ため
-> [population_by_age5](population_by_age5.md) と同じく全国合成が要る＝**cleaner は clean_national
-> （00000/全国/level1 を合成）と clean_prefecture（実 area 軸）の2変種**（本体は共通・`national` フラグ分岐）。
-> 派生の `industry_timeseries` は全国＋47県を area 軸で単純 union するだけ（合併 rollup なし）。
-> 帳票の位置づけ（就業状態等基本集計＝人口等基本集計とは別の親）は
-> 収集データカタログ [estat-census-catalog.md](../sources/estat-census-catalog.md) §3-6。職業版（occupation）は同型で後追い実装予定。
+> 共通の位置づけ・関連ドキュメントは [forged-dataset-catalog.md](forged-dataset-catalog.md)。
 
 ---
 
@@ -83,15 +75,4 @@ labor_force（労働力状態不詳）・age5（年齢不詳）と違い、**「
   （常住地ベースゆえ全国＝県合計が厳密に閉じる。全国合成でも作れたが公式全国表を採用している）。
 - **男女保存**: 各 area×industry×year で `男(1) + 女(2) == 総数(0)`
 
----
-
-## 使い方
-
-```bash
-uv run poe run industry_national       # 全国（0003410395, 1995〜2020）
-uv run poe run industry_prefecture     # 都道府県（0003410398, 2005〜2020）
-uv run poe run industry_timeseries     # 全国＋47県を union した配布正典
-uv run poe clean industry_national     # 先頭を確認（書き出しなし）
-```
-
-産業構成比は配布側で count から算出する（`各産業 workers / 総数(100) の workers`）。
+**派生指標:** 産業構成比は配布側で count から算出する（`各産業 workers / 総数(100) の workers`）。

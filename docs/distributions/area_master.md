@@ -1,12 +1,7 @@
 # area_master — 地域マスタ（アトム軸スタースキーマ）
 
-星座型アーキテクチャの**共有ディメンション（conformed dimension）**。  
-特定のファクトに属さず、合併をまたぐ市区町村の連続時系列を成立させる**共有ハブ**として、全ファクト（[population](population.md) / [population_by_age](population_by_age.md) / 将来の兄弟ファクト）から参照される。
-
-**関連ドキュメント**:
-
-- **正座型アーキテクチャについて**: [docs/pipeline-architecture.md](../pipeline-architecture.md)
-- **実装詳細**: [src/data_forge/area/](../../apps/pipeline/src/data_forge/area/) の docstring
+星座型アーキテクチャが全ファクトで共有する**地域ディメンション（conformed dimension）の正典**（合併畳み込み aggregate_to_base / crosswalk・人口保存/孤児検証・overrides 運用）。  
+特定のファクトに属さず、合併をまたぐ市区町村の連続時系列を成立させる**共有ハブ**として、全ファクト（[population](population.md) / [population_by_age](population_by_age.md) / 将来の兄弟ファクト）から参照される。共通の位置づけ・関連ドキュメントは [forged-dataset-catalog.md](forged-dataset-catalog.md)。
 
 > 本 doc は `distributions/`（精製データカタログ）に同居するが、それ自体が配布データセットなのではなく、各データセットが依存する**内部の共有ハブ**の設計を記す。
 

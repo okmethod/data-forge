@@ -1,10 +1,9 @@
 # population — 国勢調査 男女別人口
 
-国勢調査（e-Stat）の男女別人口を、全国／都道府県／市区町村の粒度で精製したデータセット群。
+国勢調査（e-Stat）の男女別人口を全国／都道府県／市区町村の粒度で精製した**データセット群の正典**。  
 単年のクロスセクションと、それらを結合した時系列（派生データセット）を提供する。
 
-- パイプラインの使い方は [apps/pipeline/README.md](../../apps/pipeline/README.md)、全体設計は [docs/pipeline-architecture.md](../pipeline-architecture.md) を参照。
-- データソースの利用規約・商用可否は [data-provider-catalog.md](../sources/data-provider-catalog.md) を参照。ソース帳票の全体像は収集データカタログ [estat-census-catalog.md](../sources/estat-census-catalog.md)。
+> 共通の位置づけ・関連ドキュメントは [forged-dataset-catalog.md](forged-dataset-catalog.md)。
 
 ---
 
@@ -33,11 +32,6 @@
 > （5歳階級の `population_by_age5_prefecture` と同型）。出力シェイプは 47都道府県・全国行なし
 > （全国は Σ県で復元）・2025速報を splice。1980-2020 の重複年は市区町村ミクロの県 rollup と一致する
 > （唯一の差＝東京都1980 の +37人＝特別区部の区未定分。回次跨帳票側が区未定分を含む正しい県総数）。
-
-```bash
-uv run poe run population_2020         # 2020 単年
-uv run poe run population_timeseries   # 1980〜2020 時系列
-```
 
 ---
 

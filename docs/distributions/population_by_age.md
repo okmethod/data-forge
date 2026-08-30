@@ -1,11 +1,9 @@
 # population_by_age — 国勢調査 年齢3区分×男女別人口（設計）
 
-国勢調査（e-Stat）の **年齢3区分（年少0-14／生産15-64／老年65+）× 男女** 別人口を、
-全国／都道府県／市区町村の粒度で 1980〜2020 の全年について精製するデータセット群。
+国勢調査（e-Stat）の **年齢3区分（年少0-14／生産15-64／老年65+）× 男女** 別人口を、全国／都道府県／市区町村の粒度で 1980〜2020 の全年について精製した**データセット群の正典**。
 高齢化の 45 年連続時系列を提供する。
 
-> cleaner=`clean_population_by_age`（全年1個）／datasets 9表＋`population_by_age_timeseries`。combine は `grain` 引数で、area 集約（`aggregate_to_base` / `crosswalk`）は分類軸コード列（`*_code`）の自動判別で後方互換に一般化（`--join aggregate_to_base` / `crosswalk` が by_age でも通り、集約後も年齢保存・男女保存が実データで違反0＝2020 総人口 126,146,099 一致）。
-> パイプライン全体設計は [pipeline-architecture.md](../pipeline-architecture.md) を参照。
+> 共通の位置づけ・関連ドキュメントは [forged-dataset-catalog.md](forged-dataset-catalog.md)。
 
 ---
 
