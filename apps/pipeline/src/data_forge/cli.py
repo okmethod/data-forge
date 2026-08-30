@@ -92,6 +92,12 @@ def _cmd_area_check(ds: Dataset | StitchedDataset | ProjectedDataset, args: argp
         print(f"⚠️ 未整備の消滅アトム {orph.height} 件（例: {top}）→ area-orphans で全件確認")
     else:
         print("✅ 孤児アトムなし（全消滅アトムが base_year へ到達）")
+    dangling = area_reconcile.dangling_successors(events, atom_fact)
+    if dangling.height:
+        print(f"⚠️ 後継先が実在しないイベント {dangling.height} 件（後継コードの指定ミス疑い）:")
+        print(dangling)
+    else:
+        print("✅ 全イベントの後継先が実在コードへ着地")
 
 
 # クロスファクト検算（§data-quality-assurance.md 三角測量）: 照合相手 ds.key → (共有軸, 総数スライス述語)。

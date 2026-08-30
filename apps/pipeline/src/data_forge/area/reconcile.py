@@ -3,10 +3,11 @@
 堀（moat）の駆動役。parsed イベントだけでは埋まらない箇所を機械的にフラグし、
 人手 overrides（クッション）で埋める運用を支える。
 
-2 つの検査:
+3 つの検査:
     - national_conservation … 各年、アトム合計 == 全国total か（アトム抽出の健全性）。
     - orphans … base_year までに消滅したのに rollup 先が base_year に無いアトム
                 （＝合併イベント未整備）。人口降順で「次に埋める候補」を返す。
+    - dangling_successors … 後継先が実在コードへ着地しないイベント行（後継コードの指定ミス）。
 """
 
 import polars as pl
@@ -155,4 +156,27 @@ def orphans(atom_fact: pl.DataFrame, events: pl.DataFrame, *, base_year: int | N
         mapped.filter(~pl.col("base_code").is_in(list(base_codes)))
         .select("area_code", "area_name", "last_year", "last_population", "base_code")
         .sort("last_population", descending=True, nulls_last=True)
+    )
+
+
+def dangling_successors(events: pl.DataFrame, atom_fact: pl.DataFrame) -> pl.DataFrame:
+    """後継先が実在コードへ着地しないイベント行を返す（後継コードの指定ミス検出）。
+
+    orphans が「消滅アトム側」から未整備を炙り出すのに対し、本検査は overrides/parsed の
+    `successor_code` そのものを突く。合併先を打ち間違えても rollup は黙って通し、孤児として
+    表に出ないことがある（例: 消滅アトムの人口が 0／その年に非登場）。ここで後継先の実在を
+    直接確かめ、指定ミスを取りこぼさない。
+
+    実在コードの宇宙 = 全年に登場するアトム area_code ∪ イベントの old_code。後者を含めるのは、
+    中間後継（さらに合併される側）が国勢調査の葉として登場しないまま連鎖解決されるため。
+    この宇宙のどこにも無い successor_code は着地先の無い dangling 参照＝ほぼ指定ミスなので、
+    人手確認用に該当行を返す（rollup は無効化しないので配布は止めず、警告に留める）。
+    """
+    universe = set(atom_fact.get_column("area_code").unique().to_list()) | set(
+        events.get_column("old_code").to_list()
+    )
+    return events.filter(
+        pl.col("successor_code").is_not_null()
+        & (pl.col("successor_code").str.len_chars() > 0)
+        & ~pl.col("successor_code").is_in(list(universe))
     )

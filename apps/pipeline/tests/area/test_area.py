@@ -369,6 +369,32 @@ def test_reconcile_orphans_flags_unmapped():
     assert cons["ok"].to_list() == [True, True]
 
 
+def test_dangling_successors_flags_nonexistent_target():
+    # 01202→01201 は実在(01201 はアトム)、01202→99999 は着地先が宇宙に無い＝指定ミス。
+    fact = _fact([("01201", "A市", 2020, 150), ("01202", "B市", 2005, 40)])
+    ev = pl.DataFrame(
+        {
+            "old_code": ["01202", "01203"],
+            "successor_code": ["01201", "99999"],
+            "year": [2008, 2008],
+            "kind": [None, None],
+        },
+        schema=events.EVENTS_SCHEMA,
+    )
+    bad = reconcile.dangling_successors(ev, fact)
+    assert bad["old_code"].to_list() == ["01203"]  # 後継 99999 は実在せず
+
+
+def test_dangling_successors_accepts_intermediate_chain():
+    # A→B→C の多段。中間後継 B はアトムに登場しなくても old_code なので実在扱い＝dangling でない。
+    fact = _fact([("C", "C市", 2020, 100)])
+    ev = pl.DataFrame(
+        {"old_code": ["A", "B"], "successor_code": ["B", "C"], "year": [2005, 2008], "kind": [None, None]},
+        schema=events.EVENTS_SCHEMA,
+    )
+    assert reconcile.dangling_successors(ev, fact).height == 0
+
+
 def test_conservation_known_diff_is_accepted():
     # 1980 は既知差分 37（区未定分）を受容＝ok。他年の diff=0 も ok。値は KNOWN_DIFFS で固定。
     assert reconcile.KNOWN_DIFFS[1980] == 37
