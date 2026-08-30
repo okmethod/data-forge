@@ -8,7 +8,7 @@
 ## 分類体系の呼称（SSoT）
 
 > **この節が呼称の唯一の定義元。** 職業大分類は分類改訂で 2 系統に分かれる。
-> data-forge では両者を**大分類の区分数**で `major<N>` と命名し、**以降このドキュメント・[census_source_tables.md](census_source_tables.md)・datasets.py・[data-quality-assurance.md](../data-quality-assurance.md)・コード（occupation.py / test_occupation.py）でこの呼称のみを使う**（「2015体系」「旧大分類」「12区分」「改訂前/後」等の別表現は本節以外で使わない）。
+> data-forge では両者を**大分類の区分数**で `major<N>` と命名し、**以降このドキュメント・収集データカタログ [estat-census-catalog.md](../sources/estat-census-catalog.md)・datasets.py・[data-quality-assurance.md](../data-quality-assurance.md)・コード（occupation.py / test_occupation.py）でこの呼称のみを使う**（「2015体系」「旧大分類」「12区分」「改訂前/後」等の別表現は本節以外で使わない）。
 
 | 呼称（canonical） | table_name           | 正式分類（＝定義）                                 | 大分類 | ソース 全国 / 都道府県  | 期間 全国 / 都道府県    |
 | ----------------- | -------------------- | -------------------------------------------------- | ------ | ----------------------- | ----------------------- |
@@ -30,7 +30,7 @@ union せず別テーブルに分ける。区分数で名付けるのは「新�
 > 実 area の cleaner の2系統で、cleaner 本体は共通・`national` フラグと `classes`（採用する大分類コード→名称）
 > で分岐する（occupation.py 参照）。派生の `*_timeseries` は全国＋47県を area 軸で単純 union するだけ
 > （合併 rollup なし・area master 不要）。帳票の位置づけ（就業状態等基本集計＝人口等基本集計とは別の親）は
-> [census_source_tables.md](census_source_tables.md) §3-6。
+> 収集データカタログ [estat-census-catalog.md](../sources/estat-census-catalog.md) §3-6。
 
 ---
 

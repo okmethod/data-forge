@@ -12,7 +12,7 @@
 > `labor_force_timeseries` は全国＋47県を area 軸で単純 union するだけ（合併 rollup なし）。
 > パイプライン全体設計は [docs/pipeline-architecture.md](../pipeline-architecture.md) を参照。
 > 帳票の位置づけ（就業状態等基本集計＝人口等基本集計とは別の親）は
-> [census_source_tables.md](census_source_tables.md) §3-6。
+> 収集データカタログ [estat-census-catalog.md](../sources/estat-census-catalog.md) §3-6。
 
 ---
 

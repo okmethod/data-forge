@@ -14,7 +14,7 @@
 > （00000/全国/level1 を合成）と clean_prefecture（実 area 軸）の2変種**（本体は共通・`national` フラグ分岐）。
 > 派生の `industry_timeseries` は全国＋47県を area 軸で単純 union するだけ（合併 rollup なし）。
 > 帳票の位置づけ（就業状態等基本集計＝人口等基本集計とは別の親）は
-> [census_source_tables.md](census_source_tables.md) §3-6。職業版（occupation）は同型で後追い実装予定。
+> 収集データカタログ [estat-census-catalog.md](../sources/estat-census-catalog.md) §3-6。職業版（occupation）は同型で後追い実装予定。
 
 ---
 

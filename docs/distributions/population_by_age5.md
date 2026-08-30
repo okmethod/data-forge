@@ -3,17 +3,16 @@
 国勢調査（e-Stat）の **年齢5歳階級（0〜4／5〜9／…／85歳以上）× 男女** 別人口を精製するデータセット群。
 `population_by_age`（年齢3区分）より細かい年齢構造の時系列を提供する。
 
-**1 つの table_name `population_by_age5` に 2 系列が同居する**（命名規約＝粒度は key suffix で表し family 名には持たせない・`apps/pipeline/src/data_forge/datasets.py` docstring）:
+**1 つの table_name `population_by_age5` に 2 系列が同居する**（粒度は key suffix で表し family 名には持たせない＝命名規約 `apps/pipeline/src/data_forge/datasets.py` docstring）:
 
-| 系列                          | 粒度・カバレッジ                                         | 系統 | 配布 key                                   | cleaner             |
-| ----------------------------- | -------------------------------------------------------- | ---- | ------------------------------------------ | ------------------- |
-| **市区町村＝旗艦**            | 市区町村（level4/6/7）・1980-2020（5年間隔）・**国籍別** | A    | `population_by_age5_timeseries`            | `age5_municipality` |
-| **全国・都道府県＝companion** | 全国＋47都道府県・1920〜2020（一世紀・総人口）           | B    | `population_by_age5_prefecture_timeseries` | `age5`              |
+| 系列                          | 粒度・カバレッジ                                         | 帳票の性質     | 配布 key                                   | cleaner             |
+| ----------------------------- | -------------------------------------------------------- | -------------- | ------------------------------------------ | ------------------- |
+| **市区町村（ミクロ）**        | 市区町村（level4/6/7）・1980-2020（5年間隔）・**国籍別** | 回次別帳票を縫合 | `population_by_age5_timeseries`            | `age5_municipality` |
+| **全国・都道府県（マクロ）**  | 全国＋47都道府県・1920〜2020（一世紀・総人口）           | 回次跨帳票を射影 | `population_by_age5_prefecture_timeseries` | `age5`              |
 
-> **ステータス:** 全国/県版 実装済み（2026-08-15）／市区町村版 M1 実装済み（2026-08-18）。
 > 両系列は別 statsDataId・別 stem（別配布ファイル）だが同じ table_name `population_by_age5` を共有する（N:1 ハブ）。
-> 2010-2020 では県値が重なるため物理2重保存せず、市区町村→県 rollup==県 companion を**検算オラクル**（test）で照合する。
-> パイプライン全体設計は [docs/pipeline-architecture.md](../pipeline-architecture.md)。
+> 2010-2020 では県値が重なるため物理2重保存せず、市区町村→県 rollup==県マクロ を**検算オラクル**（test）で照合する。
+> ソース帳票の全 statsDataId・年別クセ・選定根拠は収集データカタログ [estat-census-catalog.md](../sources/estat-census-catalog.md)。パイプライン全体設計は [pipeline-architecture.md](../pipeline-architecture.md)。
 
 ---
 
@@ -22,17 +21,17 @@
 同じ fact（5歳階級×男女別人口）でも、粒度によって e-Stat の供給形態が全く違うため、
 取得経路＝系列が2本に分かれる（table_name は共有・別 stem）。
 
-- **全国・都道府県（companion／系統B）は安い**: 5歳階級が **1920〜2020 を単一 ID で提供**（下表）。
-  合併の影響を受けない 47 コード固定＝**area master も合併集約も不要**の低コスト fact。
-- **市区町村（旗艦／系統A）は高い**: 市区町村×全年の綺麗な 5歳階級時系列は **e-Stat に存在しない**
+- **全国・都道府県（マクロ）は安い**: 5歳階級が **1920〜2020 を単一 ID で提供**（下表）。
+  合併の影響を受けない 47 コード固定＝**area master も合併集約も不要**の低コスト fact（回次跨帳票の射影）。
+- **市区町村（ミクロ）は高い**: 市区町村×全年の綺麗な 5歳階級時系列は **e-Stat に存在しない**
   （時系列データ製品で市区町村まで下りる年齢表は[年齢3区分だけ](population_by_age.md)）。各回基本集計には
   市区町村5歳階級が 1980 から在るが、年ごとに別 statsDataId・別軸交差（総数と日本人が別表の年もある）と極めて不揃い
-  （[census_source_tables.md](census_source_tables.md) §3-3）。**各回を年ごとに取得して `aggregate_to_base` で
-  合併畳込**する泥臭い経路が必要＝これが「価値の芯」（設計判断は §4-3）。
+  （収集データカタログ [estat-census-catalog.md](../sources/estat-census-catalog.md) §3-3）。**各回（回次別帳票）を年ごとに取得して
+  `aggregate_to_base` で合併畳込**する経路が必要。
 
-以下の「データソース」「出力スキーマ」「合成」「検証」節は主に **companion（全国・都道府県）系列**を
-説明する。市区町村＝旗艦系列の固有事情（100歳以上・合併畳込・年別スキーマ差）は
-[市区町村＝旗艦系列](#市区町村旗艦系列)節にまとめる。
+以下の「データソース」「出力スキーマ」「合成」「検証」節は主に **マクロ（全国・都道府県）系列**を
+説明する。ミクロ（市区町村）系列の固有事情（100歳以上・合併畳込・年別スキーマ差）は
+[市区町村ミクロ系列](#市区町村ミクロ系列)節にまとめる。
 
 ---
 
@@ -68,12 +67,12 @@
 
 ## 出力スキーマ
 
-下表は companion（全国・都道府県）系列＝grain **area × year × sex × age_class**・`population_by_age` と同型の 10 列。
-**旗艦（市区町村）系列はこれに nationality 軸を足した 12 列**（`nationality_code`/`nationality` を `sex` の後に挿入・
+下表はマクロ（全国・都道府県）系列＝grain **area × year × sex × age_class**・`population_by_age` と同型の 10 列。
+**ミクロ（市区町村）系列はこれに nationality 軸を足した 12 列**（`nationality_code`/`nationality` を `sex` の後に挿入・
 grain は area × year × sex × **nationality** × age_class）。SQLite テーブル名は 2系列共有の `population_by_age5` だが
-別 stem＝別ファイルなので列差は物理的に同居しない（companion は総人口専用で nationality 軸を持たない）。旗艦は
+別 stem＝別ファイルなので列差は物理的に同居しない（マクロは総人口専用で nationality 軸を持たない）。ミクロは
 `area_level` に 4/6/7、`age_class_code` に 100歳以上（280〜310）、`year` は 1980-2020（5年間隔）、`is_current` に
-false（level7）が入る（差分は[市区町村＝旗艦系列の対比表](#companion全国県版との違い)）。
+false（level7）が入る（差分は[マクロ（全国/県版）との違い](#マクロ全国県版との違い)）。
 
 | 列               | 型   | 説明                                                                             |
 | ---------------- | ---- | -------------------------------------------------------------------------------- |
@@ -86,7 +85,7 @@ false（level7）が入る（差分は[市区町村＝旗艦系列の対比表](
 | `age_class`      | str  | 年齢5歳階級名称（総数 / 0〜4歳 … 85歳以上 / 年齢不詳）                           |
 | `year`           | int  | 調査年（1920〜2020 の 5 年間隔）                                                 |
 | `population`     | int  | 人口（欠損は null）                                                              |
-| `is_current`     | bool | 現存自治体か（companion は全国/都道府県のみ＝常に true。旗艦は level7 が false） |
+| `is_current`     | bool | 現存自治体か（マクロは全国/都道府県のみ＝常に true。ミクロは level7 が false）   |
 
 > **age_class_code は e-Stat の cat02 コードをそのまま採る**（3桁ゼロ埋め＝辞書順が年齢昇順で、
 > 出所が追える。18 区分を独自連番へ振り直す remap 表を持たない）。総数=100 が先頭、年齢不詳=999 が末尾。
@@ -109,7 +108,7 @@ false（level7）が入る（差分は[市区町村＝旗艦系列の対比表](
 ```bash
 uv run data-forge run population_by_age5_national               # 全国のみ（1920〜2020）
 uv run data-forge run population_by_age5_prefecture             # 47都道府県
-uv run data-forge run population_by_age5_prefecture_timeseries  # 全国＋都道府県（companion 配布正典）
+uv run data-forge run population_by_age5_prefecture_timeseries  # 全国＋都道府県（マクロ 配布正典）
 ```
 
 ---
@@ -127,79 +126,49 @@ uv run data-forge run population_by_age5_prefecture_timeseries  # 全国＋都�
 
 ---
 
-## 市区町村＝旗艦系列
+## 市区町村ミクロ系列
 
-> **ステータス:** **1980/1985/1990/1995/2000/2005/2010/2015/2020 実装済み（2026-08-18〜22）＋nationality 軸導入**。
-> 方針転換（Projected の Tier2 昇格）のパイロット。cleaner=`age5_municipality.clean_<year>`（年別）／
-> datasets=`population_by_age5_{1980,1985,1990,1995,2000,2005,2010,2015,2020}`（＋総数用に
-> `population_by_age5_{1990,1995}_total`）＋`population_by_age5_timeseries`
-> （table_name は companion と共有の `population_by_age5`・別 stem）／test=`tests/test_age5_municipality.py`。
-> **国籍(nationality)軸あり**（総数=0/日本人=1）。取れる基底が年で非対称＝**総数は 1980-2020 全年・日本人は
-> 1990/1995/2000-2020**（可否と理由は [census_source_tables §3-3](census_source_tables.md) のマトリクス）。
-> 1990/1995 は総数=各歳表 00401（0000031401/0000032219）と日本人=5歳階級表 006（0000031405/0000032223）の**別表を
-> 同年 union**（`clean_1990_1995_total`＋`clean_1990`/`clean_1995`。2026-08-22）。2005 は各歳表 0000033783（2000 同型・
-> cat04 だけ男女×出生月）を `clean_2005` で取得（2026-08-22）。
-> 検証＝1980 全国=117,060,396／1985=121,048,923（公表値一致・系統B県 diff=0）、1990 総数=123,611,167／1995 総数=125,570,246
-> （公表値と完全一致・系統B県 47県 diff=0）、1995 日本人=124,298,947（公表値一致）、2000 全国=126,925,843
-> （公表値と完全一致・系統B県 47県 diff=0）。印西市 総人口 1990:55,131→1995:72,278→2000:79,780 連続（合併補正済）。
+上記マクロ系列（全国・都道府県・回次跨帳票・1920-2020）と対をなす**市区町村粒度**の5歳階級。マクロ側には
+市区町村×全年の5歳階級が無いため、**各回の基本集計（回次別帳票）**を年ごとに取得して `aggregate_to_base` で
+合併畳込した市区町村長期時系列にする（population／population_by_age と同じ経路）。
 
-上記の全国・都道府県版（系統B・1920-2020）と対をなす**市区町村粒度**の5歳階級。系統B には市区町村×全年の
-5歳階級が無いため、**各回の基本集計（系統A）**を年ごとに取得して `aggregate_to_base` で合併畳込した市区町村
-長期時系列にする（population／population_by_age と同じ「価値の芯」）。ソースの全 statsDataId とクセは
-[census_source_tables.md §3-3](census_source_tables.md#3-3-各回の基本集計の年齢5歳階級市区町村-系統-a1980-から実在するが不揃い)。
+**国籍(nationality)軸あり**（総数=0/日本人=1）。取れる基底が年で非対称＝**総数は 1980-2020 全年・日本人は 1990-2020**。
+cleaner=`age5_municipality.clean_<year>`（年別）／datasets=`population_by_age5_{年}`（＋総数用 `population_by_age5_{1990,1995}_total`）
+＋`population_by_age5_timeseries`（table_name はマクロと共有・別 stem）／test=`tests/test_age5_municipality.py`。
 
-### companion（全国/県版）との違い
+> **ソースの全 statsDataId・年別の軸割当/コード体系・国籍別の可否マトリクス・選定根拠（2000 の各歳表採用・2015 の
+> getMetaInfo 食い違い・`muni_levels={4,6}` 上書き必須 等）は収集データカタログが正典**:
+> [estat-census-catalog.md §3-3](../sources/estat-census-catalog.md)。本節は出力側（配布シェイプの差・保存則検証）に絞る。
+
+### マクロ（全国/県版）との違い
 
 同じ table_name `population_by_age5` を共有しつつ、粒度・年齢終端・不詳の扱いが非対称（別 stem＝別配布ファイル
 なので schema 差は同居しない）:
 
-| 観点           | companion（全国/県版）                     | 旗艦（市区町村版）                                                                         |
-| -------------- | ------------------------------------------ | ------------------------------------------------------------------------------------------ |
-| 系統・ソース   | B（単一ID・0003410380/381）                | A（各回別 statsDataId・年別 cleaner）                                                      |
-| 配布 key       | `population_by_age5_prefecture_timeseries` | `population_by_age5_timeseries`                                                            |
-| nationality 軸 | なし（総人口専用）                         | **あり**（総数=0/日本人=1・総数は1980-2020全年・日本人は1990-2020）                        |
-| 年齢終端       | 85歳以上（310）                            | **100歳以上まで保持**（280〜310＝85-89…100歳以上）                                         |
-| age_class_code | B の飛び番（140/270 欠番）                 | **5歳刻みの独自連番**（110=0〜4 … 270=80〜84 / 280〜310）                                  |
-| 年齢不詳       | 導出注入（総数−Σ）                         | **実コードをそのまま採用**（1990/1995 は原表に不詳無し・注入しない）                       |
-| area・合併     | 47県固定＝合併なし＝area master 非経由     | 市区町村（level4/6 アトム）＝**合併畳込あり**（level7 は 2020 のみ）                       |
-| 年カバレッジ   | 1920-2020                                  | **1980-2020（5年間隔）**（2000＝各歳表0000032965／2005＝各歳表0000033783 から5歳再掲抽出） |
+| 観点           | マクロ（全国/県版）                        | ミクロ（市区町村版）                                                |
+| -------------- | ------------------------------------------ | ------------------------------------------------------------------- |
+| 帳票の性質     | 回次跨帳票（単一ID・0003410380/381）       | 回次別帳票（各回別 statsDataId・年別 cleaner）                      |
+| 配布 key       | `population_by_age5_prefecture_timeseries` | `population_by_age5_timeseries`                                     |
+| nationality 軸 | なし（総人口専用）                         | **あり**（総数=0/日本人=1・総数は1980-2020全年・日本人は1990-2020） |
+| 年齢終端       | 85歳以上（310）                            | **100歳以上まで保持**（280〜310＝85-89…100歳以上）                  |
+| age_class_code | 飛び番（140/270 欠番）                     | **5歳刻みの独自連番**（110=0〜4 … 270=80〜84 / 280〜310）           |
+| 年齢不詳       | 導出注入（総数−Σ）                         | **実コードをそのまま採用**（1990/1995 は原表に不詳無し・注入しない）|
+| area・合併     | 47県固定＝合併なし＝area master 非経由     | 市区町村（level4/6 アトム）＝**合併畳込あり**（level7 は 2020 のみ）|
+| 年カバレッジ   | 1920-2020                                  | **1980-2020（5年間隔）**                                            |
 
 粒度は key suffix で表し family 名（table_name）には持たせない、が命名規約（`datasets.py` docstring）。
-2 系列は別 stem なので age_class_code 体系差・nationality 軸差は物理的に混ざらない。ダッシュボードは 100歳以上まで
-持つ旗艦系列で高齢化物語を精密化できる（総数スライス=nationality=0 でフィルタ・二重計上回避）。
-
-### 年ごとに軸割当もコード体系も違う（実装の要）
-
-各回表は年齢5歳階級のほかに国籍・出生の月・全域/人口集中地区(DID) の軸を持ち、**どの `catNN` が男女／年齢か
-（軸割当）もコード体系も年ごとに違う**。cleaner は年別に持ち、共通の `_clean` へ tab・軸列名・コード写像・
-「余分な軸を総数コードで潰す」フィルタを渡す（`age5_municipality.py`）。
-
-| 年   | 男女軸    | 年齢軸    | 年齢コード例             | 総数で潰す余分軸                                               | level7 |
-| ---- | --------- | --------- | ------------------------ | -------------------------------------------------------------- | ------ |
-| 2000 | cat04     | cat03     | T01/200-219/500/900      | 国籍cat02（残す）・DID cat01=00700（各歳は再掲抽出で自動除外） | 無     |
-| 2010 | cat02     | cat03     | 000/200-219/600/999      | 国籍cat04=000・出生月cat05=000・DID cat01=00710                | 無     |
-| 2015 | **cat03** | **cat02** | 0000/1180-1370/1460/1490 | 国籍cat04=0000・出生月cat05=0000・DID cat01=00710              | 無     |
-| 2020 | cat02     | cat03     | 00-21/22                 | 国籍cat01=0                                                    | あり   |
-
-> ⚠ **2015 は getMetaInfo と getStatsData で軸割当・コードが食い違う**（メタは 男女=cat02/年齢=cat03 の3桁だが、
-> 実データ＝to_tidy 出力は 男女=cat03/年齢=cat02 の4桁）。マップは必ず getStatsData の実コードで確定する。
-
-> ⚠ **2000 だけは各歳表 0000032965 が唯一の穴なし全市区町村ソース**（5歳階級の2表 0000032807 ≥20万／0000032969 <20万は
-> 20-50万の特別区と<20万の県庁所在市が狭間に落ち全国が約476万人不足＝不採用）。各歳表だが年齢軸に5歳階級の再掲コードを
-> 内包するので `clean_2000` で 5歳コードだけ拾う。3.82M行と巨大ゆえ datasets 側で**サーバ側絞り込み**（`source_params["filters"]`＝
-> `cdCat01=00700`＋`cdCat03`=5歳コード）を掛け 53万行に抑える。令和型 level4/6 なので `muni_levels={4,6}` を明示上書き
-> （同年の人口時系列製品は level3＝上書きしないと市部の集計行を拾う）。詳細は [census_source_tables §3-3](census_source_tables.md)。
+ダッシュボードは 100歳以上まで持つミクロ系列で高齢化物語を精密化できる（総数スライス=nationality=0 でフィルタ・二重計上回避）。
 
 ### 検証（保存則）
 
-`tests/test_age5_municipality.py` と実データで次を確認済み（2000/2010/2015/2020）:
+`tests/test_age5_municipality.py` と実データで次を確認済み:
 
 1. **年齢保存:** Σ(5歳階級) + 不詳 == 総数。全 area×sex 違反 0。
 2. **男女保存:** 男 + 女 == 総数。全 area×age 違反 0。
-3. **全国＝47都道府県合計:** 各回 diff=0（2000=126,925,843／2010=128,057,352／2015=127,094,745／2020=126,146,099＝公表値一致）。
-4. **検算オラクル（別製品クロス照合）:** 市区町村→県 rollup == 別製品 population_by_age5_prefecture（0003410381）
-   が **47県×各年で diff=0**（2000 は総数スライスで完全一致）。Projected を破棄せず「答え合わせ」に使う方針転換の実装（daynight と同じ役回り）。
-5. **合併畳込:** 印西市(12231) 総人口＝2000:79,780→2010:88,176→2015:92,670→2020:102,609 と連続（合併境界へ畳込済）。
+3. **全国＝47都道府県合計:** 各回 diff=0（2020=126,146,099 等・公表値一致）。
+4. **検算オラクル（別製品クロス照合）:** 市区町村→県 rollup == マクロ系列 population_by_age5_prefecture（0003410381）
+   が **47県×各年で diff=0**。射影版を破棄せず「答え合わせ」に使う（daynight と同じ役回り）。
+5. **合併畳込:** 印西市(12231) 総人口＝2000:79,780→2020:102,609 と連続（合併境界へ畳込済）。
 
 ```bash
 uv run data-forge run population_by_age5_2020        # 単年（各回表）
@@ -211,5 +180,5 @@ uv run data-forge export population_by_age5_timeseries --join aggregate_to_base 
 ## 関連
 
 - 兄弟ファクト（年齢3区分・市区町村まで）… [population_by_age.md](population_by_age.md)
-- ソース選定の全体像・系統A/B・未使用ポテンシャル … [census_source_tables.md](census_source_tables.md)
+- ソース選定の全体像・帳票の性質・未使用ポテンシャル … 収集データカタログ [estat-census-catalog.md](../sources/estat-census-catalog.md)
 - 検証の横断管理 … [data-quality-assurance.md](../data-quality-assurance.md)

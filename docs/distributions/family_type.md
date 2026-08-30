@@ -8,7 +8,7 @@
 > **ステータス:** 実装済み（2026-08-17）。**単一 ID に全国・都道府県・全年を含む最小構成**
 > （[households](households.md) と同型・射影も合併畳み込みも不要）。単独 `Dataset` ＝ cleaner
 > `clean_family_type` 1 個のみで完結し、combine・area master・reconcile は一切通らない。
-> 帳票の位置づけ（系統B・世帯系の全体像）は [census_source_tables.md](census_source_tables.md) §3-4。
+> 帳票の位置づけ（回次跨帳票・世帯系の全体像）は 収集データカタログ [estat-census-catalog.md](../sources/estat-census-catalog.md) §3-4。
 
 ---
 
@@ -20,7 +20,7 @@
 
 - **households(0003410420) と同型の低コスト fact**：area 軸は全国(level1)＋47都道府県(level2)固定で
   旧市区町村(level7)も DID も持たず、合併の影響を受けない。全国も都道府県も同一 ID に含むため射影も不要。
-- 「世帯構造等基本集計」の別名で呼ばれるのがこの家族類型16区分（census_source_tables.md §3-4 の注記）。
+- 「世帯構造等基本集計」の別名で呼ばれるのがこの家族類型16区分（estat-census-catalog.md §3-4 の注記）。
   市区町村版（各回 0003445105・約321万行）は重く採らない。
 - 別系列に注意：旧分類区分版 0003410424（〜2005 打切り）・世帯主年齢クロス版 0003414256（全国のみ）は
   別帳票で本データセットには混ぜない。
