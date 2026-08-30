@@ -2,7 +2,7 @@
 
 時系列データ製品「世帯の種類別世帯数及び世帯人員 － 全国，都道府県」
 （0003410420、その1＝一般世帯及び施設等の世帯・1960〜2020）を配布用の1枚テーブルへ整形する。
-系統B（cross-census 編纂）で year 軸を1帳票内に持ち、area は全国(level1)＋47都道府県(level2)固定
+回次跨（cross-census 編纂）で year 軸を1帳票内に持ち、area は全国(level1)＋47都道府県(level2)固定
 ＝合併なし＝**area master 不要の低コスト fact**（age5.py と同性格）。単一 ID に全国も都道府県も
 含むため射影（ProjectedDataset）も不要で、cleaner 1 個の単独 Dataset で完結する。
 

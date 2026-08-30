@@ -17,13 +17,13 @@ population 固有のクレンジング（level→is_current・int化・欠損処
         2015 平成型 → 共通8列（人口性比・人口集中地区を拾わない）。
     test_clean_handles_levels_and_missing
         階層・欠損。level7 の is_current=false・欠損記号 "-" の null 化。
-    test_clean_population_prefecture_companion
+    test_clean_population_prefecture_macro
         都道府県マクロ（回次跨帳票の射影）。世紀マクロ cleaner の写像。
     test_clean_population_by_age_schema_and_national_restore
         （by_age）年齢軸を保持した10列への写像・全国行を都道府県合計から復元。
     test_clean_population_by_age_conservation
         （by_age）年齢保存。年少+生産+老年+不詳 == 総数（不詳=総数−3区分で注入）。男女保存も確認。
-    test_clean_by_age_prefecture_companion
+    test_clean_by_age_prefecture_macro
         （by_age）都道府県マクロ（回次跨帳票の射影）の写像。
 
 共有インフラ側の委譲先:
@@ -283,7 +283,7 @@ def test_clean_population_by_age_conservation():
 
 
 def _by_age_longterm_tidy() -> pl.DataFrame:
-    """系統B長期表 0003410383 を模した tidy（全国+2県・tab1060実数・cat01=100/105/120/130・男女軸なし）。"""
+    """回次跨長期表 0003410383 を模した tidy（全国+2県・tab1060実数・cat01=100/105/120/130・男女軸なし）。"""
     area_rows = {
         "00000": {"100": 300, "105": 40, "120": 200, "130": 55},  # 全国（落とされる）
         "01000": {"100": 100, "105": 10, "120": 60, "130": 25},  # 不詳=5
@@ -330,9 +330,9 @@ def _by_age_longterm_tidy() -> pl.DataFrame:
     return pl.DataFrame(rows)
 
 
-def test_clean_by_age_prefecture_companion():
+def test_clean_by_age_prefecture_macro():
     df = population.clean_by_age_prefecture(_by_age_longterm_tidy())
-    # 旗艦 by_age と同一10列スキーマ
+    # ミクロ by_age と同一10列スキーマ
     assert df.columns == [
         "area_code",
         "area_name",
@@ -350,7 +350,7 @@ def test_clean_by_age_prefecture_companion():
     assert sorted(df["area_code"].unique().to_list()) == ["01000", "02000"]
     # sex は総数固定
     assert df["sex_code"].unique().to_list() == ["0"]
-    # cat01=105(0-14) が旗艦ターゲット '1' へ写像される
+    # cat01=105(0-14) がミクロターゲット '1' へ写像される
     child = df.filter((pl.col("area_code") == "01000") & (pl.col("age_class_code") == "1")).row(0, named=True)
     assert child["population"] == 10 and child["age_class"] == "年少人口(0-14)"
     # 不詳補完版(000010)は無視（総数は 100 のまま・999999 を採らない）
@@ -371,7 +371,7 @@ def test_clean_by_age_prefecture_companion():
 
 
 def _pop_longterm_tidy() -> pl.DataFrame:
-    """系統B長期表 0003410379 を模した tidy（全国+DID+2県・tab020人口/1120性比・cat01=男女100/110/120）。"""
+    """回次跨長期表 0003410379 を模した tidy（全国+DID+2県・tab020人口/1120性比・cat01=男女100/110/120）。"""
     rows: list[dict] = []
     areas = {
         "00000": "全国",
@@ -408,9 +408,9 @@ def _pop_longterm_tidy() -> pl.DataFrame:
     return pl.DataFrame(rows)
 
 
-def test_clean_population_prefecture_companion():
+def test_clean_population_prefecture_macro():
     df = population.clean_population_prefecture(_pop_longterm_tidy())
-    # 旗艦 population と同一8列スキーマ
+    # ミクロ population と同一8列スキーマ
     assert df.columns == ["area_code", "area_name", "area_level", "sex_code", "sex", "year", "population", "is_current"]
     # 全国(00000)・DID(00100/00200)を落とし47県相当のみ（ここでは2県）
     assert sorted(df["area_code"].unique().to_list()) == ["13000", "27000"]

@@ -46,7 +46,7 @@
 | **C4** | age5→県rollup == population_by_age5_prefecture | 県×year           | A×B  |
 | **C5** | daynight(夜間) == population                   | 全国              | −×A  |
 
-- **C1 が最も堅い**: population も age5 も同じ各回基本集計（系統A・同一調査母集団）ゆえ厳密 diff=0 が期待できる。実測ステータスは「検証手段の索引」の crossfact 検証で得る。
+- **C1 が最も堅い**: population も age5 も同じ各回基本集計（回次別・同一調査母集団）ゆえ厳密 diff=0 が期待できる。実測ステータスは「検証手段の索引」の crossfact 検証で得る。
   - **粒度指定の落とし穴**（C1 が顕在化させた知見）: 一部の各歳表は市区町村を持つのに、既定の粒度指定のままだと中間集計（郡／支庁）を葉に拾って粒度が非対称になる。該当年は粒度指定を明示上書きして市区町村フルへ揃える（具体年は population_by_age5 / estat-census-catalog の各 doc が正典）。
 - **年別の許容カテゴリ**: 全年が diff=0 とは限らないため年別に status を分類し、**真の不一致のみ**を失敗とする（許容年は年別リストで管理）。
   - **scope_out**: 照合相手が未収録の年（population 速報のみ等）。照合相手側=0 を期待＝スコープ外として許容。
@@ -141,7 +141,7 @@ grain 列の組で重複がないことを保証し、静かに通さず reject 
   - 対応方針: GitHub Actions で `poe check` 自動化
 - **クロスファクト検算 C2**
   - 現状: age5→3区分畳込 vs population_by_age は未実装
-  - 対応方針: by_age(系統B)の年齢不詳の帰属を `getStatsData` 実測→照合式・畳込後アトムで比較・diff は KNOWN_DIFFS 登録
+  - 対応方針: by_age(回次跨)の年齢不詳の帰属を `getStatsData` 実測→照合式・畳込後アトムで比較・diff は KNOWN_DIFFS 登録
 - **日本人スライスの検算**
-  - 現状: C1〜C5 は総人口(nationality=0)のみ照合＝日本人(=1)は検証網の外。旗艦 age5 の 1990/1995 日本人が支庁 level3 混入で壊れていた事故を C1 は検知できず（`muni_levels` 設定の契約テストで別途ガード）
-  - 対応方針: 日本人版の照合オラクル（例: 県 rollup vs 系統B の日本人表・年齢/男女保存）を crossfact に追加
+  - 現状: C1〜C5 は総人口(nationality=0)のみ照合＝日本人(=1)は検証網の外。ミクロ age5 の 1990/1995 日本人が支庁 level3 混入で壊れていた事故を C1 は検知できず（`muni_levels` 設定の契約テストで別途ガード）
+  - 対応方針: 日本人版の照合オラクル（例: 県 rollup vs 回次跨 の日本人表・年齢/男女保存）を crossfact に追加

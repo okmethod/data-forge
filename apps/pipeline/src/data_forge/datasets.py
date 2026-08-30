@@ -15,7 +15,7 @@
 サブ辞書の区切りは cleaner モジュール／table_name のまとまりに対応し、将来のファイル分割の縫い目でもある。
 
 命名規約（family / key / stem / table_name の関係）:
-- **family名 ＝ table_name**。粒度（市区町村/都道府県/全国）や来歴（系統A/B・Stitched/Projected）を
+- **family名 ＝ table_name**。粒度（市区町村/都道府県/全国）や来歴（回次別/回次跨・Stitched/Projected）を
   suffix に含めない「その fact の論理名」。カバレッジ年次は名前でなく docs/title で明示する。
 - **family : key = 1:N**。key は family名 ＋ 役割/粒度 suffix（_national/_prefecture/_timeseries/_<year> 等）で
   一意化する。同一 fact の別パーティション/別ビュー（全国 base・県 base・縫合・県ロールアップ）が同じ
@@ -63,7 +63,7 @@ class Dataset:
     table_name: str  # SQLite テーブル名
     index_columns: list[str] = field(default_factory=list)
     # アトム抽出時の市区町村レベルの明示上書き（None なら年から自動判定）。同じ年でも
-    # e-Stat 製品ごとに level の意味が違う表（例: age5 旗艦の 2000＝令和型 level4/6）で使う。
+    # e-Stat 製品ごとに level の意味が違う表（例: age5 ミクロの 2000＝令和型 level4/6）で使う。
     muni_levels: frozenset[int] | None = None
 
 
@@ -127,7 +127,7 @@ FAMILIES: frozenset[str] = frozenset(
     {
         "population",  # 男女別人口
         "population_by_age",  # 年齢3区分×男女別人口
-        "population_by_age5",  # 年齢5歳階級×男女別人口（市区町村=旗艦／県世紀=companion 同居）
+        "population_by_age5",  # 年齢5歳階級×男女別人口（市区町村=ミクロ／県世紀=マクロ 同居）
         "daynight_population",  # 昼夜間人口
         "households",  # 世帯の種類別 世帯数・世帯人員
         "family_type",  # 家族類型16区分別 世帯数・世帯人員
@@ -276,8 +276,8 @@ _POPULATION: dict[str, DatasetEntry] = {
         default_join="union",
     ),
     # 派生（空間軸）: 都道府県別。upstreams は上と同じで default_join=prefecture のみ違える。
-    # 世紀 companion（系統B）: 単一 ID「男女別人口 － 全国，都道府県（大正9年～令和2年）」0003410379。
-    # 旗艦（市区町村・各回別ID・1980〜）とは別ソースの都道府県 companion（age5 の _prefecture と同型）。
+    # 世紀マクロ（回次跨）: 単一 ID「男女別人口 － 全国，都道府県（大正9年～令和2年）」0003410379。
+    # ミクロ（市区町村・各回別ID・1980〜）とは別ソースの都道府県マクロ（age5 の _prefecture と同型）。
     # 全国と人口集中地区を落とし47県のみ出す（cleaner 参照）。
     "population_prefecture": Dataset(
         key="population_prefecture",
@@ -288,8 +288,8 @@ _POPULATION: dict[str, DatasetEntry] = {
         table_name="population",
         index_columns=["area_code", "sex_code", "year"],
     ),
-    # 派生: 都道府県 世紀 companion の配布正典（1920〜2020 ＋ 2025速報）。
-    # 戦略B: 旧・空間rollup 版（市区町村旗艦→県・1980〜）から系統B raw 長期へ張り替え済。
+    # 派生: 都道府県 世紀マクロ の配布正典（1920〜2020 ＋ 2025速報）。
+    # 戦略B: 旧・空間rollup 版（市区町村ミクロ→県・1980〜）から回次跨 raw 長期へ張り替え済。
     # 出力シェイプ（47県・全国行なし）は旧版と同一＝ダッシュボードはドロップイン。
     # 単一 upstream を union（year 軸は既に全年揃い）し、後段で 2025速報を splice する
     # （＝preliminary を持つため ProjectedDataset ではなく StitchedDataset(union)）。
@@ -343,8 +343,8 @@ _POPULATION_BY_AGE: dict[str, DatasetEntry] = {
         grain=["area_code", "sex_code", "age_class_code", "year"],
         default_join="aggregate_to_base",
     ),
-    # 世紀 companion（系統B）: 単一 ID「年齢（3区分）別人口 － 全国，都道府県（大正9年～令和2年）」。
-    # 旗艦（市区町村・各回別ID・1980〜）とは別ソースの都道府県 companion（age5 の _prefecture と同型）。
+    # 世紀マクロ（回次跨）: 単一 ID「年齢（3区分）別人口 － 全国，都道府県（大正9年～令和2年）」。
+    # ミクロ（市区町村・各回別ID・1980〜）とは別ソースの都道府県マクロ（age5 の _prefecture と同型）。
     # 本表は男女軸を持たない（総数のみ）。全国は落とし47県のみ出す（cleaner 参照）。
     "population_by_age_prefecture": Dataset(
         key="population_by_age_prefecture",
@@ -355,8 +355,8 @@ _POPULATION_BY_AGE: dict[str, DatasetEntry] = {
         table_name="population_by_age",
         index_columns=["area_code", "sex_code", "age_class_code", "year"],
     ),
-    # 派生（射影フロー）: 都道府県 世紀 companion の配布正典（1920〜2020・総数のみ）。
-    # 旧・空間rollup 版（市区町村旗艦→県・1980〜）から系統B raw 長期へ張り替え済（戦略B）。
+    # 派生（射影フロー）: 都道府県 世紀マクロ の配布正典（1920〜2020・総数のみ）。
+    # 旧・空間rollup 版（市区町村ミクロ→県・1980〜）から回次跨 raw 長期へ張り替え済（戦略B）。
     # 出力シェイプ（47県・全国行なし・総数のみ）は旧版と同一＝ダッシュボードはドロップイン。
     "population_by_age_prefecture_timeseries": ProjectedDataset(
         key="population_by_age_prefecture_timeseries",
@@ -422,12 +422,12 @@ _DAYNIGHT_POPULATION: dict[str, DatasetEntry] = {
 
 # === population_by_age5（年齢5歳階級×男女別人口）============================
 # 1 family に2系列が同居する（table_name はどちらも bare "population_by_age5"）:
-#   (1) 市区町村＝旗艦（系統A・各回別 statsDataId・2010-2020・合併畳込）… _<year> base ＋ _timeseries
-#   (2) 全国/都道府県＝世紀 companion（系統B・単一 ID・1920-2020）… _national/_prefecture base ＋ _prefecture_timeseries
+#   (1) 市区町村＝ミクロ（回次別・各回別 statsDataId・2010-2020・合併畳込）… _<year> base ＋ _timeseries
+#   (2) 全国/都道府県＝世紀マクロ（回次跨・単一 ID・1920-2020）… _national/_prefecture base ＋ _prefecture_timeseries
 # 粒度は key suffix で表し family名（table_name）には持たせない（命名規約＝モジュール docstring）。
-# 2010-2020 では両系列の県値が重なる＝物理2重保存せず、系統A→県 rollup==系統B県 を検算オラクル(test)で照合する。
+# 2010-2020 では両系列の県値が重なる＝物理2重保存せず、回次別→県 rollup==回次跨県 を検算オラクル(test)で照合する。
 
-# --- (2) 世紀 companion（系統B）: 単一 ID で一世紀。全国表は area 軸なし→合成（clean_national）。--------------
+# --- (2) 世紀マクロ（回次跨）: 単一 ID で一世紀。全国表は area 軸なし→合成（clean_national）。--------------
 _POPULATION_BY_AGE5: dict[str, DatasetEntry] = {
     "population_by_age5_national": Dataset(
         key="population_by_age5_national",
@@ -447,7 +447,7 @@ _POPULATION_BY_AGE5: dict[str, DatasetEntry] = {
         table_name="population_by_age5",
         index_columns=["area_code", "sex_code", "age_class_code", "year"],
     ),
-    # 派生（射影フロー）: 全国＋47都道府県を area 軸で縦結合した県粒度 1920〜2020 時系列（世紀 companion の配布正典）。
+    # 派生（射影フロー）: 全国＋47都道府県を area 軸で縦結合した県粒度 1920〜2020 時系列（世紀マクロ の配布正典）。
     "population_by_age5_prefecture_timeseries": ProjectedDataset(
         key="population_by_age5_prefecture_timeseries",
         upstreams=["population_by_age5_national", "population_by_age5_prefecture"],
@@ -460,7 +460,7 @@ _POPULATION_BY_AGE5: dict[str, DatasetEntry] = {
 }
 
 
-# --- (1) 市区町村＝旗艦（系統A）: 各回別 statsDataId・市区町村まで。取れる年を year 軸で縫合。--------------------
+# --- (1) 市区町村＝ミクロ（回次別）: 各回別 statsDataId・市区町村まで。取れる年を year 軸で縫合。--------------------
 # 合併畳込あり＝StitchedDataset（aggregate_to_base）。
 # nationality 軸あり（総数=1980/85/2000-20・日本人=1990/95/2000-20）＝grain に nationality_code を含める。
 # 2000/2005 は各歳表（0000032965/0000033783・同型）から 5歳再掲を抽出。cleaner=age5_municipality。

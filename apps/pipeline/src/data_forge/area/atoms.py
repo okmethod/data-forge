@@ -64,7 +64,7 @@ def leaf_codes(hierarchy: pl.DataFrame, *, year: int, muni_levels: frozenset[int
         muni_levels … 市区町村レベルの明示上書き（None なら年から `_muni_levels` で決める）。
                       同じ年でも e-Stat 製品ごとに level の意味が違うことがある
                       （例: 2000 の人口時系列製品は level3=市区町村だが、
-                      同年の人口等基本集計・市規模別2表は令和型 level4/6＝旗艦 age5 の 2000）。
+                      同年の人口等基本集計・市規模別2表は令和型 level4/6＝ミクロ age5 の 2000）。
 
     グレインは全年で「標準的な市区町村（政令市=1・東京23特別区=各1）」に統一する。
     2005 は特別区部・政令市がともに level3、23区・行政区がともに level4 で level では
