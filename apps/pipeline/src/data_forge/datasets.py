@@ -467,7 +467,8 @@ _POPULATION_BY_AGE5: dict[str, DatasetEntry] = {
 _POPULATION_BY_AGE5_MUNI_YEARS = (1980, 1985, 1990, 1995, 2000, 2005, 2010, 2015, 2020)
 _POPULATION_BY_AGE5_MUNI_GRAIN = ["area_code", "sex_code", "nationality_code", "age_class_code", "year"]
 # 2000/2005 は各歳の巨大表から 5歳階級の再掲コードだけを拾う。
-# 全域(cdCat01=00700)＋5歳コード(cdCat03) にサーバ側絞り込みして行数を抑える（sources/estat-census-catalog.md（年齢5歳階級節））。
+# 全域(cdCat01=00700)＋5歳コード(cdCat03) にサーバ側絞り込みして行数を抑える
+# （sources/estat-census-catalog.md「年齢（5歳階級）」節）。
 # 同年の人口時系列製品がlevel3=市区町村なのに対し、
 # これらの表は令和型 level4/6 なので muni_levels={4,6} を明示上書きする。
 # 2005 は「年齢不詳を除く」表ゆえ不詳(900)コードが無い（2000 は 900 を含む）。
@@ -508,7 +509,8 @@ for _year, _sid, _cleaner, _params, _levels in (
     )
 # 1990/1995 の**総数**（各歳表 00401・国籍軸なし＝nat_const=0）。日本人版（population_by_age5_1990/1995＝
 # 5歳階級表 006）とは別ソースで、同年に総数(nat=0)・日本人(nat=1)を別 Dataset で持つ（表形式の非対称＝
-# sources/estat-census-catalog.md（年齢5歳階級節）。2000/2005 は単一表に国籍軸ありで両出しだったのと構造が違う）。令和型 level4/6・
+# sources/estat-census-catalog.md「年齢（5歳階級）」節。2000/2005 は単一表に国籍軸ありで両出しだったのと
+# 構造が違う）。令和型 level4/6・
 # 巨大各歳表ゆえサーバ側絞り込み（cdCat01=00700・cdCat02=5歳コード〈900不詳あり＝_AGE5_2000_CODES と同一〉）を掛ける。
 for _year, _sid in ((1990, "0000031401"), (1995, "0000032219")):
     _key = f"population_by_age5_{_year}_total"
