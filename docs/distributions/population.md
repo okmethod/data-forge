@@ -27,11 +27,9 @@
 
 出典はいずれも「政府統計の総合窓口(e-Stat)」。
 
-> **都道府県 世紀マクロ（1920〜）**：`population_prefecture_timeseries` は回次跨帳票
-> **0003410379「男女別人口及び人口性比 － 全国，都道府県（大正9年～令和2年）」** から独立取得する
-> （5歳階級の `population_by_age5_prefecture` と同型）。出力シェイプは 47都道府県・全国行なし
-> （全国は Σ県で復元）・2025速報を splice。1980-2020 の重複年は市区町村ミクロの県 rollup と一致する
-> （唯一の差＝東京都1980 の +37人＝特別区部の区未定分。回次跨帳票側が区未定分を含む正しい県総数）。
+> **都道府県 世紀マクロ（1920〜）**：`population_prefecture_timeseries` は回次跨帳票 **0003410379「男女別人口及び人口性比 － 全国，都道府県（大正9年～令和2年）」** から独立取得する（5歳階級の `population_by_age5_prefecture` と同型）。
+> 出力シェイプは 47都道府県・全国行なし（全国は Σ県で復元）・2025速報を splice。
+> 1980-2020 の重複年は市区町村ミクロの県 rollup と一致する（唯一の差＝東京都1980 の +37人＝特別区部の区未定分。回次跨帳票側が区未定分を含む正しい県総数）。
 
 ---
 
@@ -63,7 +61,8 @@
 ## 年ごとのスキーマ差
 
 **同名「男女別人口」でも年で e-Stat のスキーマ設計が全く異なる（4変種）。**
-型名（第3型 / 平成型 / 令和型）の**定義は帳票カタログが正典**（[estat-census-catalog.md](../sources/estat-census-catalog.md#男女別人口)）。本表は各年の**男女コード実値**を持つ。
+型名（第3型 / 平成型 / 令和型）の**定義は帳票カタログが正典**（[estat-census-catalog.md](../sources/estat-census-catalog.md#男女別人口)）。
+本表は各年の**男女コード実値**を持つ。
 
 | 年                  | 型               | 男女の在り処                                                                                                                                                              |
 | ------------------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -72,8 +71,7 @@
 | 2010/2015           | 平成型           | `cat02`（2010=000/001/002・2015=010/020/030）                                                                                                                             |
 | 2020                | 令和型           | `cat01`=男女（0/1/2）                                                                                                                                                     |
 
-パース差は **1つのパラメータ化 cleaner `clean_population`（男女を持つ軸・コード対応・事前フィルタ）**
-に集約し、年ごとの違いは設定だけで吸収する（year 関数を増やさない）。
+パース差は **1つのパラメータ化 cleaner `clean_population`（男女を持つ軸・コード対応・事前フィルタ）**に集約し、年ごとの違いは設定だけで吸収する（year 関数を増やさない）。
 **正規化の契約は「入力パースの共有」ではなく「共通の出力スキーマへの写像」。**
 実装は [src/data_forge/sources/estat/population.py](../../apps/pipeline/src/data_forge/sources/estat/population.py)。
 
@@ -98,23 +96,18 @@ uv run data-forge run population_timeseries --join grid          # 欠損をnull
 | `intersection` | 共通のみ。全年に存在する area_code だけ残す（比較可能な地域）  | 44,844                 |
 | `grid`         | 欠損明示。area×year×sex の全格子。無い (area,year) は null 行  | 55,284                 |
 
-> 二重計上防止のため、結合時に (`area_code`, `sex_code`, `year`) の重複を検出したら
-> `combine.combine_years` が明確に失敗する（年次 cleaner の分類軸取りこぼしを早期検知）。
+> 二重計上防止のため、結合時に (`area_code`, `sex_code`, `year`) の重複を検出したら `combine.combine_years` が明確に失敗する（年次 cleaner の分類軸取りこぼしを早期検知）。
 
-> **合併を畳む集約は別モード:** union/intersection/grid は「生」の簡易オプション。市町村合併を
-> またいで正しく畳んだ連続時系列（`--join aggregate_to_base` / `crosswalk`）は共有ディメンションの
-> [area_master.md](area_master.md) を参照。
+> **合併を畳む集約は別モード:** union/intersection/grid は「生」の簡易オプション。市町村合併をまたいで正しく畳んだ連続時系列（`--join aggregate_to_base` / `crosswalk`）は共有ディメンションの [area_master.md](area_master.md) を参照。
 
 ---
 
 ## 速報値の扱い（`data_status` 来歴列）
 
-国勢調査は調査年の翌年に**速報**（人口速報集計＝総人口・世帯数のみ）が出て、確定は年齢別・
-昼夜間などが段階リリースされる。速報→確定で数値が微修正される（不詳の補完差）。
+国勢調査は調査年の翌年に**速報**（人口速報集計＝総人口・世帯数のみ）が出て、確定は年齢別・昼夜間などが段階リリースされる。速報→確定で数値が微修正される（不詳の補完差）。
 
-方針は **「速報を確定系列に素で混ぜない」**。速報は独立の基底データセット
-（例 `population_2025_preliminary`）として先行取込し、時系列へ合成する際は**汎用の来歴列
-`data_status` で暫定を明示**する。確定が出たら正典系列へ統合し、速報は破棄する。
+方針は **「速報を確定系列に素で混ぜない」**。速報は独立の基底データセット（例 `population_2025_preliminary`）として先行取込し、時系列へ合成する際は**汎用の来歴列 `data_status` で暫定を明示**する。
+確定が出たら正典系列へ統合し、速報は破棄する。
 
 | 値            | 意味                               |
 | ------------- | ---------------------------------- |
@@ -135,4 +128,20 @@ uv run data-forge run population_timeseries --join grid          # 欠損をnull
 
 ## 地域マスタ（合併をまたぐ集約）
 
-年をまたぐと市町村合併・政令市移行で地域集合が変わるため、実用グレードの連続時系列には**地域マスタ（アトム軸スタースキーマ）** が必要になる。これは総人口に限らず全ファクトが共有する**conformed dimension** なので、設計・運用は独立の正典 [area_master.md](area_master.md) にまとめた（`population_timeseries --join aggregate_to_base / crosswalk`、人口保存・孤児検証、堀＝overrides 運用など）。
+年をまたぐと市町村合併・政令市移行で地域集合が変わるため、実用グレードの連続時系列には**地域マスタ（アトム軸スタースキーマ）** が必要になる。
+これは総人口に限らず全ファクトが共有する**conformed dimension** なので、設計・運用は独立の正典 [area_master.md](area_master.md) にまとめた（`population_timeseries --join aggregate_to_base / crosswalk`、人口保存・孤児検証、堀＝overrides 運用など）。
+
+---
+
+## 検証
+
+年別4変種の cleaner は共通8列への写像を単体テスト（`tests/cleaners/test_population.py`）で担保し、合併集約・人口保存・速報 splice は共有インフラ側のテストへ委譲する。
+
+- **出典メタ抽出:** statsDataId・提供者・調査名・引用文＝ `test_extract_meta`。
+- **tidy 化（軸解決）:** 各軸の code/name/level 解決＝ `test_to_tidy_resolves_names`。
+- **スキーマ・写像:** 8列・全国総数（2020=126,146,099）＝ `test_clean_from_fixture`。2015 平成型 → 共通8列（人口性比・人口集中地区を拾わない）＝ `test_clean_2015_maps_to_shared_schema`。
+- **階層・欠損:** level7 の is_current=false・欠損記号 `-` の null 化＝ `test_clean_handles_levels_and_missing`。
+- **都道府県マクロ（回次跨帳票の射影）:** 世紀マクロ cleaner の写像＝ `test_clean_population_prefecture_companion`。
+- **人口保存・合併集約:** 「アトム合計 == 全国total」（全9年 diff=0・1980 のみ 37 人差＝特別区部の区未定分を `KNOWN_DIFFS` で受容）と合併畳込は共有ディメンションの [area_master.md](area_master.md)（`tests/area/test_area.py`）が正典。
+- **速報 splice:** 速報 → 確定の来歴列 `data_status` と area scope の intersection scoping は [provenance.py](../../apps/pipeline/src/data_forge/provenance.py) が正典。
+- **クロスファクト検算:** 男女別人口の全国値・県 rollup は他ファクト（age/daynight の総数スライス）の頂点＝conformed dimension として一致する。横断検算 C1-C5 の方針は data-quality-assurance.md が正典。

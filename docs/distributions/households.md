@@ -13,11 +13,8 @@
 | ----------- | --------------------------------------------------------- | ----------------------------- |
 | 0003410420  | 世帯の種類別世帯数及び世帯人員 － 全国，都道府県（その1） | 全国＋47都道府県 / 1960〜2020 |
 
-- **area master 不要**の低コスト fact：area 軸は全国(level1)＋47都道府県(level2)固定で
-  旧市区町村(level7)を持たず、合併の影響を受けない（[population_by_age5.md](population_by_age5.md)
-  と同性格）。全国も都道府県も同一 ID に含むため、age5 のような全国/都道府県別 ID の射影も不要。
-- **不詳処理は不要**：世帯は悉皆カウントで cat01（世帯の種類）に不詳区分が無い。
-  配偶関係表（0003410382）で問題になった大量の「不詳」は本表には存在しない。
+- **area master 不要**の低コスト fact：area 軸は全国(level1)＋47都道府県(level2)固定で旧市区町村(level7)を持たず、合併の影響を受けない（[population_by_age5.md](population_by_age5.md)と同性格）。全国も都道府県も同一 ID に含むため、age5 のような全国/都道府県別 ID の射影も不要。
+- **不詳処理は不要**：世帯は悉皆カウントで cat01（世帯の種類）に不詳区分が無い。配偶関係表（0003410382）で問題になった大量の「不詳」は本表には存在しない。
 - 1965 年は本帳票に無く、**実在する 12 時点**（1960/1970/1975/1980/…/2020）のみ運ぶ。
 - 出典は「政府統計の総合窓口(e-Stat)」。
 
@@ -37,8 +34,8 @@
 
 ## 出力スキーマ
 
-grain = **area × household_type × year**。population 系の8列を土台に、sex→household_type、
-単一 `population`→2測定量（`households` / `household_members`）へ差し替えた形。
+grain = **area × household_type × year**。
+population 系の8列を土台に、sex→household_type、単一 `population`→2測定量（`households` / `household_members`）へ差し替えた形。
 
 | 列                    | 型   | 説明                                            |
 | --------------------- | ---- | ----------------------------------------------- |
@@ -55,3 +52,14 @@ grain = **area × household_type × year**。population 系の8列を土台に�
 **保存則:** 各 area×year で `household_type=総数 == 一般世帯 + 施設等の世帯`（世帯数・世帯人員とも）。
 
 **派生指標:** 平均世帯人員は配布側で `household_members / households`（世帯規模の縮小＝核家族化・単身化の指標）として算出する。
+
+---
+
+## 検証
+
+本表は area master 不要・不詳注入無しの低コスト fact ゆえ、cleaner の単体テスト（`tests/cleaners/test_households.py`）で担保する。
+
+- **保存則（世帯種別）:** 各 area×year で `総数(100) == 一般世帯(110) + 施設等の世帯(120)`（世帯数・世帯人員とも）＝ `test_household_type_conservation`。
+- **スキーマ・2測度:** 8列・`households`/`household_members` の同時保持と総数行の値＝ `test_schema_and_two_measures`。
+- **不要行の除去:** 1世帯当たり人員(tab 1390)・人口集中地区(area 00100/00200)行を落とす＝ `test_drops_avg_and_did_rows`。
+- **欠損の null 化:** 県で欠測測度・欠損記号 `-` を左結合で null にする＝ `test_prefecture_keeps_area_and_null_on_missing_measure`。
