@@ -1,31 +1,37 @@
-"""人口テーブル（国勢調査 男女別人口）固有のクレンジング。
+"""国勢調査「人口」grain ファクトのクレンジング（男女別総人口＋年齢3区分×男女＋各 companion）。
 
-transform.to_tidy() のロング形式を配布用の1枚テーブルへ整形する。同名「男女別人口」でも
-e-Stat のスキーマ設計は年（テーブル世代）で全く異なる。実例が3変種揃ったので、パース差を
-1つのパラメータ化 cleaner `clean_population` に集約し、年ごとの違いは設定（男女を持つ軸・
-コード対応・事前フィルタ）だけで吸収する（＝年関数を増やさない）。
+transform.to_tidy() のロング形式を配布用の1枚テーブルへ整形する。特定統計表に依存しない汎用処理は
+transform.py。本モジュールは「人口」grain の cleaner を集約する（詳細は各関数 docstring が正典）:
 
-年ごとの構造の違い（すべて同一の出力スキーマへ写像する）:
-    - 1980(0003412413)/1985(0003412414)/1990(0003412415)/1995(0003412416):
-      同型の「年齢3区分,男女別人口及び年齢別割合」表。
-      area 構造は 2000/2005 と同型（level3=市区町村・level4=区）だが、男女は cat02。
-      年齢3区分(cat01)・表章項目tab(020人口/105割合)を持つため tab=020・cat01=100(年齢総数) で絞る。
-      本表は全国(00000)行を持たない（都道府県始まり）→ 他年と揃え 47都道府県合計から全国行を復元する。
-    - 2000(0003391075): 2005表と同一ファミリー（平成12年版）。cat01=100/110/120・DID軸なし・area level3=市区町村。
-    - 2005(0003408216): cat01に測定項目＋男女が融合（人口_総数/男/女=100/110/120）・DID軸なし。
-    - 2010/2015(平成型, 0003038587/0003149040): tab軸なし・cat01=全域/人口集中地区(DID)・
-      cat02に表章事項＋男女が統合（人口の総数/男/女コードは年で異なる）。全域のみ採用。
-    - 2020(令和型, 0003445078): tab=人口・cat01=男女(0/1/2)。
+- clean_population（男女別総人口・8列）＝ clean_1980..2020/2025速報。
+  同名「男女別人口」でも e-Stat のスキーマ設計は年（テーブル世代）で全く異なる（4変種）。
+  パース差を1つのパラメータ化 cleaner に集約し、年ごとの違いは
+  設定（男女を持つ軸・コード対応・事前フィルタ）だけで吸収する（＝年関数を増やさない）。
+  年別の軸構造（4変種の男女の在り処・全国行復元の要否）は
+  docs/distributions/population.md「年ごとのスキーマ差」が正典（ここには再掲しない＝ドリフト防止）。
+- clean_population_by_age（年齢3区分×男女・10列）＋ _inject_age_unknown＝ clean_population が
+  cat01=100 で捨てる年齢軸を保持する拡張。回次跨の時系列ファミリー（全年同型）を1個で処理し、
+  年齢不詳を「総数−3区分」で導出注入する。
+- clean_by_age_prefecture / clean_population_prefecture＝回次跨の県マクロ companion（1920〜）。
 
-出力スキーマ:
-    area_code(str) / area_name(str) / area_level(int) /
-    sex_code(str) / sex(str) / year(int) /
-    population(Int64) / is_current(bool)
+**正規化の契約は「入力パースの共有」ではなく「共通の出力スキーマへの写像」**。
 
-NOTE: area_name / area_level は年（テーブル世代）で意味・表記が異なる（例: 2005は level3=市区町村・
-名称が「北海道札幌市」形式、2020は level4=市/6=市区町村）。年またぎで信頼できるのは area_code のみ。
+出力スキーマ（clean_population）:
+  area_code(str) / area_name(str) / area_level(int) /
+  sex_code(str) / sex(str) / year(int) /
+  population(Int64) / is_current(bool)
+  （clean_population_by_age は age_class_code / age_class を足した10列）
+
+NOTE: area_name / area_level は年（テーブル世代）で意味・表記が異なる。
+（例: 2005は level3=市区町村・名称が「北海道札幌市」形式、2020は level4=市/6=市区町村）
+年またぎで信頼できるのは area_code のみ。
 多年の正規化（合併の後継自治体への集約や area 属性の統一）は地域マスタ(crosswalk)で行う想定。
 is_current: area 階層が 7（旧市区町村・合併消滅）でないもの（level7 は 2020型のみ存在）。
+
+NOTE: by_age/companion を別モジュール（例: population_by_age.py）へ切らず本ファイルに同居させるのは、
+clean_population・_prepend_national_from_prefectures・SEX_2005 等の private helper を共有するため
+（切ると helper を公開せねばならず surface が増える）。粒度バリアントで age5.py が独立なのと非対称だが、
+モジュール分割は「実例が2つ揃ってから」原則で見送り（本モジュールの俯瞰は上記の構成マップで代替）。
 """
 
 from collections.abc import Callable, Sequence
@@ -183,6 +189,10 @@ def clean_population_by_age(tidy: pl.DataFrame) -> pl.DataFrame:
            これにより「年少+生産+老年+不詳 == 総数」が全地域・全年で恒等的に成立する。
 
     出力スキーマは population の8列に age_class_code / age_class を足した10列。
+
+    設計メモ（population との一本化）: age_class_code=0（総数）スライスは現行 population と
+    値一致する（全9年で全国 diff=0 を実証済み）。将来 population を本 fact の総数スライスへ
+    一本化し、population.py の異種年 cleaner 群を退役させうる（今は並存＝population 側は据え置き）。
     """
     fact = (
         tidy.filter(pl.col("tab_code") == "020")
