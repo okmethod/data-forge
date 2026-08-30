@@ -2,8 +2,6 @@
 
 外部依存なしのユニット／回帰テスト。fixture・合成データで完結し、実 API は叩かない。
 
-> `fetch.py` のモック化は未着手＝[docs/data-quality-assurance.md](../../../docs/data-quality-assurance.md) §未カバー領域 バックログ）
-
 **何をどう検証するかの設計（保存則の恒等式・クロスファクト検算）は [docs/data-quality-assurance.md](../../../docs/data-quality-assurance.md) が正典。**  
 本書はそれを実装した pytest スイートの地図であり、数値の最新実測・確からしさの設計判断は埋め込まない。  
 （CLI 検証コマンド `area-check` / `crossfact-check` と上記 doc を参照）
@@ -18,6 +16,7 @@
 ```text
 tests/
 ├── fixtures/     # テスト入力（e-Stat 生レスポンス等・tidy 化の起点）
+├── sources/      # 取得層：client のページング/エラー検査・fetch のキャッシュ（モック・実 API 不使用）
 ├── cleaners/     # クレンジング：スキーマ変種・欠損 null 化・保存則
 ├── combine/      # 合成：union / intersection / grid＋粒度ガード
 ├── area/         # 地域参照：rollup・基準年集約・孤児検出・既知差分
