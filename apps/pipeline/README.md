@@ -3,9 +3,10 @@
 公的データを取得・クレンジングし、利用しやすいデータ形式に精製するパイプライン。
 
 - **パイプライン設計（段構成・派生・依存の向き・seam）**: [docs/pipeline-architecture.md](../../docs/pipeline-architecture.md)
-- **データセット個別仕様・一覧**: [docs/README.md](../../docs/README.md) / [docs/datasets/&lt;name&gt;.md](../../docs/datasets/)
+- **収集データカタログ** [docs/sources/](../../docs/sources/) — 精製の取得元（ソース側）の仕様
+- **精製データカタログ** [docs/distributions/](../../docs/distributions/) — 本パイプラインが精製・配布するデータセットごとの仕様（出力スキーマ・カバレッジ・検証結果）
 - **データ品質保証（保存則・クロスファクト検算・粒度ガード・出典同梱の4ゲート）**: [docs/data-quality-assurance.md](../../docs/data-quality-assurance.md)
-- **ライセンス・規約・商用可否・出典表記**: [docs/sources/data_catalog.md](../../docs/sources/data_catalog.md)
+- **ライセンス・規約・商用可否・出典表記**: [docs/sources/data-provider-catalog.md](../../docs/sources/data-provider-catalog.md)
   - 出力物には出典表記（citation）を自動埋め込み・自動検証済み
 
 ---
@@ -88,6 +89,6 @@ uv run data-forge estat-search --word 年齢 --limit 50
 
 1. **cleaner を書く** — `sources/` に、その帳票の軸差を吸収して共通の出力スキーマへ写像する関数を追加。既存 cleaner の設定パラメータで足りる場合は不要。
 2. **レジストリに登録** — `src/data_forge/datasets.py` にエントリを追加（単年=`Dataset` / 縫合=`StitchedDataset` / 射影=`ProjectedDataset`）。cleaner・statsDataId・join・grain をここで結線する。
-3. **仕様ドキュメントを用意** — `docs/datasets/<name>.md` を新設（statsDataId・出力スキーマ・年ごとのスキーマ差）し、[docs/README.md](../../docs/README.md) の索引に1行追記。
+3. **仕様ドキュメントを用意** — `docs/distributions/<name>.md` を新設（statsDataId・出力スキーマ・年ごとのスキーマ差）し、[docs/README.md](../../docs/README.md) の索引に1行追記。
 4. **テスト・検証を追加** — cleaner／派生ロジックの単体テストを `tests/` に追加（外部依存なし）。保存則・クロスファクト検算など横断検証の方針は [docs/data-quality-assurance.md](../../docs/data-quality-assurance.md) が正典。
 5. **動作確認** — `uv run poe run <key>` で取得〜出力を通し、`uv run poe check`（lint + test）を通す。

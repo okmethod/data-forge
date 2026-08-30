@@ -5,7 +5,7 @@
 世帯種類版（0003410420）と**同型の single-ID fact**で、area は全国(level1)＋47都道府県(level2)
 固定＝合併なし＝**area master 不要**。単一 ID に全国も都道府県も含むため射影も不要で、cleaner 1 個の
 単独 Dataset で完結する。households との差は tab コード（6/7 ⇔ households の 040/050）と、分類軸が
-3フラット→**20コードの4階層ツリー**である点の2つだけ（census_source_tables.md §3-4）。
+3フラット→**20コードの4階層ツリー**である点の2つだけ（sources/estat-census-catalog.md（家族類型節））。
 
 軸構造:
     tab   … 6=一般世帯数 / 7=一般世帯人員 / 1390=1世帯当たり人員 / 1930=世帯数割合

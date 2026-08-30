@@ -7,9 +7,9 @@ pipeline の全体設計の「なぜ」を集約する正典。
 
 - **使い方・セットアップ・コマンド**: [apps/pipeline/README.md](../apps/pipeline/README.md)
 - **各段の内部ファイルの役割**: 当該パッケージの `__init__.py` docstring
-- **データセット個別仕様（ID・スキーマ・年差）**: [docs/datasets/&lt;name&gt;.md](datasets/)
+- **データセット個別仕様（ID・スキーマ・年差）**: [docs/distributions/&lt;name&gt;.md](distributions/)
+- **合併集約（地域マスタ）の設計・運用**: [docs/distributions/area_master.md](distributions/area_master.md)
 - **命名規約（family/key/stem/table_name）**: `datasets.py` docstring（コード正典）
-- **合併集約（地域マスタ）の設計・運用**: [docs/datasets/area_master.md](datasets/area_master.md)
 
 ---
 
@@ -52,7 +52,7 @@ pipeline の全体設計の「なぜ」を集約する正典。
 - **射影（project）**: e-Stat 既製の時系列帳票（1 ID が全年）を area 軸で union するだけの最小フロー（area master 不要）。
 
 > 各型（`StitchedDataset` / `ProjectedDataset`）の汎用意味論（既定 join・grain・速報 splice の契約）はそれぞれの docstring がコード正典。
-> 個別データセットの適用例は [docs/datasets/population.md](datasets/population.md) を参照。
+> 個別データセットの適用例は [docs/distributions/population.md](distributions/population.md) を参照。
 
 ---
 
@@ -68,7 +68,7 @@ pipeline の全体設計の「なぜ」を集約する正典。
 全体構成で示した層分離のとおり、合成（縫合）とは別配線で、参照層の地域マスタにのみ依存する。
 
 設計・運用（アトム抽出・events・基準年集約 / crosswalk・人口保存検証・堀＝overrides）の正典は
-[docs/datasets/area_master.md](datasets/area_master.md)。
+[docs/distributions/area_master.md](distributions/area_master.md)。
 
 ---
 
@@ -101,4 +101,4 @@ pipeline の全体設計の「なぜ」を集約する正典。
 
 > **2つ目のデータセット時の実地知見（cleaner の設計判断）:** 同名の帳票でも年（テーブル世代）で e-Stat のスキーマ設計が全く異なる（tab 軸の有無・男女軸の位置など）。
 > そのため「入力パースの共通化」ではなく**年ごとの cleaner が共通の出力スキーマへ写像し、合成層で地域正規化する** 構成に落ち着いた。
-> 具体的な年差の実例は [docs/datasets/population.md](datasets/population.md) の「年ごとのスキーマ差」を参照。
+> 具体的な年差の実例は [docs/distributions/population.md](distributions/population.md) の「年ごとのスキーマ差」を参照。

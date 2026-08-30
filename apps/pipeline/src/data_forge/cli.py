@@ -228,7 +228,7 @@ def _cmd_estat_search(args: argparse.Namespace) -> None:
     """帳票リスト（getStatsList）を検索し、statsDataId と表題を端末へ一覧表示する。
 
     探索専用の使い捨てツール。目当ての statsDataId を突き止めたら docs へ手で記録する。
-    キャッシュや docs 生成はしない（正典は docs/datasets/ 側）。
+    キャッシュや docs 生成はしない（正典は docs/distributions/ 側）。
     """
     tables = get_stats_list(
         stats_code=args.stats_code,

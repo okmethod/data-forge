@@ -6,7 +6,7 @@
 本モジュールは industry.py を職業向けに写したもの。設計思想の詳細は industry.py と共通。
 
 **分類改訂で2セグメント併存（コード写像不能ゆえ別テーブル）**：職業大分類は分類改訂で 2 系統に分かれる。
-呼称 major12/major10 の定義（正式分類・区分数・statsDataId・改訂）は docs/datasets/occupation.md
+呼称 major12/major10 の定義（正式分類・区分数・statsDataId・改訂）は docs/distributions/occupation.md
 「分類体系の呼称（SSoT）」が正典で、本モジュールもその呼称に従う（区分数で命名）：
 
 - **major12**: 全国 0003410408（1995-2020）／都道府県 0003410411（2005-2020）

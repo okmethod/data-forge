@@ -22,7 +22,7 @@
 同じ fact（5歳階級×男女別人口）でも、粒度によって e-Stat の供給形態が全く違うため、取得経路＝系列が2本に分かれる（table_name は共有・別 stem）。
 
 - **全国・都道府県（マクロ）は安い**: 5歳階級が **1920〜2020 を単一 ID で提供**（下表）。合併の影響を受けない 47 コード固定＝**area master も合併集約も不要**の低コスト fact（回次跨帳票の射影）。
-- **市区町村（ミクロ）は高い**: 市区町村×全年の綺麗な 5歳階級時系列は **e-Stat に存在しない**（時系列データ製品で市区町村まで下りる年齢表は[年齢3区分だけ](population_by_age.md)）。各回基本集計には市区町村5歳階級が 1980 から在るが、年ごとに別 statsDataId・別軸交差（総数と日本人が別表の年もある）と極めて不揃い（収集データカタログ [estat-census-catalog.md](../sources/estat-census-catalog.md) §3-3）。**各回（回次別帳票）を年ごとに取得して `aggregate_to_base` で合併畳込**する経路が必要。
+- **市区町村（ミクロ）は高い**: 市区町村×全年の綺麗な 5歳階級時系列は **e-Stat に存在しない**（時系列データ製品で市区町村まで下りる年齢表は[年齢3区分だけ](population_by_age.md)）。各回基本集計には市区町村5歳階級が 1980 から在るが、年ごとに別 statsDataId・別軸交差（総数と日本人が別表の年もある）と極めて不揃い（収集データカタログ [estat-census-catalog.md](../sources/estat-census-catalog.md)「年齢（5歳階級）」節）。**各回（回次別帳票）を年ごとに取得して `aggregate_to_base` で合併畳込**する経路が必要。
 
 以下の「データソース」「出力スキーマ」「合成」節は主に **マクロ（全国・都道府県）系列**を説明する。
 ミクロ（市区町村）系列の固有事情（100歳以上・合併畳込・年別スキーマ差）は[市区町村ミクロ系列](#市区町村ミクロ系列)節にまとめる。
@@ -106,7 +106,7 @@ uv run data-forge run population_by_age5_prefecture_timeseries  # 全国＋都�
 **国籍(nationality)軸あり**（総数=0/日本人=1）。取れる基底が年で非対称＝**総数は 1980-2020 全年・日本人は 1990-2020**。
 cleaner=`age5_municipality.clean_<year>`（年別）／datasets=`population_by_age5_{年}`（＋総数用 `population_by_age5_{1990,1995}_total`）＋`population_by_age5_timeseries`（table_name はマクロと共有・別 stem）。
 
-> ソースの全 statsDataId・年別の軸割当/コード体系・国籍別の可否マトリクス・選定根拠（2000 の各歳表採用・2015 のgetMetaInfo 食い違い・`muni_levels={4,6}` 上書き必須 等）は収集データカタログが正典: [estat-census-catalog.md §3-3](../sources/estat-census-catalog.md)。本節は出力側（配布シェイプの差・保存則検証）に絞る。
+> ソースの全 statsDataId・年別の軸割当/コード体系・国籍別の可否マトリクス・選定根拠（2000 の各歳表採用・2015 のgetMetaInfo 食い違い・`muni_levels={4,6}` 上書き必須 等）は収集データカタログが正典: [estat-census-catalog.md「年齢（5歳階級）」節](../sources/estat-census-catalog.md)。本節は出力側（配布シェイプの差・保存則検証）に絞る。
 
 ### マクロ（全国/県版）との違い
 

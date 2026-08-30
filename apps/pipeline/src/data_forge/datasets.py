@@ -6,7 +6,7 @@
 正典の所在（ここには再掲しない＝ドリフト防止）:
 - 軸構造（tab/cat コード・年ごとのスキーマ差・全国行の有無・不詳の導出等）
   cleaner モジュール sources/estat/<name>.py の docstring
-- statsDataId・e-Stat 原題・年カバレッジ … docs/datasets/<name>.md
+- statsDataId・e-Stat 原題・年カバレッジ … docs/distributions/<name>.md
 - 派生（縫合／射影）フローの汎用意味論 … 下記 StitchedDataset / ProjectedDataset の docstring
 
 本ファイルのコメントは「そのエントリ固有の判断（なぜこの cleaner/join/grain か）」に絞る。
@@ -140,7 +140,7 @@ FAMILIES: frozenset[str] = frozenset(
 
 
 # === population（男女別人口）================================================
-# 軸構造＝population.py docstring／statsDataId 一覧＝docs/datasets/population.md。
+# 軸構造＝population.py docstring／statsDataId 一覧＝docs/distributions/population.md。
 # 単年 Dataset（古い順）。cleaner は年（テーブル世代）ごとに別関数で同一8列へ写像する。
 _POPULATION: dict[str, DatasetEntry] = {
     "population_1980": Dataset(
@@ -307,7 +307,7 @@ _POPULATION: dict[str, DatasetEntry] = {
 
 
 # === population_by_age（年齢3区分×男女別人口）==============================
-# 軸構造＝population.py（clean_population_by_age）／一覧＝docs/datasets/population_by_age.md。
+# 軸構造＝population.py（clean_population_by_age）／一覧＝docs/distributions/population_by_age.md。
 # 全年同型のため cleaner は全年 1 個。年齢不詳は cleaner 側で導出注入する。
 _POPULATION_BY_AGE: dict[str, DatasetEntry] = {
     **{
@@ -371,7 +371,7 @@ _POPULATION_BY_AGE: dict[str, DatasetEntry] = {
 
 
 # === daynight_population（昼夜間人口＝従業地・通学地集計）====================
-# 軸構造＝daynight.py／一覧＝docs/datasets/daynight_population.md。
+# 軸構造＝daynight.py／一覧＝docs/distributions/daynight_population.md。
 # 1990〜2020（1990 が最古。それ以前へ遡れない根拠＝e-Stat 実検索結果は docs 参照）。
 # grain は sex ではなく daynight_code。cleaner は全年 1 個。
 _DAYNIGHT_POPULATION: dict[str, DatasetEntry] = {
@@ -467,7 +467,7 @@ _POPULATION_BY_AGE5: dict[str, DatasetEntry] = {
 _POPULATION_BY_AGE5_MUNI_YEARS = (1980, 1985, 1990, 1995, 2000, 2005, 2010, 2015, 2020)
 _POPULATION_BY_AGE5_MUNI_GRAIN = ["area_code", "sex_code", "nationality_code", "age_class_code", "year"]
 # 2000/2005 は各歳の巨大表から 5歳階級の再掲コードだけを拾う。
-# 全域(cdCat01=00700)＋5歳コード(cdCat03) にサーバ側絞り込みして行数を抑える（census_source_tables §3-3）。
+# 全域(cdCat01=00700)＋5歳コード(cdCat03) にサーバ側絞り込みして行数を抑える（sources/estat-census-catalog.md（年齢5歳階級節））。
 # 同年の人口時系列製品がlevel3=市区町村なのに対し、
 # これらの表は令和型 level4/6 なので muni_levels={4,6} を明示上書きする。
 # 2005 は「年齢不詳を除く」表ゆえ不詳(900)コードが無い（2000 は 900 を含む）。
@@ -508,7 +508,7 @@ for _year, _sid, _cleaner, _params, _levels in (
     )
 # 1990/1995 の**総数**（各歳表 00401・国籍軸なし＝nat_const=0）。日本人版（population_by_age5_1990/1995＝
 # 5歳階級表 006）とは別ソースで、同年に総数(nat=0)・日本人(nat=1)を別 Dataset で持つ（表形式の非対称＝
-# census_source_tables §3-3。2000/2005 は単一表に国籍軸ありで両出しだったのと構造が違う）。令和型 level4/6・
+# sources/estat-census-catalog.md（年齢5歳階級節）。2000/2005 は単一表に国籍軸ありで両出しだったのと構造が違う）。令和型 level4/6・
 # 巨大各歳表ゆえサーバ側絞り込み（cdCat01=00700・cdCat02=5歳コード〈900不詳あり＝_AGE5_2000_CODES と同一〉）を掛ける。
 for _year, _sid in ((1990, "0000031401"), (1995, "0000032219")):
     _key = f"population_by_age5_{_year}_total"
@@ -539,7 +539,7 @@ _POPULATION_BY_AGE5_MUNI["population_by_age5_timeseries"] = StitchedDataset(
 
 
 # === households（世帯の種類別 世帯数・世帯人員）==============================
-# 軸構造＝households.py／一覧＝docs/datasets/households.md。
+# 軸構造＝households.py／一覧＝docs/distributions/households.md。
 # 単一 ID に全国＋47都道府県＋全年を含む＝合併なし・射影不要で単独 Dataset 完結（sex 軸なし）。
 _HOUSEHOLDS: dict[str, DatasetEntry] = {
     "households": Dataset(
@@ -555,7 +555,7 @@ _HOUSEHOLDS: dict[str, DatasetEntry] = {
 
 
 # === family_type（世帯の家族類型16区分別 世帯数・世帯人員）====================
-# 軸構造＝family_type.py／一覧＝docs/datasets/family_type.md。
+# 軸構造＝family_type.py／一覧＝docs/distributions/family_type.md。
 # households(0003410420) と同型の single-ID fact（全国＋47県＋全年）。分類軸が20コードの4階層ツリー。
 _FAMILY_TYPE: dict[str, DatasetEntry] = {
     "family_type": Dataset(
@@ -571,7 +571,7 @@ _FAMILY_TYPE: dict[str, DatasetEntry] = {
 
 
 # === labor_force（労働力状態3区分×男女別人口）================================
-# 軸構造＝labor_force.py／一覧＝docs/datasets/labor_force.md。
+# 軸構造＝labor_force.py／一覧＝docs/distributions/labor_force.md。
 # 単一 ID で全年・47県固定＝合併なし。両表とも実 area 軸を持つため cleaner は 1 個共用。
 _LABOR_FORCE: dict[str, DatasetEntry] = {
     "labor_force_national": Dataset(
@@ -606,7 +606,7 @@ _LABOR_FORCE: dict[str, DatasetEntry] = {
 
 
 # === industry（産業大分類×男女別就業者数）====================================
-# 軸構造＝industry.py／一覧＝docs/datasets/industry.md。
+# 軸構造＝industry.py／一覧＝docs/distributions/industry.md。
 # 全国表は area 軸なし→合成（clean_national）。年カバレッジ非対称（全国のみ 1995/2000）。
 _INDUSTRY: dict[str, DatasetEntry] = {
     "industry_national": Dataset(
@@ -642,7 +642,7 @@ _INDUSTRY: dict[str, DatasetEntry] = {
 
 
 # === occupation major12（職業大分類・12区分）================================
-# 軸構造・呼称 SSoT＝occupation.py／docs/datasets/occupation.md。industry と軸構造完全同型。
+# 軸構造・呼称 SSoT＝occupation.py／docs/distributions/occupation.md。industry と軸構造完全同型。
 # major10 とは大分類が 10↔12 でコード写像不能ゆえ別テーブルにする。
 _OCCUPATION_MAJOR12: dict[str, DatasetEntry] = {
     "occupation_major12_national": Dataset(

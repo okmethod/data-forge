@@ -23,7 +23,7 @@
     このファイルは e-Stat の area 階層（level の意味・"00000" 全国・"13100" 特別区部）に依存する唯一の層で、
     第2ソース（例: 国土数値情報）を足す場合の主な改修点は `_MUNI_LEVELS`（市区町村 level の解釈）と特別区ハードコード。
     events/mapping/combine は JIS コード軸だけに依存するソース非依存の核なので流用できる。
-    （詳細は docs/datasets/population.md）
+    （詳細は docs/distributions/area_master.md）
 """
 
 import polars as pl
