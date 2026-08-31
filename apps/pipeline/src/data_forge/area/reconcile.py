@@ -71,6 +71,8 @@ def cross_fact(
     keys: list[str],
     hub_slice: pl.Expr | None = None,
     other_slice: pl.Expr | None = None,
+    hub_with: list[pl.Expr] | None = None,
+    other_with: list[pl.Expr] | None = None,
     value: str = "population",
     scope_years: frozenset[int] = frozenset(),
     known_diff_years: frozenset[int] = frozenset(),
@@ -94,6 +96,9 @@ def cross_fact(
         hub_slice   … hub を絞る述語（within-fact で総数スライスへ絞る用。既定 None＝絞らない）。
         other_slice … other を絞る述語（例 age5 総数＝`nationality_code=="0"` かつ
                       `age_class_code=="100"`／by_age＝`age_class_code=="0"`）。
+        hub_with / other_with … filter/集約の前に with_columns で足す派生列（既定 None＝足さない）。
+                      粒度をまたぐ折り畳み検算で使う。例 C2＝age5 の 5歳階級コードを 3区分コード
+                      （`age3_code`）へ写像し、それを keys に含めて by_age の区分と突合する。
         scope_years … other（や hub 側の対象国籍）が未収録の年。この年は other==0 が期待で
                       status="scope_out"・ok=(other==0)＝スコープ外として許容する。
         known_diff_years … 定義差で diff!=0 が期待される年（例 age5＝2005 各歳表は「年齢不詳を
@@ -109,9 +114,11 @@ def cross_fact(
         ok     … match、scope_out(other==0)、known_diff(diff>=0)、
                  bound(diff>=0 かつ (other>0 または hub==0))。
     """
-    h = hub.filter(hub_slice) if hub_slice is not None else hub
+    h = hub.with_columns(*hub_with) if hub_with else hub
+    h = h.filter(hub_slice) if hub_slice is not None else h
     h = h.group_by(keys).agg(pl.col(value).fill_null(0).sum().alias("hub"))
-    o = other.filter(other_slice) if other_slice is not None else other
+    o = other.with_columns(*other_with) if other_with else other
+    o = o.filter(other_slice) if other_slice is not None else o
     o = o.group_by(keys).agg(pl.col(value).fill_null(0).sum().alias("other"))
     rep = (
         h.join(o, on=keys, how="full", coalesce=True)

@@ -28,6 +28,7 @@ from data_forge.area.history import ingest as area_ingest
 from data_forge.datasets import Dataset, ProjectedDataset, StitchedDataset, get_dataset
 from data_forge.output import export_all
 from data_forge.public_scope import PublicScopePolicy, find_violations
+from data_forge.sources.estat import age5_municipality as estat_age5_muni
 from data_forge.sources.estat import fetch as estat_fetch
 from data_forge.sources.estat.client import get_stats_list
 
@@ -115,6 +116,8 @@ class _CrossFactSpec:
     other_slice: pl.Expr
     hub_key: str = _CROSSFACT_HUB  # ハブのデータセットキー（within-fact は自 ds を指す）
     hub_slice: pl.Expr | None = None  # within-fact でハブ側を総数スライスへ絞る述語
+    hub_with: list[pl.Expr] | None = None  # 集約前に足す派生列（折り畳み検算の粒度写像）
+    other_with: list[pl.Expr] | None = None  # 同上（other 側）
     mode: str = "equality"  # "equality"（diff=0）／"bound"（上界＝diff>=0 かつ other>0）
     scope_years: frozenset[int] = frozenset()  # other 未収録の年（other==0 を許容）
     known_diff_years: frozenset[int] = frozenset()  # 定義差で diff!=0 が期待される年（diff>=0 を許容）
@@ -123,6 +126,14 @@ class _CrossFactSpec:
 
 # 日本人スライスの再利用述語（age5 のミクロ系列のみ nationality 軸を持つ）。
 _JP_TOTAL = (pl.col("nationality_code") == "1") & (pl.col("age_class_code") == "100")  # 日本人×年齢総数
+
+# C2: age5（市区町村ミクロ系列）の 5歳階級コード → 年齢3区分コード（by_age の age_class_code 1/2/3 に対応）。
+# コード体系は市区町村版 age5_municipality.AGE_CLASS が正典
+# （回次跨の県版 age5.AGE5 とは別体系＝140=15〜19歳・240=65〜69歳）。
+# 境界は 15歳（130→140）と 65歳（230→240）でコード昇順にクリーンに割れる。
+# バンド集合は正典から採り（総数 100・不詳 999 を除く＝3区分は不詳を含まない）drift を防ぐ。
+_AGE5_BANDS = [c for c in estat_age5_muni.AGE_CLASS if c not in ("100", "999")]  # 110〜310（5歳階級のみ）
+_AGE5_TO_AGE3 = {c: ("1" if c < "140" else "2" if c < "240" else "3") for c in _AGE5_BANDS}
 
 _CROSSFACT: dict[str, list[_CrossFactSpec]] = {
     "population_by_age5_timeseries": [
@@ -136,6 +147,25 @@ _CROSSFACT: dict[str, list[_CrossFactSpec]] = {
             reasons={
                 2025: "age5 未収録（population 速報のみ）＝スコープ外",
                 2005: "各歳表が「年齢不詳を除く」ゆえ age5 総数 = population − 年齢不詳（other ≤ hub）",
+            },
+        ),
+        # C2: age5(nat=0・市区町村) を年齢3区分へ畳込 == population_by_age（別ソース＝独立検算）。
+        # 5歳階級を age3_code へ写像し keys に含め、by_age の区分(1/2/3)と区分ごとに突合する。
+        # 2005 は各歳表の「埋め込み不詳」（Σ5歳 ≤ 総数＝5歳バンドに未分類残差が残る）で
+        # 老年 fold が by_age より僅少（by_age ≥ age5・向き diff≥0）＝known_diff。
+        _CrossFactSpec(
+            name="C2 age5→3区分 == population_by_age",
+            keys=["area_code", "sex_code", "age3_code", "year"],
+            hub_key="population_by_age_timeseries",
+            hub_slice=pl.col("age_class_code").is_in(["1", "2", "3"]),  # by_age の3区分（総数0/不詳9を除く）
+            hub_with=[pl.col("age_class_code").alias("age3_code")],
+            other_slice=(pl.col("nationality_code") == "0") & pl.col("age_class_code").is_in(_AGE5_BANDS),
+            other_with=[pl.col("age_class_code").replace_strict(_AGE5_TO_AGE3, default=None).alias("age3_code")],
+            scope_years=frozenset({2025}),
+            known_diff_years=frozenset({2005}),
+            reasons={
+                2025: "age5 未収録（population 速報のみ）＝スコープ外",
+                2005: "各歳表の埋め込み不詳で 5歳バンドΣ≤総数＝老年 fold が by_age より僅少（other≤hub）",
             },
         ),
         # J1（上界）: 日本人(nat=1)×年齢総数 ≤ population。diff = 総人口 − 日本人 = 外国人 ≥ 0。
@@ -196,6 +226,8 @@ def _run_crossfact_spec(spec: _CrossFactSpec, other: pl.DataFrame, hub: pl.DataF
         keys=spec.keys,
         hub_slice=spec.hub_slice,
         other_slice=spec.other_slice,
+        hub_with=spec.hub_with,
+        other_with=spec.other_with,
         scope_years=spec.scope_years,
         known_diff_years=spec.known_diff_years,
         mode=spec.mode,

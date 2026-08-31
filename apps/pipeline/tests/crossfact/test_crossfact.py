@@ -26,6 +26,77 @@ def _age5_other(rows: list[tuple[str, str, str, str, int, int]]) -> pl.DataFrame
     )
 
 
+def _by_age_hub(rows: list[tuple[str, str, str, int, int]]) -> pl.DataFrame:
+    """population_by_age 相当（area×sex×age_class×year の3区分人口）を手組みする。"""
+    return pl.DataFrame(
+        [
+            {"area_code": a, "sex_code": s, "age_class_code": ac, "year": y, "population": p}
+            for a, s, ac, y, p in rows
+        ]
+    )
+
+
+def test_cross_fact_c2_folds_age5_bands_into_three_categories():
+    # C2: age5 の5歳階級(nat=0)を年齢3区分へ畳込し by_age の区分(1/2/3)と区分ごとに一致する。
+    # 130(10-14)→年少1・150/240(15-64)→生産2・250(65+)→老年3。総数100/不詳999・日本人(nat=1)は除外。
+    fold = {"130": "1", "150": "2", "240": "2", "250": "3"}
+    hub = _by_age_hub(
+        [
+            ("01100", "0", "0", 2020, 1000),  # 総数（除外されるべき）
+            ("01100", "0", "1", 2020, 100),  # 年少 0-14
+            ("01100", "0", "2", 2020, 700),  # 生産 15-64
+            ("01100", "0", "3", 2020, 200),  # 老年 65+
+            ("01100", "0", "9", 2020, 0),  # 不詳（除外されるべき）
+        ]
+    )
+    other = _age5_other(
+        [
+            ("01100", "0", "0", "100", 2020, 1000),  # 総数（除外されるべき）
+            ("01100", "0", "0", "130", 2020, 100),  # 年少 → cat1
+            ("01100", "0", "0", "150", 2020, 300),  # 生産 → cat2
+            ("01100", "0", "0", "240", 2020, 400),  # 生産 → cat2（Σ=700）
+            ("01100", "0", "0", "250", 2020, 200),  # 老年 → cat3
+            ("01100", "0", "0", "999", 2020, 5),  # 不詳（バンド外＝除外）
+            ("01100", "0", "1", "150", 2020, 280),  # 日本人（nat=1＝除外）
+        ]
+    )
+    rep = reconcile.cross_fact(
+        hub,
+        other,
+        keys=["area_code", "sex_code", "age3_code", "year"],
+        hub_slice=pl.col("age_class_code").is_in(["1", "2", "3"]),
+        hub_with=[pl.col("age_class_code").alias("age3_code")],
+        other_slice=(pl.col("nationality_code") == "0") & pl.col("age_class_code").is_in(list(fold)),
+        other_with=[pl.col("age_class_code").replace_strict(fold, default=None).alias("age3_code")],
+    ).sort("age3_code")
+    assert rep["age3_code"].to_list() == ["1", "2", "3"]
+    assert rep["diff"].to_list() == [0, 0, 0]
+    assert rep["ok"].all()
+
+
+def test_cross_fact_c2_flags_category_boundary_error():
+    # 区分レベルの取り違え（総数は保存するが境界がズレる）を C2 は検出する（C1/C3 は総数のみで素通り）。
+    fold = {"240": "2", "250": "3"}  # 240=60-64→生産・250=65-69→老年
+    hub = _by_age_hub([("01100", "0", "2", 2020, 400), ("01100", "0", "3", 2020, 200)])
+    other = _age5_other(
+        [
+            ("01100", "0", "0", "240", 2020, 300),  # 生産が100不足
+            ("01100", "0", "0", "250", 2020, 300),  # 老年が100過剰（総和600は保存）
+        ]
+    )
+    rep = reconcile.cross_fact(
+        hub,
+        other,
+        keys=["area_code", "sex_code", "age3_code", "year"],
+        hub_slice=pl.col("age_class_code").is_in(["1", "2", "3"]),
+        hub_with=[pl.col("age_class_code").alias("age3_code")],
+        other_slice=(pl.col("nationality_code") == "0") & pl.col("age_class_code").is_in(list(fold)),
+        other_with=[pl.col("age_class_code").replace_strict(fold, default=None).alias("age3_code")],
+    ).sort("age3_code")
+    assert dict(zip(rep["age3_code"], rep["diff"], strict=True)) == {"2": 100, "3": -100}
+    assert not rep["ok"].any()  # 両区分とも真の不一致
+
+
 def test_cross_fact_matches_hub_and_slices_total():
     # age5 の nat=0×age_class=100 スライスが population ハブと一致し、内訳(age=110)・日本人(nat=1)は
     # other_slice で除外され二重計上しない。
