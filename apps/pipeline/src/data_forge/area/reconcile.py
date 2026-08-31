@@ -69,35 +69,48 @@ def cross_fact(
     other: pl.DataFrame,
     *,
     keys: list[str],
+    hub_slice: pl.Expr | None = None,
     other_slice: pl.Expr | None = None,
     value: str = "population",
     scope_years: frozenset[int] = frozenset(),
     known_diff_years: frozenset[int] = frozenset(),
+    mode: str = "equality",
 ) -> pl.DataFrame:
-    """別ソース由来の 2 ファクトを共有軸 `keys` で突合し diff 表を返す（クロスファクト検算）。
+    """2 スライスを共有軸 `keys` で突合し diff 表を返す（クロスファクト検算／保存則検算）。
 
-    方針A「重複軸はハブと一致検証して捨てる」の実体化。`hub`（総人口の正典＝population）と
-    `other`（照合相手。`other_slice` で総数スライスへ潰してから keys へ集約）を full-join し、
-    共有軸ごとに `value` の差を出す。**full-join ゆえ片側だけに在るキー（カバレッジ差）も
-    diff!=0 として検出する**（level7 差を見落とさない）。
+    方針A「重複軸はハブと一致検証して捨てる」の実体化。`hub` と `other` を各々のスライス述語で
+    絞り keys へ集約して full-join し、共有軸ごとに `value` の差を出す。**full-join ゆえ片側だけに
+    在るキー（カバレッジ差）も diff!=0 として検出する**（level7 差を見落とさない）。
+
+    用途は2系統:
+      - クロスファクト（別ファクト間）: hub=population・other=age5 など。既定 mode="equality"。
+      - within-fact 保存則（同一ファクト内の別スライス）: hub_slice/other_slice で同じ DF を
+        総数側/内訳側に切り、Σ内訳==総数 を検算（例 日本人の年齢保存・男女保存）。
 
     引数:
         hub / other … 畳込後（`derive.load(..., join="aggregate_to_base")`）の配布用 DF。
+                      within-fact では同一 DF を両方に渡し hub_slice/other_slice で切り分ける。
         keys        … 共有軸（例 `["area_code", "sex_code", "year"]`）。
-        other_slice … other を総数スライスへ絞る述語（例 age5＝`nationality_code=="0"` かつ
-                      `age_class_code=="100"`／by_age＝`age_class_code=="0"`）。hub 側は
-                      呼び出し前に総数構成であること（population は sex 別の総人口）。
-        scope_years … other が未収録の年（例 age5＝2025 速報）。この年は other==0 が期待で
+        hub_slice   … hub を絞る述語（within-fact で総数スライスへ絞る用。既定 None＝絞らない）。
+        other_slice … other を絞る述語（例 age5 総数＝`nationality_code=="0"` かつ
+                      `age_class_code=="100"`／by_age＝`age_class_code=="0"`）。
+        scope_years … other（や hub 側の対象国籍）が未収録の年。この年は other==0 が期待で
                       status="scope_out"・ok=(other==0)＝スコープ外として許容する。
         known_diff_years … 定義差で diff!=0 が期待される年（例 age5＝2005 各歳表は「年齢不詳を
                       除く」ゆえ other = hub − 年齢不詳 ≤ hub）。status="known_diff"・
                       ok=(diff>=0)＝定義差の向き（other ≤ hub）が保たれる限り許容する。
+        mode        … "equality"（既定・diff==0 を期待）／"bound"（上界検算＝other ≤ hub の
+                      部分集合関係のみ保証。status="bound"・ok=(diff>=0 かつ other>0)。
+                      hub>0 なのに other==0（スライス欠落）を見逃さないため実在も要求するが、
+                      hub==0 の空セル（そもそも住民がいない自治体）は other==0 でも許容する）。
 
     列: *keys / hub / other / diff / status / ok。
-        status … match（diff==0）／scope_out／known_diff／mismatch。
-        ok     … match、または scope_out(other==0)、または known_diff(diff>=0)。
+        status … match（diff==0）／bound／scope_out／known_diff／mismatch。
+        ok     … match、scope_out(other==0)、known_diff(diff>=0)、
+                 bound(diff>=0 かつ (other>0 または hub==0))。
     """
-    h = hub.group_by(keys).agg(pl.col(value).fill_null(0).sum().alias("hub"))
+    h = hub.filter(hub_slice) if hub_slice is not None else hub
+    h = h.group_by(keys).agg(pl.col(value).fill_null(0).sum().alias("hub"))
     o = other.filter(other_slice) if other_slice is not None else other
     o = o.group_by(keys).agg(pl.col(value).fill_null(0).sum().alias("other"))
     rep = (
@@ -106,15 +119,19 @@ def cross_fact(
         .with_columns((pl.col("hub") - pl.col("other")).alias("diff"))
     )
     if "year" in keys:
-        status = (
-            pl.when(pl.col("year").is_in(list(scope_years)))
-            .then(pl.lit("scope_out"))
-            .when(pl.col("year").is_in(list(known_diff_years)))
-            .then(pl.lit("known_diff"))
-            .when(pl.col("diff") == 0)
-            .then(pl.lit("match"))
-            .otherwise(pl.lit("mismatch"))
-        )
+        scoped = pl.when(pl.col("year").is_in(list(scope_years))).then(pl.lit("scope_out"))
+        if mode == "bound":
+            status = scoped.otherwise(pl.lit("bound"))
+        else:
+            status = (
+                scoped.when(pl.col("year").is_in(list(known_diff_years)))
+                .then(pl.lit("known_diff"))
+                .when(pl.col("diff") == 0)
+                .then(pl.lit("match"))
+                .otherwise(pl.lit("mismatch"))
+            )
+    elif mode == "bound":
+        status = pl.lit("bound")
     else:
         status = pl.when(pl.col("diff") == 0).then(pl.lit("match")).otherwise(pl.lit("mismatch"))
     return rep.with_columns(status.alias("status")).with_columns(
@@ -122,6 +139,11 @@ def cross_fact(
             (pl.col("status") == "match")
             | ((pl.col("status") == "scope_out") & (pl.col("other") == 0))
             | ((pl.col("status") == "known_diff") & (pl.col("diff") >= 0))
+            | (
+                (pl.col("status") == "bound")
+                & (pl.col("diff") >= 0)
+                & ((pl.col("other") > 0) | (pl.col("hub") == 0))
+            )
         ).alias("ok")
     ).sort(keys)
 

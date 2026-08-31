@@ -100,90 +100,152 @@ def _cmd_area_check(ds: Dataset | StitchedDataset | ProjectedDataset, args: argp
         print("✅ 全イベントの後継先が実在コードへ着地")
 
 
-# クロスファクト検算（§data-quality-assurance.md 三角測量）: 照合相手 ds.key → (共有軸, 総数スライス述語)。
-# ハブ（総人口の正典）は population_timeseries 固定。C1=age5・C3=by_age。
+# クロスファクト検算（§data-quality-assurance.md 三角測量）＋日本人スライスの保存則検算。
+# 照合相手 ds.key → 検算スペックのリスト（1 データセットに複数検算を束ねる）。
+# ハブ（総人口の正典）の既定は population_timeseries。within-fact 検算は hub_key に自 ds を指す。
 _CROSSFACT_HUB = "population_timeseries"
 
 
 @dataclass(frozen=True)
 class _CrossFactSpec:
-    """クロスファクト検算1件の仕様。年別の許容カテゴリ（スコープ外・定義差）を同梱する。"""
+    """検算1件の仕様。年別の許容カテゴリ（スコープ外・定義差）とハブ/スライス/モードを同梱する。"""
 
+    name: str  # 検算名（C1・日本人上界 等。実走ログの見出しに使う）
     keys: list[str]
     other_slice: pl.Expr
+    hub_key: str = _CROSSFACT_HUB  # ハブのデータセットキー（within-fact は自 ds を指す）
+    hub_slice: pl.Expr | None = None  # within-fact でハブ側を総数スライスへ絞る述語
+    mode: str = "equality"  # "equality"（diff=0）／"bound"（上界＝diff>=0 かつ other>0）
     scope_years: frozenset[int] = frozenset()  # other 未収録の年（other==0 を許容）
     known_diff_years: frozenset[int] = frozenset()  # 定義差で diff!=0 が期待される年（diff>=0 を許容）
     reasons: dict[int, str] = field(default_factory=dict)  # 年 → 許容理由（表示用）
 
 
-_CROSSFACT: dict[str, _CrossFactSpec] = {
-    # C1: age5 の 国籍総数(nat=0)×年齢総数(age_class=100) スライス == population。
-    "population_by_age5_timeseries": _CrossFactSpec(
-        keys=["area_code", "sex_code", "year"],
-        other_slice=(pl.col("nationality_code") == "0") & (pl.col("age_class_code") == "100"),
-        scope_years=frozenset({2025}),
-        known_diff_years=frozenset({2005}),
-        reasons={
-            2025: "age5 未収録（population 速報のみ）＝スコープ外",
-            2005: "各歳表が「年齢不詳を除く」ゆえ age5 総数 = population − 年齢不詳（other ≤ hub）",
-        },
-    ),
+# 日本人スライスの再利用述語（age5 のミクロ系列のみ nationality 軸を持つ）。
+_JP_TOTAL = (pl.col("nationality_code") == "1") & (pl.col("age_class_code") == "100")  # 日本人×年齢総数
+
+_CROSSFACT: dict[str, list[_CrossFactSpec]] = {
+    "population_by_age5_timeseries": [
+        # C1: age5 の 国籍総数(nat=0)×年齢総数(age_class=100) スライス == population。
+        _CrossFactSpec(
+            name="C1 総数×年齢総数 == population",
+            keys=["area_code", "sex_code", "year"],
+            other_slice=(pl.col("nationality_code") == "0") & (pl.col("age_class_code") == "100"),
+            scope_years=frozenset({2025}),
+            known_diff_years=frozenset({2005}),
+            reasons={
+                2025: "age5 未収録（population 速報のみ）＝スコープ外",
+                2005: "各歳表が「年齢不詳を除く」ゆえ age5 総数 = population − 年齢不詳（other ≤ hub）",
+            },
+        ),
+        # J1（上界）: 日本人(nat=1)×年齢総数 ≤ population。diff = 総人口 − 日本人 = 外国人 ≥ 0。
+        # 外国人コードが無く等値にならないため部分集合関係のみ保証（日本人スライスの実在も要求）。
+        _CrossFactSpec(
+            name="J1 日本人 ≤ population（上界）",
+            keys=["area_code", "sex_code", "year"],
+            other_slice=_JP_TOTAL,
+            mode="bound",
+            scope_years=frozenset({1980, 1985, 2025}),  # 日本人 age5 未収録（総人口のみ）＝other==0 を許容
+            reasons={
+                1980: "日本人 age5 未収録（総人口のみ・国籍軸なし）＝スコープ外",
+                1985: "日本人 age5 未収録（総人口のみ・国籍軸なし）＝スコープ外",
+                2025: "age5 未収録（population 速報のみ）＝スコープ外",
+            },
+        ),
+        # J2（年齢保存・within-fact）: 日本人 Σ(age_class≠100) == 日本人 年齢総数(age_class=100)。
+        # age5 の age_class は 100=総数／5歳階級／999=不詳 のみ（中間集計なし）＝Σ内訳で二重計上しない。
+        _CrossFactSpec(
+            name="J2 日本人 年齢保存（within-fact）",
+            keys=["area_code", "sex_code", "year"],
+            hub_key="population_by_age5_timeseries",
+            hub_slice=_JP_TOTAL,
+            other_slice=(pl.col("nationality_code") == "1") & (pl.col("age_class_code") != "100"),
+            known_diff_years=frozenset({2005}),  # 2005 各歳表は 5歳階級再掲が不詳を含まず総数 T01 は含む
+            reasons={
+                2005: "2005 各歳表は 5歳階級再掲に年齢不詳が無い一方 総数(T01) は含む"
+                "＝総数 ≥ Σ5歳（不詳分・不詳行は非materialize）",
+            },
+        ),
+        # J3（男女保存・within-fact）: 日本人 男(sex=1)+女(sex=2) == 日本人 男女計(sex=0)。
+        _CrossFactSpec(
+            name="J3 日本人 男女保存（within-fact）",
+            keys=["area_code", "year"],
+            hub_key="population_by_age5_timeseries",
+            hub_slice=_JP_TOTAL & (pl.col("sex_code") == "0"),
+            other_slice=_JP_TOTAL & pl.col("sex_code").is_in(["1", "2"]),
+        ),
+    ],
     # C3: by_age の 年齢総数(age_class=0) スライス == population（既存「総数スライス一致」の明文化）。
-    "population_by_age_timeseries": _CrossFactSpec(
-        keys=["area_code", "sex_code", "year"],
-        other_slice=pl.col("age_class_code") == "0",
-        scope_years=frozenset({2025}),  # by_age も 1980-2020＝2025 速報は未収録
-        reasons={2025: "by_age 未収録（population 速報のみ）＝スコープ外"},
-    ),
+    "population_by_age_timeseries": [
+        _CrossFactSpec(
+            name="C3 年齢総数 == population",
+            keys=["area_code", "sex_code", "year"],
+            other_slice=pl.col("age_class_code") == "0",
+            scope_years=frozenset({2025}),  # by_age も 1980-2020＝2025 速報は未収録
+            reasons={2025: "by_age 未収録（population 速報のみ）＝スコープ外"},
+        ),
+    ],
 }
 
 
-def _cmd_crossfact_check(ds: Dataset | StitchedDataset | ProjectedDataset, args: argparse.Namespace) -> None:
-    """クロスファクト検算: ds の総人口スライスが population ハブと共有軸で一致するか（diff=0）。
-
-    別ソース・別系統から到達した同一の総人口（conformed dimension）を照合する。両ファクトを
-    同じ base_year で aggregate_to_base 畳込してから突合するので、level7 カバレッジ差を吸収する。
-    """
-    spec = _CROSSFACT.get(ds.key)
-    if spec is None:
-        raise SystemExit(f"{ds.key!r} はクロスファクト検算の対象外（対応: {sorted(_CROSSFACT)}）")
-    hub_ds = get_dataset(_CROSSFACT_HUB)
-    other, _ = derive.load(ds, refresh=args.refresh, join="aggregate_to_base", base_year=args.base_year)
-    hub, _ = derive.load(hub_ds, refresh=args.refresh, join="aggregate_to_base", base_year=args.base_year)
+def _run_crossfact_spec(spec: _CrossFactSpec, other: pl.DataFrame, hub: pl.DataFrame) -> int:
+    """検算1件を走らせ結果を表示し、真の不一致キー数を返す。"""
     rep = area_reconcile.cross_fact(
         hub,
         other,
         keys=spec.keys,
+        hub_slice=spec.hub_slice,
         other_slice=spec.other_slice,
         scope_years=spec.scope_years,
         known_diff_years=spec.known_diff_years,
-    )
-    head = f"[crossfact-check] {ds.key} vs {_CROSSFACT_HUB}"
-    if "year" not in spec.keys:  # 年軸を持たない検算は総キーだけ突合
-        n_bad = int(rep.filter(~pl.col("ok")).height)
-        print(f"{head}: {'✅ 全キー一致' if n_bad == 0 else f'⚠️ {n_bad} キーで不一致'}")
-        if n_bad:
-            with pl.Config(tbl_rows=30):
-                print(rep.filter(~pl.col("ok")).sort(pl.col("diff").abs(), descending=True))
-        return
-
-    # 年別サマリ: status（match/known_diff/scope_out/mismatch）別に件数・最大|diff| を集計。
-    summary = (
-        rep.with_columns(bad=~pl.col("ok"), adiff=pl.col("diff").abs())
-        .group_by("year", "status")
-        .agg(keys=pl.len(), bad=pl.col("bad").sum(), max_adiff=pl.col("adiff").max())
-        .sort("year")
+        mode=spec.mode,
     )
     n_bad = int(rep.filter(~pl.col("ok")).height)
-    verdict = "✅ 全キー整合" if n_bad == 0 else f"⚠️ 真の不一致 {n_bad} キー"
-    print(f"{head}: {verdict}（match=diff0／known_diff=定義差許容／scope_out=スコープ外許容）")
-    with pl.Config(tbl_rows=40):
-        print(summary)
-    for year in sorted(spec.reasons):
-        print(f"  ・{year}: {spec.reasons[year]}")
+    head = f"  [{spec.name}] vs {spec.hub_key}"
+    if "year" not in spec.keys:  # 年軸を持たない検算は総キーだけ突合
+        print(f"{head}: {'✅ 全キー一致' if n_bad == 0 else f'⚠️ {n_bad} キーで不一致'}")
+    else:
+        summary = (
+            rep.with_columns(bad=~pl.col("ok"), adiff=pl.col("diff").abs())
+            .group_by("year", "status")
+            .agg(keys=pl.len(), bad=pl.col("bad").sum(), max_adiff=pl.col("adiff").max())
+            .sort("year")
+        )
+        verdict = "✅ 全キー整合" if n_bad == 0 else f"⚠️ 真の不一致 {n_bad} キー"
+        print(f"{head}: {verdict}")
+        with pl.Config(tbl_rows=40):
+            print(summary)
+        for year in sorted(spec.reasons):
+            print(f"    ・{year}: {spec.reasons[year]}")
     if n_bad:  # 許容カテゴリに収まらない真の不一致だけを詳細表示
         with pl.Config(tbl_rows=30):
             print(rep.filter(~pl.col("ok")).sort(pl.col("diff").abs(), descending=True))
+    return n_bad
+
+
+def _cmd_crossfact_check(ds: Dataset | StitchedDataset | ProjectedDataset, args: argparse.Namespace) -> None:
+    """クロスファクト検算＋日本人スライスの保存則検算を実データで走らせる。
+
+    別ソース・別系統から到達した同一の総人口（conformed dimension）を照合し、加えて日本人スライスの
+    上界（≤ 総人口）と保存則（年齢・男女）を検算する。全ファクトを同じ base_year で aggregate_to_base
+    畳込してから突合するので、level7 カバレッジ差を吸収する。
+    """
+    specs = _CROSSFACT.get(ds.key)
+    if specs is None:
+        raise SystemExit(f"{ds.key!r} はクロスファクト検算の対象外（対応: {sorted(_CROSSFACT)}）")
+    other, _ = derive.load(ds, refresh=args.refresh, join="aggregate_to_base", base_year=args.base_year)
+    hub_cache: dict[str, pl.DataFrame] = {ds.key: other}  # within-fact は other（自 ds）を再利用
+
+    def load_hub(key: str) -> pl.DataFrame:
+        if key not in hub_cache:
+            hub_cache[key], _ = derive.load(
+                get_dataset(key), refresh=args.refresh, join="aggregate_to_base", base_year=args.base_year
+            )
+        return hub_cache[key]
+
+    print(f"[crossfact-check] {ds.key}: {len(specs)} 検算（match=diff0／bound=上界／known_diff/scope_out=許容）")
+    total_bad = sum(_run_crossfact_spec(spec, other, load_hub(spec.hub_key)) for spec in specs)
+    if total_bad:
         raise SystemExit(1)
 
 
