@@ -4,6 +4,8 @@
 ソース固有の取得・整形処理は sources/ 以下の関数を参照する。
 
 正典の所在（ここには再掲しない＝ドリフト防止）:
+- 命名規約（family / key / stem / table_name の関係・suffix の軸・未統一論点）
+  … apps/pipeline/README.md「命名規則」
 - 軸構造（tab/cat コード・年ごとのスキーマ差・全国行の有無・不詳の導出等）
   cleaner モジュール sources/estat/<name>.py の docstring
 - statsDataId・e-Stat 原題・年カバレッジ … docs/distributions/<name>.md
@@ -14,17 +16,7 @@
 レジストリはファミリー単位のサブ辞書（_POPULATION 等）に分け、末尾の DATASETS で束ねる。
 サブ辞書の区切りは cleaner モジュール／table_name のまとまりに対応し、将来のファイル分割の縫い目でもある。
 
-命名規約（family / key / stem / table_name の関係）:
-- **family名 ＝ table_name**。粒度（市区町村/都道府県/全国）や来歴（回次別/回次跨・Stitched/Projected）を
-  suffix に含めない「その fact の論理名」。カバレッジ年次は名前でなく docs/title で明示する。
-- **family : key = 1:N**。key は family名 ＋ 役割/粒度 suffix（_national/_prefecture/_timeseries/_<year> 等）で
-  一意化する。同一 fact の別パーティション/別ビュー（全国 base・県 base・縫合・県ロールアップ）が同じ
-  table_name を共有する（N:1 のハブ）。**基底 key は table_name と決して一致しない**。
-- **key : stem = 1:1**（stem = "census_" ＋ key が慣習・test で一意性を担保）。stem は出力ファイル名＝物理 identity。
-- 分類改訂等で「同名では畳めない別 fact」になる場合のみ、**粒度語でない弁別子**で別 family を立てる
-  （例: occupation_major12 / occupation_major10）。粒度語（_prefecture 等）を family名に入れると
-  key の area suffix と衝突するため避ける。
-- family名の閉じた語彙は下記 FAMILIES に集約し、test で全 table_name ∈ FAMILIES を強制する。
+family 名の閉じた語彙は下記 FAMILIES に集約し、test で全 table_name ∈ FAMILIES を強制する。
 """
 
 from collections.abc import Callable

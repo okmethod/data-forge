@@ -50,6 +50,35 @@ apps/pipeline/
 
 ---
 
+## 命名規則
+
+データセットは [src/data_forge/datasets.py](src/data_forge/datasets.py) の**レジストリ**に family 単位で登録する。名前は次の4語彙の関係で決まり、`test` が整合を強制する。
+
+### family / key / stem / table_name
+
+| 語彙           | 意味                                                                        | 例                                     |
+| -------------- | --------------------------------------------------------------------------- | -------------------------------------- |
+| **family**     | その fact の論理名 ＝ `table_name`。粒度・来歴は含めない                    | `population_by_age5`                   |
+| **key**        | family ＋ suffix で一意化したレジストリ識別子（family : key = 1:N）         | `population_by_age5_prefecture`        |
+| **stem**       | 出力ファイル名＝物理 identity。`"census_" + key` が慣習（key : stem = 1:1） | `census_population_by_age5_prefecture` |
+| **table_name** | SQLite テーブル名 ＝ family。複数 key が同一 table を共有（N:1 ハブ）       | `population_by_age5`                   |
+
+- **family ＝ table_name**：粒度（市区町村/都道府県/全国）も来歴（回次別/回次跨・Stitched/Projected）も名前に入れない。カバレッジ年次は名前でなく docs / title で示す。
+- **基底 key は table_name と一致させない**（必ず suffix を付ける）。同一 fact の別パーティション/別ビュー（全国 base・県 base・縫合・県ロールアップ）が同じ table_name を共有する。
+- 分類改訂等で「同名では畳めない別 fact」になる時だけ、**粒度語でない弁別子**で別 family を立てる（例: `occupation_major12` / `occupation_major10`）。粒度語（`_prefecture` 等）を family 名に入れると key の area suffix と衝突するため避ける。
+
+### suffix の軸（key = family ＋ suffix。地理 × 時間は直交して連結）
+
+- **地理粒度**: `_national`（全国のみ）／ `_prefecture`（全国＋都道府県）／ **無印**（＝その fact の基底＝最細粒度）
+- **時間軸**: `_<year>`（単年, 例 `_1980`）／ `_timeseries`（全回時系列）／ `_raw`（畳込無しデモ）／ `_<year>_preliminary`（速報単独）
+- 連結例: `population_by_age5_prefecture_timeseries`
+
+> ⚠️ **既知の未統一論点**: 無印の意味が family 群で揺れている。`population`・`population_by_age(5)` 系は市区町村が基底なので**無印**、就業系（`labor_force` / `industry` / `occupation`）は市区町村帳票が無く全国/県が基底のため `_national` / `_prefecture` を**必ず明示**する。統一するなら `_municipality` を明示して無印を廃止し、全 family で地理粒度を明示に揃える。
+
+family 名の閉じた語彙は `datasets.py` の `FAMILIES` に集約し、`test` が全 table_name ∈ FAMILIES を強制する。
+
+---
+
 ## 使い方
 
 取得（Fetch）→ クレンジング（Clean）→ 出力（Export）を独立ステップとして提供する。

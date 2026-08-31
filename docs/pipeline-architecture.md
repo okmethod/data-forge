@@ -9,7 +9,7 @@ pipeline の全体設計の「なぜ」を集約する正典。
 - **各段の内部ファイルの役割**: 当該パッケージの `__init__.py` docstring
 - **データセット個別仕様（ID・スキーマ・年差）**: [docs/distributions/&lt;name&gt;.md](distributions/)
 - **合併集約（地域マスタ）の設計・運用**: [docs/distributions/area_master.md](distributions/area_master.md)
-- **命名規約（family/key/stem/table_name）**: `datasets.py` docstring（コード正典）
+- **命名規約（family/key/stem/table_name・suffix の軸）**: [apps/pipeline/README.md](../apps/pipeline/README.md)「命名規則」
 
 ---
 
