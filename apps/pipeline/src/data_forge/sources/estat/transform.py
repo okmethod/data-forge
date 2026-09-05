@@ -17,6 +17,24 @@ from data_forge.meta import SourceMeta
 # e-Stat 共通の出典表記ベース（政府統計利用規約）
 _CITATION_BASE = "出典：政府統計の総合窓口(e-Stat)（https://www.e-stat.go.jp/）"
 
+# 単一 ID に同居する 全国(level1) を表す area code。配布時に地理粒度で分離する。
+NATIONAL_AREA_CODE = "00000"
+
+
+def scope_area(fact: pl.DataFrame, scope: str) -> pl.DataFrame:
+    """配布スキーマの地理粒度を排他選択する: national=全国のみ / prefecture=47都道府県のみ / all=両方。
+
+    単一 ID に全国(level1) と 47都道府県(level2) が同居する fact（households / family_type 等）で、
+    配布時に地理粒度を分離するための共通フィルタ。
+    """
+    if scope == "all":
+        return fact
+    if scope == "national":
+        return fact.filter(pl.col("area_code") == NATIONAL_AREA_CODE)
+    if scope == "prefecture":
+        return fact.filter(pl.col("area_code") != NATIONAL_AREA_CODE)
+    raise ValueError(f"未知の scope: {scope!r}（all/national/prefecture のいずれか）")
+
 
 def _as_list(value: Any) -> list[Any]:
     return value if isinstance(value, list) else [value]
