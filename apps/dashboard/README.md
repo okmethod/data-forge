@@ -26,43 +26,48 @@ apps/dashboard/
 
 ## データソース
 
-`apps/pipeline` が出力した SQLite を参照する（**非コミット**。ローカルにパイプライン出力が必要）。
-パスはソースディレクトリ基準の相対（Evidence sqlite コネクタ仕様）。
+`apps/pipeline` が精製した **parquet** を参照する（**非コミット**。ローカルにパイプライン出力が必要）。
+各ソースは `type: duckdb` で、読取先は `.sql` の `read_parquet('../../data/processed/<stem>.parquet')` が持つ（パスは Evidence プロジェクトルート＝`apps/dashboard` 基準）。
+出典メタは同梱の `<stem>.meta.json` を `read_json` で読む（各ソースの `source_meta.sql`）。
 
-ソースは**粒度**で対称に分かれる（Evidence は「1コネクタ=1 SQLite」のため fact×粒度でディレクトリを割る）:
+ソースは **fact × 粒度** で対称に分かれる（1ソース＝1論理テーブル）:
 
-- `*_prefecture` … **都道府県粒度**。県集約まで済ませた export。`.sql` は素の射影のみ。
-- `*_city` … **サンプル市区町村（印西市）粒度**。市区町村粒度の時系列から対象市区町村だけを抽出したもの。Evidence は結果 parquet を公開ビルドへ丸ごと同梱するため、公開範囲のみを抽出している。
+- `*_prefecture` … **都道府県粒度**。県集約まで済ませた精製系列。`.sql` は素の射影のみ。
+- `*_municipality` … **サンプル市区町村（印西市）粒度**。市区町村系列から公開範囲だけを `where area_code in (...)` で抽出（Evidence は結果 parquet を公開ビルドへ丸ごと同梱するため）。
+- 粒度 suffix を持たない fact（`census_households` / `census_industry` 等の世帯・就業系）は、排他粒度で分離された **全国（`_national`）＋都道府県（`_prefecture`）の2 parquet を `.sql` 内で `union all`** し、「全国(00000)＋47県」の1論理テーブルへ合成する（全国はベースライン。pipeline README §命名規則「全国行の同梱禁止（排他粒度）」に対応）。
 
-| ソース                                                                           | 参照先 SQLite                                             | 内容                                          |
-| -------------------------------------------------------------------------------- | --------------------------------------------------------- | --------------------------------------------- |
-| [census_prefecture](sources/census_prefecture/connection.yaml)                   | `census_population_prefecture_timeseries.sqlite`          | 都道府県別 男女別人口（1980〜2020）           |
-| [census_age_prefecture](sources/census_age_prefecture/connection.yaml)           | `census_population_by_age_prefecture_timeseries.sqlite`   | 都道府県別 年齢3区分×男女別人口（1980〜2020） |
-| [census_daynight_prefecture](sources/census_daynight_prefecture/connection.yaml) | `census_daynight_population_prefecture_timeseries.sqlite` | 都道府県別 昼夜間人口（1990〜2020）           |
-| [census_city](sources/census_city/connection.yaml)                               | `census_population_timeseries.sqlite`                     | サンプル市 男女別人口（合併畳み込み済）       |
-| [census_city_raw](sources/census_city_raw/connection.yaml)                       | `census_population_timeseries_raw.sqlite`                 | サンプル市 合併畳み込み無し版（比較用）       |
-| [census_age_city](sources/census_age_city/connection.yaml)                       | `census_population_by_age_timeseries.sqlite`              | サンプル市 年齢3区分×男女別人口               |
-| [census_daynight_city](sources/census_daynight_city/connection.yaml)             | `census_daynight_population_timeseries.sqlite`            | サンプル市 昼夜間人口                         |
+各 fact の**出力スキーマ・年カバレッジ・出典**は [docs/distributions/](../../docs/distributions/) と [apps/pipeline/README.md](../pipeline/README.md) の命名規則が正典。
+下表は**ダッシュ固有の合成**＝「どの精製 stem を・どう組んで・どのページに出すか」の地図（スキーマ等は重複させず上記へ委譲）:
 
-### SQLite の生成
+| ソース (`sources/`)                  | 参照 stem（`data/processed/*.parquet`）                                                | 合成                            | 主な表示ページ    |
+| ------------------------------------ | -------------------------------------------------------------------------------------- | ------------------------------- | ----------------- |
+| `census_population_prefecture`       | `census_population_prefecture_timeseries`                                              | 素の射影（県）                  | population, inzai |
+| `census_population_municipality`     | `census_population_municipality_timeseries`                                            | サンプル市抽出                  | population, inzai |
+| `census_population_municipality_raw` | `census_population_municipality_timeseries_raw`                                        | サンプル市抽出（畳込無=比較用） | population        |
+| `census_age3class_prefecture`        | `census_age3class_prefecture_timeseries`                                               | 素の射影（県）                  | age_3class        |
+| `census_age3class_municipality`      | `census_age3class_municipality_timeseries`                                             | サンプル市抽出                  | age_3class, inzai |
+| `census_age5year_municipality`       | `census_age5year_municipality_timeseries`                                              | サンプル市抽出（国籍軸）        | age_5year         |
+| `census_daynight_prefecture`         | `census_daynight_prefecture_timeseries`                                                | 素の射影（県）                  | daynight          |
+| `census_daynight_municipality`       | `census_daynight_municipality_timeseries`                                              | サンプル市抽出                  | daynight, inzai   |
+| `census_age5year_prefecture`         | `census_age5year_national_timeseries` ＋ `census_age5year_prefecture_timeseries`       | `union`（全国＋県）             | age_5year         |
+| `census_households`                  | `census_households_national_timeseries` ＋ `census_households_prefecture_timeseries`   | `union`（全国＋県）             | households        |
+| `census_family_type`                 | `census_family_type_national_timeseries` ＋ `census_family_type_prefecture_timeseries` | `union`（全国＋県）             | family_type       |
+| `census_labor_force`                 | `census_labor_force_national_timeseries` ＋ `census_labor_force_prefecture_timeseries` | `union`（全国＋県）             | labor_force       |
+| `census_industry`                    | `census_industry_national_timeseries` ＋ `census_industry_prefecture_timeseries`       | `union`（全国＋県）             | industry          |
+| `census_occupation_major10`          | `census_occupation_major10_national_timeseries` ＋ `..._prefecture_timeseries`         | `union`（全国＋県）             | occupation        |
+| `census_occupation_major12`          | `census_occupation_major12_national_timeseries` ＋ `..._prefecture_timeseries`         | `union`（全国＋県）             | occupation        |
 
-県粒度3表は `--join prefecture`（既定）で市区町村アトムを県へ集約して出力する。市区町村粒度3表は既定で
-**合併畳み込み済み（`default_join="aggregate_to_base"`）**＝市制施行や合併で消えた旧コードを後継自治体へ
-畳むため、サンプル市の連続時系列を作れる（例: 印西市 12231 は 1996年の市制施行前が別コードだが、
-畳み込みで 1980年から連続に）。
+> 出典メタは各ソースの `source_meta.sql` が `<stem>.meta.json` を `read_json` で読む（`union` ソースは全国＋県の2 meta を集約・単一 ID は重複排除）。
+
+### parquet の生成
+
+パイプラインで各データセットを `run`（取得→クレンジング→出力）すると、`data/processed/` に `<stem>.parquet` / `<stem>.meta.json`（＋ csv / sqlite / duckdb）が生成される。
+市区町村粒度は既定で**合併畳み込み済み`default_join="aggregate_to_base"`）**＝消えた旧コードを後継自治体へ畳むため、サンプル市の連続時系列を作れる（例: 印西市 12231 は 1996年の市制施行前が別コードだが畳み込みで 1980年から連続に）。
+データセット一覧と実行方法は [apps/pipeline/README.md](../pipeline/README.md) が正典。
 
 ```bash
 cd apps/pipeline
-# 都道府県粒度（county rollup）
-uv run data-forge export population_prefecture_timeseries          # census_population_prefecture_timeseries.sqlite
-uv run data-forge export population_by_age_prefecture_timeseries   # census_population_by_age_prefecture_timeseries.sqlite
-uv run data-forge export daynight_population_prefecture_timeseries # census_daynight_population_prefecture_timeseries.sqlite
-# 市区町村粒度（サンプル市抽出の材料。畳込済）
-uv run data-forge export population_timeseries           # census_population_timeseries.sqlite
-uv run data-forge export population_by_age_timeseries    # census_population_by_age_timeseries.sqlite
-uv run data-forge export daynight_population_timeseries  # census_daynight_population_timeseries.sqlite
-# 畳み込み有り/無しの比較デモ専用（生 union 版）
-uv run data-forge export population_timeseries_raw       # census_population_timeseries_raw.sqlite
+uv run poe run <dataset_key>   # 例: population_prefecture_timeseries / age5year_national_timeseries
 ```
 
 ---
@@ -72,7 +77,7 @@ uv run data-forge export population_timeseries_raw       # census_population_tim
 ```bash
 cd apps/dashboard
 npm install          # 初回のみ
-npm run sources      # SQLite からデータを取り込み（.evidence/ にキャッシュ）
+npm run sources      # parquet からデータを取り込み（.evidence/ にキャッシュ）
 npm run dev          # ローカル開発サーバ（ブラウザ自動起動）
 npm run build        # 静的サイトを build/ に出力
 npm run build:strict # クエリ/描画エラーを失敗扱いにしてビルド（CI 向け）
@@ -125,12 +130,7 @@ npx wrangler r2 bucket cors set <bucket> --file r2-cors.json
 公開ビルドに載せてよい地域粒度は [public_scope.yaml](public_scope.yaml) が**唯一の定義**。
 `allow_municipalities` に列挙した市区町村コード（＋県 `XX000`・全国 `00000`）だけを公開範囲とする。
 
-- Evidence は各 `sources/*.sql` の結果 parquet を `build/data` へ丸ごと同梱するため、絞り込みを誤ると
-  公開対象外の市区町村が流出し得る。そこで **SQL 側の `where area_code in (...)` は「ポリシーに適合すべき実装」**と位置づけ、
-  真の定義はこの YAML に一元化している。
-- 流出ゲートは pipeline の `data-forge public-scope-check` が担う（実装 `apps/pipeline/src/data_forge/public_scope.py`、
-  テスト `apps/pipeline/tests/test_public_scope.py`）。`build/data/**/*.parquet` を走査し、この YAML と照合する
-  （判定ルール＝5桁かつ末尾3桁≠000 の市区町村粒度コードが `allow_municipalities` 以外に無いこと）。
-  ゲートはルールの写しを持たず YAML を読むだけなので、定義と検査がドリフトしない。
+- Evidence は各 `sources/*.sql` の結果 parquet を `build/data` へ丸ごと同梱するため、絞り込みを誤ると公開対象外の市区町村が流出し得る。そこで **SQL 側の `where area_code in (...)` は「ポリシーに適合すべき実装」**と位置づけ、真の定義はこの YAML に一元化している。
+- 流出ゲートは pipeline の `data-forge public-scope-check` が担う（実装 `apps/pipeline/src/data_forge/public_scope.py`、テスト `apps/pipeline/tests/test_public_scope.py`）。`build/data/**/*.parquet` を走査し、この YAML と照合する（判定ルール＝5桁かつ末尾3桁≠000 の市区町村粒度コードが `allow_municipalities` 以外に無いこと）。ゲートはルールの写しを持たず YAML を読むだけなので、定義と検査がドリフトしない。
 - **公開範囲を変えるときは `allow_municipalities` を編集する**。SQL 側が追随していなければゲートが検出する。
 - 単体実行は `npm run check:leak`（要ビルド済 `build/`）＝pipeline の uv 環境でコマンドを呼ぶ薄いラッパー。

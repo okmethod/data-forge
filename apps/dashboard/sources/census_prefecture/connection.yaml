@@ -1,7 +1,0 @@
-name: census_prefecture
-type: sqlite
-options:
-  # 都道府県粒度＝パイプが県集約まで済ませて export（spatial_rollup の _PREFECTURES で県名一元化）。
-  # data/ は非コミットのため、ローカルにパイプライン出力が存在する前提。
-  # 市区町村粒度（サンプル市抽出）は census_city 側を参照。
-  filename: ../../../../data/processed/census_population_prefecture_timeseries.sqlite

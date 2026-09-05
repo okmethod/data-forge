@@ -16,7 +16,7 @@ sidebar_position: 1
 
 ```sql national
   select year, sum(population) as population
-  from census_prefecture.population
+  from census_population_prefecture.population
   where sex = '総数'
   group by year
   order by year
@@ -45,7 +45,7 @@ _※ 末尾の2025年は**速報値**（人口速報集計）。2020年までは
 **起点年・終点年を切り替えて**、期間ごとに分岐がどう変わるかを確認できる。
 
 <!--
-都道府県は census_prefecture（長期系列）を参照するため 1920〜2020 まで遡れる（市区町村=1980〜 とは別系列）。
+都道府県は census_population_prefecture（長期系列）を参照するため 1920〜2020 まで遡れる（市区町村=1980〜 とは別系列）。
 単一選択 Dropdown は先頭オプションが既定になる。defaultValue/ default 属性は非先頭では効かない。
 そのため既定にしたい年を先頭に置く: 起点=1920 昇順 / 終点=2020 降順。
 ※1945 は沖縄が null（米軍統治下で未実施）。1945 が起点/終点だと沖縄は増減計算が null になり棒が出ない。
@@ -100,7 +100,7 @@ _※ 末尾の2025年は**速報値**（人口速報集計）。2020年までは
 ```sql pref_change
   with p as (
     select pref_name, year, population
-    from census_prefecture.population
+    from census_population_prefecture.population
     where sex = '総数'
   ),
   chg as (
@@ -142,13 +142,13 @@ _※ 末尾の2025年は**速報値**（人口速報集計）。2020年までは
 
 ```sql pref_list
   select distinct pref_name, pref_code
-  from census_prefecture.population
+  from census_population_prefecture.population
   order by pref_code
 ```
 
 ```sql pref_trend
   select year, population
-  from census_prefecture.population
+  from census_population_prefecture.population
   where sex = '総数' and pref_name = '${inputs.pref.value}'
   order by year
 ```
@@ -182,13 +182,13 @@ _※ 末尾の2025年は**速報値**。2020年までは確定値。_
   -- （x範囲が違う系列を seriesOrder で先頭にすると、その系列の年範囲が先に軸化されてしまうため）
   with folded as (
     select year, population
-    from census_city.population
+    from census_population_municipality.population
     -- 合併畳み込みの方法論デモ（1980-2020）に集中。2025速報は総人口推移の各図で表示する。
     where area_name = '印西市' and sex = '総数' and data_status = 'confirmed'
   ),
   raw as (
     select year, population
-    from census_city_raw.population
+    from census_population_municipality_raw.population
     where sex = '総数'
   )
   select '① 畳み込み無し' as series, f.year, r.population

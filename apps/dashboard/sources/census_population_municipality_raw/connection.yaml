@@ -1,0 +1,7 @@
+name: census_population_municipality_raw
+type: duckdb
+options:
+  # サンプル市区町村の「畳み込み無し（生）」時系列＝合併畳込 有/無 の比較デモ専用。
+  # 折込済み（census_population_municipality）とは別 stem。read_parquet で直接参照。
+  # data/ は非コミットのためローカル出力前提。
+  filename: ':memory:'

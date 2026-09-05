@@ -122,7 +122,7 @@ sidebar_position: 4
 
 ```sql inzai_dn
   select year, daynight, population
-  from census_daynight_city.daynight
+  from census_daynight_municipality.daynight
   order by year, daynight_code
 ```
 
@@ -140,7 +140,7 @@ sidebar_position: 4
   select year,
     round(max(case when daynight_code = '1' then population end) * 100.0
       / max(case when daynight_code = '0' then population end), 1) as ratio
-  from census_daynight_city.daynight
+  from census_daynight_municipality.daynight
   group by year
   order by year
 ```

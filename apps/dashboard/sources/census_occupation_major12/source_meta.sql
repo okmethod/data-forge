@@ -1,10 +1,22 @@
--- 出典メタ（citation 等）を Evidence に公開する。
--- パイプラインが各 SQLite に埋め込む _source_meta（output/export.py）を1行へピボットし、
--- 出典ページ（pages/sources.md）でデータ駆動に描画する（citation は手書きしない）。
+-- 出典メタ（citation 等）を Evidence に公開する。全国＋都道府県の2 meta.json を結合し1行に集約。
+-- 単一 e-Stat ID の帳票は全国/県で meta が同一になるため重複排除する（2 ID の帳票は両方を列挙）。
+-- 出典ページ（pages/sources.md）でデータ駆動に描画する（citation は手書きしない・" / " 区切りで全文列挙）。
+with m as (
+  select title, provider, source, dataset_id, citation, 1 as ord
+  from read_json('../../data/processed/census_occupation_major12_national_timeseries.meta.json')
+  union all
+  select title, provider, source, dataset_id, citation, 2 as ord
+  from read_json('../../data/processed/census_occupation_major12_prefecture_timeseries.meta.json')
+),
+d as (
+  select title, provider, source, dataset_id, citation, min(ord) as ord
+  from m
+  group by title, provider, source, dataset_id, citation
+)
 select
-  max(case when key = 'title' then value end)        as title,
-  max(case when key = 'provider' then value end)     as provider,
-  max(case when key = 'source' then value end)        as source,
-  max(case when key = 'dataset_id' then value end)   as dataset_id,
-  max(case when key = 'citation' then value end)     as citation
-from _source_meta
+  string_agg(title, ' / ' order by ord)      as title,
+  any_value(provider)                         as provider,
+  any_value(source)                           as source,
+  string_agg(dataset_id, ', ' order by ord)  as dataset_id,
+  string_agg(citation, ' / ' order by ord)   as citation
+from d

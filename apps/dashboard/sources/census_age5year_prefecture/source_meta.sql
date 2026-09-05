@@ -3,10 +3,10 @@
 -- 出典ページ（pages/sources.md）でデータ駆動に描画する（citation は手書きしない・" / " 区切りで全文列挙）。
 with m as (
   select title, provider, source, dataset_id, citation, 1 as ord
-  from read_json('../../data/processed/census_family_type_national_timeseries.meta.json')
+  from read_json('../../data/processed/census_age5year_national_timeseries.meta.json')
   union all
   select title, provider, source, dataset_id, citation, 2 as ord
-  from read_json('../../data/processed/census_family_type_prefecture_timeseries.meta.json')
+  from read_json('../../data/processed/census_age5year_prefecture_timeseries.meta.json')
 ),
 d as (
   select title, provider, source, dataset_id, citation, min(ord) as ord

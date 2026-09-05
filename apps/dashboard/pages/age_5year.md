@@ -19,7 +19,7 @@ sidebar_position: 3
     year,
     age_class,
     sum(population) as population
-  from census_age5.by_age5
+  from census_age5year_prefecture.by_age5
   where area_code = '00000' and sex_code = '0'
     and age_class_code not in ('100','999')
   group by year, age_class_code, age_class
@@ -57,7 +57,7 @@ _※ 各図は年齢不詳を除いた5歳階級のみを描く（不詳は「�
 
 ```sql year_list
   select distinct cast(cast(year as integer) as varchar) as year
-  from census_age5.by_age5
+  from census_age5year_prefecture.by_age5
   order by year desc
 ```
 
@@ -66,7 +66,7 @@ _※ 各図は年齢不詳を除いた5歳階級のみを描く（不詳は「�
     age_class,
     sex,
     case when sex_code = '1' then -population else population end as pop
-  from census_age5.by_age5
+  from census_age5year_prefecture.by_age5
   where area_code = '00000' and sex_code in ('1','2')
     and age_class_code not in ('100','999') and year = ${inputs.year.value}
   order by age_class_code desc
@@ -107,7 +107,7 @@ _※ 最上段の「85歳以上」は都道府県表に合わせた終端（全�
 
 ```sql pref_list
   select distinct area_name, area_code
-  from census_age5.by_age5
+  from census_age5year_prefecture.by_age5
   where area_code != '00000'
   order by area_code
 ```
@@ -117,7 +117,7 @@ _※ 最上段の「85歳以上」は都道府県表に合わせた終端（全�
     year,
     age_class,
     sum(population) as population
-  from census_age5.by_age5
+  from census_age5year_prefecture.by_age5
   where area_name = '${inputs.pref.value}' and sex_code = '0'
     and age_class_code not in ('100','999')
   group by year, age_class_code, age_class
@@ -150,7 +150,7 @@ _※ 最上段の「85歳以上」は都道府県表に合わせた終端（全�
     age_class,
     sex,
     case when sex_code = '1' then -population else population end as pop
-  from census_age5.by_age5
+  from census_age5year_prefecture.by_age5
   where area_name = '${inputs.pref.value}' and sex_code in ('1','2')
     and age_class_code not in ('100','999') and year = ${inputs.pref_year.value}
   order by age_class_code desc
@@ -184,7 +184,7 @@ _※ 最上段の「85歳以上」は都道府県表に合わせた終端（全�
     year,
     age_class,
     sum(population) as population
-  from census_age5_city.by_age5
+  from census_age5year_municipality.by_age5
   where sex_code = '0' and nationality_code = '0'
     and age_class_code not in ('100','999')
   group by year, age_class_code, age_class
@@ -222,7 +222,7 @@ _※ 国籍「総数」で描く（`nationality_code='0'`）。市区町村の�
 
 ```sql inzai_year_list
   select distinct cast(cast(year as integer) as varchar) as year
-  from census_age5_city.by_age5
+  from census_age5year_municipality.by_age5
   order by year desc
 ```
 
@@ -231,7 +231,7 @@ _※ 国籍「総数」で描く（`nationality_code='0'`）。市区町村の�
     age_class,
     sex,
     case when sex_code = '1' then -population else population end as pop
-  from census_age5_city.by_age5
+  from census_age5year_municipality.by_age5
   where sex_code in ('1','2') and nationality_code = '0'
     and age_class_code not in ('100','999') and year = ${inputs.inzai_year.value}
   order by age_class_code desc

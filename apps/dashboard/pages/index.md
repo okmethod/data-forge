@@ -49,7 +49,7 @@ title: 人口統計ダッシュボード
 
 ```sql national
   select year, sum(population) as population
-  from census_prefecture.population
+  from census_population_prefecture.population
   where sex = '総数'
   group by year
   order by year

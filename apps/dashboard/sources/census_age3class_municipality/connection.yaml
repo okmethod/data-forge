@@ -1,0 +1,7 @@
+name: census_age3class_municipality
+type: duckdb
+options:
+  # サンプル市区町村（印西市など）抽出用＝市区町村粒度の年齢3区分×男女別人口 時系列。
+  # read_parquet で精製 parquet を直接参照。都道府県粒度は census_age3class_prefecture 側。
+  # data/ は非コミットのためローカル出力前提。
+  filename: ':memory:'

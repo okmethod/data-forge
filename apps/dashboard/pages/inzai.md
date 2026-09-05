@@ -16,7 +16,7 @@ sidebar_position: 99
 
 ```sql national
   select year, sum(population) as population
-  from census_prefecture.population
+  from census_population_prefecture.population
   where sex = '総数'
   group by year
   order by year
@@ -41,13 +41,13 @@ _※ 末尾の2025年は**速報値**（人口速報集計）。2020年までは
 ```sql pop_index
   with series as (
     select '全国' as region, year, sum(population) as pop
-    from census_prefecture.population where sex = '総数' group by year
+    from census_population_prefecture.population where sex = '総数' group by year
     union all
     select '千葉県' as region, year, sum(population) as pop
-    from census_prefecture.population where sex = '総数' and pref_name = '千葉県' group by year
+    from census_population_prefecture.population where sex = '総数' and pref_name = '千葉県' group by year
     union all
     select '印西市' as region, year, population as pop
-    from census_city.population where sex = '総数'
+    from census_population_municipality.population where sex = '総数'
   )
   select s.region, s.year, round(s.pop * 100.0 / b.pop, 1) as idx
   from series s
@@ -76,7 +76,7 @@ _※ 末尾の2025年は**速報値**。2020年までは確定値。_
 
 ```sql inzai_pop
   select year, population
-  from census_city.population
+  from census_population_municipality.population
   where area_name = '印西市' and sex = '総数'
   order by year
 ```
@@ -106,12 +106,12 @@ _※ 末尾の2025年は**速報値**（人口速報集計）。2020年までは
   select '印西市' as region, year,
     round(sum(case when age_class_code = '3' then population end) * 100.0
       / sum(case when age_class_code in ('1','2','3') then population end), 1) as aging_pct
-  from census_age_city.by_age where sex_code = '0' and year >= 1980 group by year
+  from census_age3class_municipality.by_age where sex_code = '0' and year >= 1980 group by year
   union all
   select '全国' as region, year,
     round(sum(case when age_class_code = '3' then population end) * 100.0
       / sum(case when age_class_code in ('1','2','3') then population end), 1) as aging_pct
-  from census_age_prefecture.by_age where sex_code = '0' and year >= 1980 group by year
+  from census_age3class_prefecture.by_age where sex_code = '0' and year >= 1980 group by year
   order by region, year
 ```
 
@@ -135,7 +135,7 @@ _※ 末尾の2025年は**速報値**（人口速報集計）。2020年までは
     age_class,
     sex,
     case when sex_code = '1' then -population else population end as pop
-  from census_age5_city.by_age5
+  from census_age5year_municipality.by_age5
   where sex_code in ('1','2') and nationality_code = '0'
     and age_class_code not in ('100','999') and year = 1980
   order by age_class_code desc
@@ -146,7 +146,7 @@ _※ 末尾の2025年は**速報値**（人口速報集計）。2020年までは
     age_class,
     sex,
     case when sex_code = '1' then -population else population end as pop
-  from census_age5_city.by_age5
+  from census_age5year_municipality.by_age5
   where sex_code in ('1','2') and nationality_code = '0'
     and age_class_code not in ('100','999') and year = 2020
   order by age_class_code desc
@@ -197,7 +197,7 @@ _※ 国籍「総数」で描く。より細かい国籍別（総数／日本人
 
 ```sql inzai_dn
   select year, daynight, population
-  from census_daynight_city.daynight
+  from census_daynight_municipality.daynight
   order by year, daynight_code
 ```
 
@@ -215,7 +215,7 @@ _※ 国籍「総数」で描く。より細かい国籍別（総数／日本人
   select year,
     round(max(case when daynight_code = '1' then population end) * 100.0
       / max(case when daynight_code = '0' then population end), 1) as ratio
-  from census_daynight_city.daynight
+  from census_daynight_municipality.daynight
   group by year
   order by year
 ```
@@ -248,7 +248,7 @@ _※ 国籍「総数」で描く。より細かい国籍別（総数／日本人
 ```sql pref_change
   with p as (
     select pref_name, year, population
-    from census_prefecture.population
+    from census_population_prefecture.population
     where sex = '総数'
   ),
   chg as (

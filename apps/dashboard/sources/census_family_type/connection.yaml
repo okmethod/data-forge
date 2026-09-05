@@ -1,6 +1,8 @@
 name: census_family_type
-type: sqlite
+type: duckdb
 options:
-  # 世帯の家族類型（16区分）別 一般世帯数・世帯人員（全国・都道府県／1995〜2020）。市区町村は持たない。
-  # 単一 ID 0003414255 に全国＋県粒度を含む最小構成。data/ は非コミットのためローカル出力前提。
-  filename: ../../../../data/processed/census_family_type.sqlite
+  # 世帯の家族類型（16区分）別 一般世帯数・世帯人員（1995〜2020）。市区町村は持たない。
+  # 排他粒度のため全国=census_family_type_national_timeseries／県=census_family_type_prefecture_timeseries に分離済。
+  # .sql で両 parquet を union し「全国(00000)＋47県」の1論理テーブルへ合成する。
+  # data/ は非コミットのためローカル出力前提。
+  filename: ':memory:'

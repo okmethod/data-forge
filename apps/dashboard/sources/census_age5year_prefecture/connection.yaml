@@ -1,0 +1,8 @@
+name: census_age5year_prefecture
+type: duckdb
+options:
+  # 年齢5歳階級×男女別人口 マクロ系列（1920〜2020）。
+  # 排他粒度のため全国=census_age5year_national_timeseries／県=census_age5year_prefecture_timeseries に分離済。
+  # .sql で両 parquet を union し「全国(00000)＋47県」の1論理テーブルへ合成する（全国はベースライン）。
+  # 市区町村ミクロ系列は census_age5year_municipality 側。data/ は非コミットのためローカル出力前提。
+  filename: ':memory:'

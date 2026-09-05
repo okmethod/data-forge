@@ -14,23 +14,23 @@ sidebar_position: 100
 ## データセット別 出典表記
 
 ```sql all_sources
-select '人口' as dataset, '都道府県' as grain, 1 as ord, m.* from census_prefecture.source_meta m
+select '人口' as dataset, '都道府県' as grain, 1 as ord, m.* from census_population_prefecture.source_meta m
 union all
-select '人口', '市区町村（合併畳み込み済）', 2, m.* from census_city.source_meta m
+select '人口', '市区町村（合併畳み込み済）', 2, m.* from census_population_municipality.source_meta m
 union all
-select '人口', '市区町村（合併畳み込み無し・比較用）', 3, m.* from census_city_raw.source_meta m
+select '人口', '市区町村（合併畳み込み無し・比較用）', 3, m.* from census_population_municipality_raw.source_meta m
 union all
-select '年齢構成（3区分）', '都道府県', 10, m.* from census_age_prefecture.source_meta m
+select '年齢構成（3区分）', '都道府県', 10, m.* from census_age3class_prefecture.source_meta m
 union all
-select '年齢構成（3区分）', '市区町村', 11, m.* from census_age_city.source_meta m
+select '年齢構成（3区分）', '市区町村', 11, m.* from census_age3class_municipality.source_meta m
 union all
-select '年齢構成（5歳階級）', '都道府県', 20, m.* from census_age5.source_meta m
+select '年齢構成（5歳階級）', '都道府県', 20, m.* from census_age5year_prefecture.source_meta m
 union all
-select '年齢構成（5歳階級）', '市区町村', 21, m.* from census_age5_city.source_meta m
+select '年齢構成（5歳階級）', '市区町村', 21, m.* from census_age5year_municipality.source_meta m
 union all
 select '昼夜間人口', '都道府県', 30, m.* from census_daynight_prefecture.source_meta m
 union all
-select '昼夜間人口', '市区町村', 31, m.* from census_daynight_city.source_meta m
+select '昼夜間人口', '市区町村', 31, m.* from census_daynight_municipality.source_meta m
 union all
 select '世帯', '都道府県', 40, m.* from census_households.source_meta m
 union all

@@ -1,7 +1,7 @@
-name: census_daynight_prefecture
+name: census_age3class_prefecture
 type: duckdb
 options:
   # 都道府県粒度＝パイプが県集約まで済ませて export（spatial_rollup の _PREFECTURES で県名一元化）。
-  # read_parquet で精製 parquet を直接参照。市区町村粒度は census_daynight_municipality 側。
+  # read_parquet で精製 parquet を直接参照。市区町村粒度は census_age3class_municipality 側。
   # data/ は非コミットのためローカル出力前提。
   filename: ':memory:'

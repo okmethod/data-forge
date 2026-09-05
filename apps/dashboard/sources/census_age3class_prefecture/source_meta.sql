@@ -7,4 +7,4 @@ select
   source,
   dataset_id,
   citation
-from read_json('../../data/processed/census_daynight_prefecture_timeseries.meta.json')
+from read_json('../../data/processed/census_age3class_prefecture_timeseries.meta.json')

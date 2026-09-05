@@ -1,0 +1,7 @@
+name: census_population_municipality
+type: duckdb
+options:
+  # サンプル市区町村（印西市など）抽出用＝市区町村粒度の折込済み人口時系列。
+  # パイプライン精製 parquet を直接参照（配布正典フォーマット）。読取先は各 .sql の read_parquet が持つ。
+  # data/ は非コミットのためローカル出力前提。都道府県粒度は census_population_prefecture 側。
+  filename: ':memory:'

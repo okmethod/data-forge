@@ -1,5 +1,5 @@
 -- 職業(旧大分類・major10)×男女別就業者数（全国 area_code=00000 ＋47都道府県）。
--- 接続先 census_occupation_major10_timeseries.sqlite は既に全国＋県粒度なので素の射影＋pref_code 派生のみ。
+-- 排他粒度のため全国と県は別 parquet。ここで union し「全国＋県」の1論理テーブルへ合成する。
 -- occupation_code は 100=総数 / 110〜200=職業大分類10区分（200=分類不能の職業＝実カテゴリ）。
 -- 職業構成比（各職業/総数）は配布側（このページ）が算出する。
 -- ⚠ major12 とは occupation_code の意味が違う（同符号でも指す職業が別）ため join・比較不可。
@@ -15,4 +15,8 @@ select
   occupation,
   year,
   workers
-from occupation_major10
+from (
+  select * from read_parquet('../../data/processed/census_occupation_major10_national_timeseries.parquet')
+  union all
+  select * from read_parquet('../../data/processed/census_occupation_major10_prefecture_timeseries.parquet')
+)

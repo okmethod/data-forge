@@ -1,0 +1,7 @@
+name: census_population_prefecture
+type: duckdb
+options:
+  # 都道府県粒度＝パイプが県集約まで済ませて export（spatial_rollup の _PREFECTURES で県名一元化）。
+  # パイプライン精製 parquet を直接参照。読取先は .sql の read_parquet が持つ。
+  # data/ は非コミットのためローカル出力前提。市区町村粒度は census_population_municipality 側。
+  filename: ':memory:'

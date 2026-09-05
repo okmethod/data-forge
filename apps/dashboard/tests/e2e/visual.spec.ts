@@ -6,9 +6,9 @@ import { test, expect, type Page } from "@playwright/test";
  * 全体スクショを test-results/ に保存する。
  * 構成:
  *   - index=概要ランディング
- *   - census=人口
- *   - pyramid=人口ピラミッド(5歳階級)
- *   - aging=高齢化率(3区分)
+ *   - population=人口
+ *   - age_5year=人口ピラミッド(5歳階級)
+ *   - age_3class=高齢化率(3区分)
  *   - daynight=昼夜間
  *   - inzai=印西市ケーススタディ（3指標横断）
  */
@@ -34,7 +34,7 @@ test("トップ（概要ランディング）が描画される", async ({ page 
 });
 
 test("人口ページ（全国→県→サンプル市）が描画される", async ({ page }) => {
-  await page.goto("/census", { waitUntil: "networkidle" });
+  await page.goto("/population", { waitUntil: "networkidle" });
   await waitCharts(page, 4);
 
   await expect(page.getByRole("heading", { name: "全国：総人口の推移" })).toBeVisible();
@@ -42,11 +42,11 @@ test("人口ページ（全国→県→サンプル市）が描画される", as
   // 都道府県 Dropdown の既定が千葉県
   await expect(page.getByText("千葉県").first()).toBeVisible();
 
-  await page.screenshot({ path: "test-results/census-full.png", fullPage: true });
+  await page.screenshot({ path: "test-results/population-full.png", fullPage: true });
 });
 
 test("人口ピラミッドページ（全国→県→サンプル市ドリルダウン）が描画される", async ({ page }) => {
-  await page.goto("/pyramid", { waitUntil: "networkidle" });
+  await page.goto("/age_5year", { waitUntil: "networkidle" });
   await waitCharts(page, 5);
 
   await expect(page.getByRole("heading", { name: /全国：年齢構造の推移/ })).toBeVisible();
@@ -54,18 +54,18 @@ test("人口ピラミッドページ（全国→県→サンプル市ドリル�
   await expect(page.getByRole("heading", { name: /印西市へドリルダウン/ })).toBeVisible();
   await expect(page.getByRole("heading", { name: /100歳以上まで刻む/ })).toBeVisible();
 
-  await page.screenshot({ path: "test-results/pyramid-full.png", fullPage: true });
+  await page.screenshot({ path: "test-results/age_5year-full.png", fullPage: true });
 });
 
 test("高齢化率ページが描画される", async ({ page }) => {
-  await page.goto("/aging", { waitUntil: "networkidle" });
+  await page.goto("/age_3class", { waitUntil: "networkidle" });
   await waitCharts(page, 6);
 
   await expect(page.getByRole("heading", { name: /高齢化率と年齢3区分構成/ })).toBeVisible();
   await expect(page.getByRole("heading", { name: /高齢化率ランキング/ })).toBeVisible();
   await expect(page.getByRole("heading", { name: "サンプル市：千葉県印西市" })).toBeVisible();
 
-  await page.screenshot({ path: "test-results/aging-full.png", fullPage: true });
+  await page.screenshot({ path: "test-results/age_3class-full.png", fullPage: true });
 });
 
 test("昼夜間人口ページが描画される", async ({ page }) => {

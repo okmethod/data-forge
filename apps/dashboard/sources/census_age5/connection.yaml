@@ -1,7 +1,0 @@
-name: census_age5
-type: sqlite
-options:
-  # 年齢5歳階級×男女別人口 全国・都道府県／1920〜2020（population_by_age5 のマクロ系列）。
-  # ※市区町村ミクロ系列は別 stem census_population_by_age5_timeseries.sqlite（未接続・追加時は別 source）。
-  # 3区分版は census_age_prefecture / census_age_city 側。data/ は非コミットのためローカル出力前提。
-  filename: ../../../../data/processed/census_population_by_age5_prefecture_timeseries.sqlite
