@@ -42,24 +42,39 @@ HOUSEHOLD_TYPE = {
 _TAB_HOUSEHOLDS = "040"  # 世帯数（単位: 世帯）
 _TAB_MEMBERS = "050"  # 世帯人員（単位: 人）
 
+# 案A（地理粒度排他）: 単一 ID に同居する 全国(level1) と 47都道府県(level2) を配布時に地理粒度で分離する。
+_NATIONAL_AREA_CODE = "00000"
+
+
+def _scope_area(fact: pl.DataFrame, scope: str) -> pl.DataFrame:
+    """配布スキーマの地理粒度分離（案A）: national=全国のみ / prefecture=47都道府県のみ / all=両方。"""
+    if scope == "all":
+        return fact
+    if scope == "national":
+        return fact.filter(pl.col("area_code") == _NATIONAL_AREA_CODE)
+    if scope == "prefecture":
+        return fact.filter(pl.col("area_code") != _NATIONAL_AREA_CODE)
+    raise ValueError(f"未知の scope: {scope!r}（all/national/prefecture のいずれか）")
+
 
 def _int_value() -> pl.Expr:
     """value（文字列）を Int64 へ。数字以外（"-" 等の欠損記号）は null に落とす。"""
     return pl.col("value").str.replace_all(r"[^0-9-]", "").cast(pl.Int64, strict=False)
 
 
-def clean_households(tidy: pl.DataFrame) -> pl.DataFrame:
+def clean_households(tidy: pl.DataFrame, *, scope: str = "all") -> pl.DataFrame:
     """世帯の種類別 世帯数・世帯人員の tidy → 配布用8列へ写像する。
 
     世帯の種類（cat01）を分類軸に採り、世帯数(tab=040)と世帯人員(tab=050)を
     area×household_type×year の同一行へ横並びに束ねる。DID 行は除外する。
+    scope で配布時の地理粒度を選ぶ（案A・地理粒度排他）: national=全国 / prefecture=47都道府県 / all=両方。
     """
     base = tidy.filter(pl.col("cat01_code").is_in(list(HOUSEHOLD_TYPE)) & ~pl.col("area_code").is_in(_DID_AREA_CODES))
     keys = ["area_code", "area_name", "area_level", "cat01_code", "time_code"]
     households = base.filter(pl.col("tab_code") == _TAB_HOUSEHOLDS).select(*keys, _int_value().alias("households"))
     members = base.filter(pl.col("tab_code") == _TAB_MEMBERS).select(*keys, _int_value().alias("household_members"))
     fact = households.join(members, on=keys, how="left")
-    return (
+    result = (
         fact.select(
             pl.col("area_code"),
             pl.col("area_name"),
@@ -74,3 +89,4 @@ def clean_households(tidy: pl.DataFrame) -> pl.DataFrame:
         .with_columns((pl.col("area_level") != _OBSOLETE_AREA_LEVEL).alias("is_current"))
         .sort("area_code", "household_type_code", "year")
     )
+    return _scope_area(result, scope)

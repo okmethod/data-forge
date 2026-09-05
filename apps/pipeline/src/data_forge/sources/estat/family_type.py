@@ -80,18 +80,33 @@ _FT_UNKNOWN_LEVEL = 2
 _TAB_HOUSEHOLDS = "6"  # 一般世帯数（単位: 世帯）
 _TAB_MEMBERS = "7"  # 一般世帯人員（単位: 人）
 
+# 案A（地理粒度排他）: 単一 ID に同居する 全国(level1) と 47都道府県(level2) を配布時に地理粒度で分離する。
+_NATIONAL_AREA_CODE = "00000"
+
+
+def _scope_area(fact: pl.DataFrame, scope: str) -> pl.DataFrame:
+    """配布スキーマの地理粒度分離（案A）: national=全国のみ / prefecture=47都道府県のみ / all=両方。"""
+    if scope == "all":
+        return fact
+    if scope == "national":
+        return fact.filter(pl.col("area_code") == _NATIONAL_AREA_CODE)
+    if scope == "prefecture":
+        return fact.filter(pl.col("area_code") != _NATIONAL_AREA_CODE)
+    raise ValueError(f"未知の scope: {scope!r}（all/national/prefecture のいずれか）")
+
 
 def _int_value() -> pl.Expr:
     """value（文字列）を Int64 へ。数字以外（"-" 等の欠損記号）は null に落とす。"""
     return pl.col("value").str.replace_all(r"[^0-9-]", "").cast(pl.Int64, strict=False)
 
 
-def clean_family_type(tidy: pl.DataFrame) -> pl.DataFrame:
+def clean_family_type(tidy: pl.DataFrame, *, scope: str = "all") -> pl.DataFrame:
     """世帯の家族類型別 世帯数・世帯人員の tidy → 配布用9列へ写像する。
 
     家族類型（cat01）を分類軸に採り、一般世帯数(tab=6)と一般世帯人員(tab=7)を
     area×family_type×year の同一行へ横並びに束ねる。ツリーの階層は family_type_level に保持し、
     最後に家族類型不詳(999)を導出注入する。
+    scope で配布時の地理粒度を選ぶ（案A・地理粒度排他）: national=全国 / prefecture=47都道府県 / all=両方。
     """
     base = tidy.filter(pl.col("cat01_code").is_in(list(FAMILY_TYPE)))
     keys = ["area_code", "area_name", "area_level", "cat01_code", "cat01_level", "time_code"]
@@ -113,7 +128,8 @@ def clean_family_type(tidy: pl.DataFrame) -> pl.DataFrame:
         )
         .with_columns((pl.col("area_level") != _OBSOLETE_AREA_LEVEL).alias("is_current"))
     )
-    return _inject_unknown(fact).sort("area_code", "family_type_code", "year")
+    result = _inject_unknown(fact).sort("area_code", "family_type_code", "year")
+    return _scope_area(result, scope)
 
 
 def _inject_unknown(fact: pl.DataFrame) -> pl.DataFrame:

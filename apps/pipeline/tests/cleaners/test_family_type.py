@@ -129,3 +129,26 @@ def test_prefecture_keeps_area_and_null_on_missing_measure():
     assert hokkaido["household_members"] is None  # tab=7 行なし → 左結合で null
     aomori = df.filter(pl.col("area_code") == "02000").row(0, named=True)
     assert aomori["households"] is None  # 欠損記号 "-" は null
+
+
+def _tidy_mixed() -> pl.DataFrame:
+    # 全国(00000)＋都道府県(01000) が同居する single-ID を模す（案A の scope 分離検証用）。
+    return pl.DataFrame(
+        [
+            _row(tab="6", ftype="100", value=100, level="1"),
+            _row(tab="6", ftype="100", value=5, level="1", area="01000", area_name="北海道", area_level="2"),
+        ]
+    )
+
+
+def test_scope_prefecture_drops_national():
+    """scope="prefecture" は全国(00000)を落とし47都道府県のみを残す（案A・地理粒度排他）。"""
+    df = family_type.clean_family_type(_tidy_mixed(), scope="prefecture")
+    assert df.filter(pl.col("area_code") == "00000").height == 0
+    assert set(df.get_column("area_code").to_list()) == {"01000"}
+
+
+def test_scope_national_keeps_only_national():
+    """scope="national" は全国(00000)のみを残す。"""
+    df = family_type.clean_family_type(_tidy_mixed(), scope="national")
+    assert set(df.get_column("area_code").to_list()) == {"00000"}

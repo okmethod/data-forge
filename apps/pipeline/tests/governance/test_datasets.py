@@ -63,8 +63,8 @@ def test_all_table_names_are_registered_families() -> None:
 def test_age5_prefecture_timeseries_is_projected_flow() -> None:
     """5歳階級の県世紀時系列は射影フロー（ProjectedDataset）＝縫合専用の機構を持たない。
 
-    既製の時系列帳票（回次跨・全国＋県）を area union するだけなので、default_join（正規化モード）も
-    preliminary_upstreams（速報 splice）も持たないことを固定する。
+    既製の時系列帳票（回次跨・県のみ＝案Aで全国は _national_timeseries へ分離）を area 射影するだけなので、
+    default_join（正規化モード）も preliminary_upstreams（速報 splice）も持たないことを固定する。
     市区町村ミクロ（age5year_municipality_timeseries）は逆に合併畳込 Stitched（aggregate_to_base）である。
     """
     ds = get_dataset("age5year_prefecture_timeseries")
@@ -131,6 +131,38 @@ def test_age5_municipality_reiwa_tables_override_muni_levels() -> None:
     for key in keys:
         ds = get_dataset(key)
         assert ds.muni_levels == frozenset({4, 6}), f"{key}: 令和型表は muni_levels={{4,6}} 必須"
+
+
+# 案A（地理粒度排他）: 全国と県を別配布に分ける family（射影＝別 ID の national/prefecture パーティション）。
+_GEO_SPLIT_PROJECTED = ("age5year", "labor_force", "industry", "occupation_major12", "occupation_major10")
+# 案A: 全国と県を別配布に分ける family（single-ID を cleaner の scope で分離）。
+_GEO_SPLIT_SINGLE_ID = ("households", "family_type")
+
+
+def test_projected_geo_split_is_disjoint() -> None:
+    """案A: 射影系の _prefecture_timeseries は県のみ・_national_timeseries は全国のみ（同居させない）。
+
+    以前は _prefecture_timeseries が全国＋県を union していたが、地理粒度排他（案A）で全国を剥離し
+    _national_timeseries を新設した。両者は disjoint な単一パーティション upstream を射影するだけ。
+    """
+    for fam in _GEO_SPLIT_PROJECTED:
+        pref = get_dataset(f"{fam}_prefecture_timeseries")
+        nat = get_dataset(f"{fam}_national_timeseries")
+        assert isinstance(pref, ProjectedDataset), f"{fam}_prefecture_timeseries は射影"
+        assert isinstance(nat, ProjectedDataset), f"{fam}_national_timeseries は射影"
+        assert pref.upstreams == [f"{fam}_prefecture"], f"{fam}: 県ビューは県 upstream のみ"
+        assert nat.upstreams == [f"{fam}_national"], f"{fam}: 全国ビューは全国 upstream のみ"
+        assert pref.table_name == nat.table_name == fam
+
+
+def test_single_id_geo_split_shares_source_and_family() -> None:
+    """案A: single-ID fact の全国/県分離は同一 statsDataId を scope 違いで2配布にする（fetch 共有）。"""
+    for fam in _GEO_SPLIT_SINGLE_ID:
+        pref = get_dataset(f"{fam}_prefecture_timeseries")
+        nat = get_dataset(f"{fam}_national_timeseries")
+        assert isinstance(pref, Dataset) and isinstance(nat, Dataset)
+        assert pref.source_params["stats_data_id"] == nat.source_params["stats_data_id"]
+        assert pref.table_name == nat.table_name == fam
 
 
 def test_projected_datasets_reference_existing_base_upstreams() -> None:
