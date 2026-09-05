@@ -17,7 +17,7 @@ import polars as pl
 from data_forge.area import aggregate as area_aggregate
 from data_forge.area import atoms as area_atoms
 from data_forge.area import events as area_events
-from data_forge.area import spatial_rollup as area_spatial
+from data_forge.area import spatial_rollup as area_spatial_rollup
 from data_forge.datasets import Dataset, ProjectedDataset, StitchedDataset, get_dataset
 from data_forge.derive.combine import combine_years, union_areas
 from data_forge.meta import SourceMeta, combine_meta
@@ -111,7 +111,7 @@ def _load_stitched(
     elif join in _SPACE_ROLLUP_JOINS:
         # 空間軸＝行政集約（events 非依存・合併 rollup と直交）。県プレフィックスで束ねる。
         atom_fact, metas = _combine_atoms(ds, refresh=refresh)
-        df = area_spatial.aggregate_to_admin(atom_fact, level=join)
+        df = area_spatial_rollup.aggregate_to_admin(atom_fact, level=join)
     else:
         # combine のみ（union/intersection/grid）。アトム抽出なしで各年 fact を直接結合。
         frames, metas = _upstream_frames(ds, refresh=refresh)

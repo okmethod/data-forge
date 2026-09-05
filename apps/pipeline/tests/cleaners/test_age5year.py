@@ -3,7 +3,7 @@
 全国表(area軸なし→合成)と都道府県表(area軸あり)の写像・共通粒度の絞り込み
 （85+終端／全国のみ細分320-370と再掲380-400を捨てる）・不詳補完値(time 000010)の除外・
 年齢不詳の導出注入（Σ5歳階級+不詳==総数）を手組み tidy で検証する。
-マクロ系列は 47県固定＝合併なし・area master 非経由ゆえ、age5.py が保存則を恒等成立させる。
+マクロ系列は 47県固定＝合併なし・area master 非経由ゆえ、age5year.py が保存則を恒等成立させる。
 
 検証項目（関数名 ⇄ 何を確かめるか）:
     test_national_schema_and_area_synthesis
@@ -21,7 +21,7 @@
 
 import polars as pl
 
-from data_forge.sources.estat import age5
+from data_forge.sources.estat import age5year
 
 # 男女コード（cat01）: 100=総数/110=男/120=女。年齢コード（cat02）は e-Stat のまま。
 _SEX = {"総数": "100", "男": "110", "女": "120"}
@@ -81,7 +81,7 @@ def _national_tidy() -> pl.DataFrame:
 
 
 def test_national_schema_and_area_synthesis():
-    df = age5.clean_national(_national_tidy())
+    df = age5year.clean_national(_national_tidy())
     assert df.columns == _COLUMNS
     nat = df.filter((pl.col("sex_code") == "0") & (pl.col("age_class_code") == "100")).row(0, named=True)
     assert nat["area_code"] == "00000"  # area 軸なし → 全国を合成
@@ -93,7 +93,7 @@ def test_national_schema_and_area_synthesis():
 
 
 def test_national_drops_finer_and_recategory_and_imputed():
-    df = age5.clean_national(_national_tidy())
+    df = age5year.clean_national(_national_tidy())
     codes = set(df.filter(pl.col("sex_code") == "0")["age_class_code"].to_list())
     # 85+細分(320)・再掲(380)は採らない。85+(310)は残る。
     assert "320" not in codes and "380" not in codes
@@ -106,7 +106,7 @@ def test_national_drops_finer_and_recategory_and_imputed():
 
 
 def test_national_injects_age_unknown():
-    df = age5.clean_national(_national_tidy())
+    df = age5year.clean_national(_national_tidy())
     unknown = df.filter((pl.col("sex_code") == "0") & (pl.col("age_class_code") == "999")).row(0, named=True)
     assert unknown["population"] == 5  # 総数100 − Σ5歳階級95
     assert unknown["age_class"] == "年齢不詳"
@@ -117,7 +117,7 @@ def test_national_injects_age_unknown():
 
 
 def test_national_sex_conservation():
-    df = age5.clean_national(_national_tidy())
+    df = age5year.clean_national(_national_tidy())
     by_sex = {
         r["sex_code"]: r["population"] for r in df.filter(pl.col("age_class_code") == "100").iter_rows(named=True)
     }
@@ -132,7 +132,7 @@ def test_prefecture_keeps_area_and_has_no_national():
             _row(sex="総数", age="310", value=70, area="01000"),
         ]
     )
-    df = age5.clean_prefecture(tidy)
+    df = age5year.clean_prefecture(tidy)
     assert df.columns == _COLUMNS
     row = df.filter(pl.col("age_class_code") == "100").row(0, named=True)
     assert row["area_code"] == "01000"  # area 軸をそのまま採る（全国は合成しない）

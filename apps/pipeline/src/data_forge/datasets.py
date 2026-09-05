@@ -26,8 +26,8 @@ from typing import Any
 import polars as pl
 
 from data_forge.sources.estat import (
-    age5,
-    age5_municipality,
+    age5year,
+    age5year_municipality,
     daynight,
     family_type,
     households,
@@ -53,6 +53,7 @@ class Dataset:
     cleaner: Callable[[pl.DataFrame], pl.DataFrame]  # tidy DF → 配布用 DF
     stem: str  # 出力ファイル名の語幹
     table_name: str  # SQLite テーブル名
+    universe: str  # 母集団メタ（population/households/employed）
     index_columns: list[str] = field(default_factory=list)
     # アトム抽出時の市区町村レベルの明示上書き（None なら年から自動判定）。同じ年でも
     # e-Stat 製品ごとに level の意味が違う表（例: age5 ミクロの 2000＝令和型 level4/6）で使う。
@@ -81,6 +82,7 @@ class StitchedDataset:
     title: str  # 結合表の出典メタ用タイトル
     stem: str
     table_name: str
+    universe: str  # 母集団メタ（population/households/employed）
     index_columns: list[str] = field(default_factory=list)
     default_join: str = "union"
     grain: list[str] = field(default_factory=lambda: ["area_code", "sex_code", "year"])
@@ -104,6 +106,7 @@ class ProjectedDataset:
     title: str
     stem: str
     table_name: str
+    universe: str  # 母集団メタ（population/households/employed）
     index_columns: list[str] = field(default_factory=list)
     grain: list[str] = field(default_factory=lambda: ["area_code", "sex_code", "year"])
 
@@ -118,9 +121,9 @@ DatasetEntry = Dataset | StitchedDataset | ProjectedDataset
 FAMILIES: frozenset[str] = frozenset(
     {
         "population",  # 男女別人口
-        "population_by_age",  # 年齢3区分×男女別人口
-        "population_by_age5",  # 年齢5歳階級×男女別人口（市区町村=ミクロ／県世紀=マクロ 同居）
-        "daynight_population",  # 昼夜間人口
+        "age3class",  # 年齢3区分×男女別人口
+        "age5year",  # 年齢5歳階級×男女別人口（市区町村=ミクロ／県世紀=マクロ 同居）
+        "daynight",  # 昼夜間人口
         "households",  # 世帯の種類別 世帯数・世帯人員
         "family_type",  # 家族類型16区分別 世帯数・世帯人員
         "labor_force",  # 労働力状態3区分×男女別人口
@@ -135,135 +138,147 @@ FAMILIES: frozenset[str] = frozenset(
 # 軸構造＝population.py docstring／statsDataId 一覧＝docs/distributions/population.md。
 # 単年 Dataset（古い順）。cleaner は年（テーブル世代）ごとに別関数で同一8列へ写像する。
 _POPULATION: dict[str, DatasetEntry] = {
-    "population_1980": Dataset(
-        key="population_1980",
+    "population_municipality_1980": Dataset(
+        key="population_municipality_1980",
         source="estat",
         source_params={"stats_data_id": "0003412413"},
         cleaner=population.clean_1980,
-        stem="census_population_1980",
+        stem="census_population_municipality_1980",
         table_name="population",
+        universe="population",
         index_columns=["area_code", "sex_code"],
     ),
-    "population_1985": Dataset(
-        key="population_1985",
+    "population_municipality_1985": Dataset(
+        key="population_municipality_1985",
         source="estat",
         source_params={"stats_data_id": "0003412414"},
         cleaner=population.clean_1985,
-        stem="census_population_1985",
+        stem="census_population_municipality_1985",
         table_name="population",
+        universe="population",
         index_columns=["area_code", "sex_code"],
     ),
-    "population_1990": Dataset(
-        key="population_1990",
+    "population_municipality_1990": Dataset(
+        key="population_municipality_1990",
         source="estat",
         source_params={"stats_data_id": "0003412415"},
         cleaner=population.clean_1990,
-        stem="census_population_1990",
+        stem="census_population_municipality_1990",
         table_name="population",
+        universe="population",
         index_columns=["area_code", "sex_code"],
     ),
-    "population_1995": Dataset(
-        key="population_1995",
+    "population_municipality_1995": Dataset(
+        key="population_municipality_1995",
         source="estat",
         source_params={"stats_data_id": "0003412416"},
         cleaner=population.clean_1995,
-        stem="census_population_1995",
+        stem="census_population_municipality_1995",
         table_name="population",
+        universe="population",
         index_columns=["area_code", "sex_code"],
     ),
-    "population_2000": Dataset(
-        key="population_2000",
+    "population_municipality_2000": Dataset(
+        key="population_municipality_2000",
         source="estat",
         source_params={"stats_data_id": "0003391075"},
         cleaner=population.clean_2000,
-        stem="census_population_2000",
+        stem="census_population_municipality_2000",
         table_name="population",
+        universe="population",
         index_columns=["area_code", "sex_code"],
     ),
-    "population_2005": Dataset(
-        key="population_2005",
+    "population_municipality_2005": Dataset(
+        key="population_municipality_2005",
         source="estat",
         source_params={"stats_data_id": "0003408216"},
         cleaner=population.clean_2005,
-        stem="census_population_2005",
+        stem="census_population_municipality_2005",
         table_name="population",
+        universe="population",
         index_columns=["area_code", "sex_code"],
     ),
-    "population_2010": Dataset(
-        key="population_2010",
+    "population_municipality_2010": Dataset(
+        key="population_municipality_2010",
         source="estat",
         source_params={"stats_data_id": "0003038587"},
         cleaner=population.clean_2010,
-        stem="census_population_2010",
+        stem="census_population_municipality_2010",
         table_name="population",
+        universe="population",
         index_columns=["area_code", "sex_code"],
     ),
-    "population_2015": Dataset(
-        key="population_2015",
+    "population_municipality_2015": Dataset(
+        key="population_municipality_2015",
         source="estat",
         source_params={"stats_data_id": "0003149040"},
         cleaner=population.clean_2015,
-        stem="census_population_2015",
+        stem="census_population_municipality_2015",
         table_name="population",
+        universe="population",
         index_columns=["area_code", "sex_code"],
     ),
-    "population_2020": Dataset(
-        key="population_2020",
+    "population_municipality_2020": Dataset(
+        key="population_municipality_2020",
         source="estat",
         source_params={"stats_data_id": "0003445078"},
         cleaner=population.clean_2020,
-        stem="census_population_2020",
+        stem="census_population_municipality_2020",
         table_name="population",
+        universe="population",
         index_columns=["area_code", "sex_code"],
     ),
     # 速報（総人口のみ）。単体では8列を出力し、時系列へは preliminary_upstreams 経由で合流する。
-    "population_2025_preliminary": Dataset(
-        key="population_2025_preliminary",
+    "population_municipality_2025_preliminary": Dataset(
+        key="population_municipality_2025_preliminary",
         source="estat",
         source_params={"stats_data_id": "0004050397"},
         cleaner=population.clean_2025_preliminary,
-        stem="census_population_2025_preliminary",
+        stem="census_population_municipality_2025_preliminary",
         table_name="population",
+        universe="population",
         index_columns=["area_code", "sex_code"],
     ),
     # 派生: 男女別人口の時系列（配布正典＝合併畳み込み済み）。2025 速報を preliminary で合流。
-    "population_timeseries": StitchedDataset(
-        key="population_timeseries",
+    "population_municipality_timeseries": StitchedDataset(
+        key="population_municipality_timeseries",
         upstreams=[
-            "population_1980",
-            "population_1985",
-            "population_1990",
-            "population_1995",
-            "population_2000",
-            "population_2005",
-            "population_2010",
-            "population_2015",
-            "population_2020",
+            "population_municipality_1980",
+            "population_municipality_1985",
+            "population_municipality_1990",
+            "population_municipality_1995",
+            "population_municipality_2000",
+            "population_municipality_2005",
+            "population_municipality_2010",
+            "population_municipality_2015",
+            "population_municipality_2020",
         ],
         title="国勢調査 男女別人口 時系列（1980年・1985年・1990年・1995年・2000年・2005年・2010年・2015年・2020年）",
-        stem="census_population_timeseries",
+        stem="census_population_municipality_timeseries",
         table_name="population",
+        universe="population",
         index_columns=["area_code", "sex_code", "year"],
         default_join="aggregate_to_base",
-        preliminary_upstreams=["population_2025_preliminary"],
+        preliminary_upstreams=["population_municipality_2025_preliminary"],
     ),
     # 生（畳み込み無し）版＝census_raw ダッシュボードの合併畳込比較デモ専用。upstreams は上と同じ。
-    "population_timeseries_raw": StitchedDataset(
-        key="population_timeseries_raw",
+    "population_municipality_timeseries_raw": StitchedDataset(
+        key="population_municipality_timeseries_raw",
         upstreams=[
-            "population_1980",
-            "population_1985",
-            "population_1990",
-            "population_1995",
-            "population_2000",
-            "population_2005",
-            "population_2010",
-            "population_2015",
-            "population_2020",
+            "population_municipality_1980",
+            "population_municipality_1985",
+            "population_municipality_1990",
+            "population_municipality_1995",
+            "population_municipality_2000",
+            "population_municipality_2005",
+            "population_municipality_2010",
+            "population_municipality_2015",
+            "population_municipality_2020",
         ],
         title="国勢調査 男女別人口 時系列（1980年〜2020年・畳み込み無し＝各年当時の境界のまま）",
-        stem="census_population_timeseries_raw",
+        stem="census_population_municipality_timeseries_raw",
         table_name="population",
+        universe="population",
         index_columns=["area_code", "sex_code", "year"],
         default_join="union",
     ),
@@ -278,6 +293,7 @@ _POPULATION: dict[str, DatasetEntry] = {
         cleaner=population.clean_population_prefecture,
         stem="census_population_prefecture",
         table_name="population",
+        universe="population",
         index_columns=["area_code", "sex_code", "year"],
     ),
     # 派生: 都道府県 世紀マクロ の配布正典（1920〜2020 ＋ 2025速報）。
@@ -291,25 +307,27 @@ _POPULATION: dict[str, DatasetEntry] = {
         title="国勢調査 男女別人口 都道府県別時系列（1920年〜2020年 5年間隔 ＋2025速報）",
         stem="census_population_prefecture_timeseries",
         table_name="population",
+        universe="population",
         index_columns=["area_code", "sex_code", "year"],
         default_join="union",
-        preliminary_upstreams=["population_2025_preliminary"],
+        preliminary_upstreams=["population_municipality_2025_preliminary"],
     ),
 }
 
 
-# === population_by_age（年齢3区分×男女別人口）==============================
-# 軸構造＝population.py（clean_population_by_age）／一覧＝docs/distributions/population_by_age.md。
+# === age3class（年齢3区分×男女別人口）==============================
+# 軸構造＝population.py（clean_age3class）／一覧＝docs/distributions/age3class.md。
 # 全年同型のため cleaner は全年 1 個。年齢不詳は cleaner 側で導出注入する。
 _POPULATION_BY_AGE: dict[str, DatasetEntry] = {
     **{
-        f"population_by_age_{year}": Dataset(
-            key=f"population_by_age_{year}",
+        f"age3class_municipality_{year}": Dataset(
+            key=f"age3class_municipality_{year}",
             source="estat",
             source_params={"stats_data_id": sid},
             cleaner=population.clean_population_by_age,
-            stem=f"census_population_by_age_{year}",
-            table_name="population_by_age",
+            stem=f"census_age3class_municipality_{year}",
+            table_name="age3class",
+            universe="population",
             index_columns=["area_code", "sex_code", "age_class_code"],
         )
         for year, sid in {
@@ -325,12 +343,13 @@ _POPULATION_BY_AGE: dict[str, DatasetEntry] = {
         }.items()
     },
     # 派生: 年齢3区分×男女別人口の時系列（配布正典＝合併畳み込み済み）。
-    "population_by_age_timeseries": StitchedDataset(
-        key="population_by_age_timeseries",
-        upstreams=[f"population_by_age_{y}" for y in (1980, 1985, 1990, 1995, 2000, 2005, 2010, 2015, 2020)],
+    "age3class_municipality_timeseries": StitchedDataset(
+        key="age3class_municipality_timeseries",
+        upstreams=[f"age3class_municipality_{y}" for y in (1980, 1985, 1990, 1995, 2000, 2005, 2010, 2015, 2020)],
         title="国勢調査 年齢3区分×男女別人口 時系列（1980年〜2020年 5年間隔）",
-        stem="census_population_by_age_timeseries",
-        table_name="population_by_age",
+        stem="census_age3class_municipality_timeseries",
+        table_name="age3class",
+        universe="population",
         index_columns=["area_code", "sex_code", "age_class_code", "year"],
         grain=["area_code", "sex_code", "age_class_code", "year"],
         default_join="aggregate_to_base",
@@ -338,43 +357,46 @@ _POPULATION_BY_AGE: dict[str, DatasetEntry] = {
     # 世紀マクロ（回次跨）: 単一 ID「年齢（3区分）別人口 － 全国，都道府県（大正9年～令和2年）」。
     # ミクロ（市区町村・各回別ID・1980〜）とは別ソースの都道府県マクロ（age5 の _prefecture と同型）。
     # 本表は男女軸を持たない（総数のみ）。全国は落とし47県のみ出す（cleaner 参照）。
-    "population_by_age_prefecture": Dataset(
-        key="population_by_age_prefecture",
+    "age3class_prefecture": Dataset(
+        key="age3class_prefecture",
         source="estat",
         source_params={"stats_data_id": "0003410383"},
         cleaner=population.clean_by_age_prefecture,
-        stem="census_population_by_age_prefecture",
-        table_name="population_by_age",
+        stem="census_age3class_prefecture",
+        table_name="age3class",
+        universe="population",
         index_columns=["area_code", "sex_code", "age_class_code", "year"],
     ),
     # 派生（射影フロー）: 都道府県 世紀マクロ の配布正典（1920〜2020・総数のみ）。
     # 旧・空間rollup 版（市区町村ミクロ→県・1980〜）から回次跨 raw 長期へ張り替え済（戦略B）。
     # 出力シェイプ（47県・全国行なし・総数のみ）は旧版と同一＝ダッシュボードはドロップイン。
-    "population_by_age_prefecture_timeseries": ProjectedDataset(
-        key="population_by_age_prefecture_timeseries",
-        upstreams=["population_by_age_prefecture"],
+    "age3class_prefecture_timeseries": ProjectedDataset(
+        key="age3class_prefecture_timeseries",
+        upstreams=["age3class_prefecture"],
         title="国勢調査 年齢3区分別人口（総数）都道府県別時系列（1920年〜2020年 5年間隔）",
-        stem="census_population_by_age_prefecture_timeseries",
-        table_name="population_by_age",
+        stem="census_age3class_prefecture_timeseries",
+        table_name="age3class",
+        universe="population",
         index_columns=["area_code", "sex_code", "age_class_code", "year"],
         grain=["area_code", "sex_code", "age_class_code", "year"],
     ),
 }
 
 
-# === daynight_population（昼夜間人口＝従業地・通学地集計）====================
-# 軸構造＝daynight.py／一覧＝docs/distributions/daynight_population.md。
+# === daynight（昼夜間人口＝従業地・通学地集計）====================
+# 軸構造＝daynight.py／一覧＝docs/distributions/daynight.md。
 # 1990〜2020（1990 が最古。それ以前へ遡れない根拠＝e-Stat 実検索結果は docs 参照）。
 # grain は sex ではなく daynight_code。cleaner は全年 1 個。
 _DAYNIGHT_POPULATION: dict[str, DatasetEntry] = {
     **{
-        f"daynight_population_{year}": Dataset(
-            key=f"daynight_population_{year}",
+        f"daynight_municipality_{year}": Dataset(
+            key=f"daynight_municipality_{year}",
             source="estat",
             source_params={"stats_data_id": sid},
             cleaner=daynight.clean_daynight_population,
-            stem=f"census_daynight_population_{year}",
-            table_name="daynight_population",
+            stem=f"census_daynight_municipality_{year}",
+            table_name="daynight",
+            universe="population",
             index_columns=["area_code", "daynight_code"],
         )
         for year, sid in {
@@ -388,23 +410,25 @@ _DAYNIGHT_POPULATION: dict[str, DatasetEntry] = {
         }.items()
     },
     # 派生: 昼夜間人口の時系列（配布正典＝合併畳み込み済み）。
-    "daynight_population_timeseries": StitchedDataset(
-        key="daynight_population_timeseries",
-        upstreams=[f"daynight_population_{y}" for y in (1990, 1995, 2000, 2005, 2010, 2015, 2020)],
+    "daynight_municipality_timeseries": StitchedDataset(
+        key="daynight_municipality_timeseries",
+        upstreams=[f"daynight_municipality_{y}" for y in (1990, 1995, 2000, 2005, 2010, 2015, 2020)],
         title="国勢調査 昼夜間人口（常住地・従業地通学地別人口）時系列（1990年〜2020年 5年間隔）",
-        stem="census_daynight_population_timeseries",
-        table_name="daynight_population",
+        stem="census_daynight_municipality_timeseries",
+        table_name="daynight",
+        universe="population",
         index_columns=["area_code", "daynight_code", "year"],
         grain=["area_code", "daynight_code", "year"],
         default_join="aggregate_to_base",
     ),
     # 派生（空間軸）: 都道府県別。
-    "daynight_population_prefecture_timeseries": StitchedDataset(
-        key="daynight_population_prefecture_timeseries",
-        upstreams=[f"daynight_population_{y}" for y in (1990, 1995, 2000, 2005, 2010, 2015, 2020)],
+    "daynight_prefecture_timeseries": StitchedDataset(
+        key="daynight_prefecture_timeseries",
+        upstreams=[f"daynight_municipality_{y}" for y in (1990, 1995, 2000, 2005, 2010, 2015, 2020)],
         title="国勢調査 昼夜間人口（常住地・従業地通学地別人口）都道府県別時系列（1990年〜2020年 5年間隔）",
-        stem="census_daynight_population_prefecture_timeseries",
-        table_name="daynight_population",
+        stem="census_daynight_prefecture_timeseries",
+        table_name="daynight",
+        universe="population",
         index_columns=["area_code", "daynight_code", "year"],
         grain=["area_code", "daynight_code", "year"],
         default_join="prefecture",
@@ -412,8 +436,8 @@ _DAYNIGHT_POPULATION: dict[str, DatasetEntry] = {
 }
 
 
-# === population_by_age5（年齢5歳階級×男女別人口）============================
-# 1 family に2系列が同居する（table_name はどちらも bare "population_by_age5"）:
+# === age5year（年齢5歳階級×男女別人口）============================
+# 1 family に2系列が同居する（table_name はどちらも bare "age5year"）:
 #   (1) 市区町村＝ミクロ（回次別・各回別 statsDataId・2010-2020・合併畳込）… _<year> base ＋ _timeseries
 #   (2) 全国/都道府県＝世紀マクロ（回次跨・単一 ID・1920-2020）… _national/_prefecture base ＋ _prefecture_timeseries
 # 粒度は key suffix で表し family名（table_name）には持たせない（命名規約＝モジュール docstring）。
@@ -421,31 +445,34 @@ _DAYNIGHT_POPULATION: dict[str, DatasetEntry] = {
 
 # --- (2) 世紀マクロ（回次跨）: 単一 ID で一世紀。全国表は area 軸なし→合成（clean_national）。--------------
 _POPULATION_BY_AGE5: dict[str, DatasetEntry] = {
-    "population_by_age5_national": Dataset(
-        key="population_by_age5_national",
+    "age5year_national": Dataset(
+        key="age5year_national",
         source="estat",
         source_params={"stats_data_id": "0003410380"},
-        cleaner=age5.clean_national,
-        stem="census_population_by_age5_national",
-        table_name="population_by_age5",
+        cleaner=age5year.clean_national,
+        stem="census_age5year_national",
+        table_name="age5year",
+        universe="population",
         index_columns=["sex_code", "age_class_code", "year"],
     ),
-    "population_by_age5_prefecture": Dataset(
-        key="population_by_age5_prefecture",
+    "age5year_prefecture": Dataset(
+        key="age5year_prefecture",
         source="estat",
         source_params={"stats_data_id": "0003410381"},
-        cleaner=age5.clean_prefecture,
-        stem="census_population_by_age5_prefecture",
-        table_name="population_by_age5",
+        cleaner=age5year.clean_prefecture,
+        stem="census_age5year_prefecture",
+        table_name="age5year",
+        universe="population",
         index_columns=["area_code", "sex_code", "age_class_code", "year"],
     ),
     # 派生（射影フロー）: 全国＋47都道府県を area 軸で縦結合した県粒度 1920〜2020 時系列（世紀マクロ の配布正典）。
-    "population_by_age5_prefecture_timeseries": ProjectedDataset(
-        key="population_by_age5_prefecture_timeseries",
-        upstreams=["population_by_age5_national", "population_by_age5_prefecture"],
+    "age5year_prefecture_timeseries": ProjectedDataset(
+        key="age5year_prefecture_timeseries",
+        upstreams=["age5year_national", "age5year_prefecture"],
         title="国勢調査 年齢5歳階級×男女別人口 全国・都道府県別時系列（1920年〜2020年 5年間隔）",
-        stem="census_population_by_age5_prefecture_timeseries",
-        table_name="population_by_age5",
+        stem="census_age5year_prefecture_timeseries",
+        table_name="age5year",
+        universe="population",
         index_columns=["area_code", "sex_code", "age_class_code", "year"],
         grain=["area_code", "sex_code", "age_class_code", "year"],
     ),
@@ -475,17 +502,17 @@ _AGE5_2000_CODES = ",".join(["T01", *[str(200 + i) for i in range(20)], "500", "
 _AGE5_2005_CODES = ",".join(["T01", *[str(200 + i) for i in range(20)], "500"])
 _POPULATION_BY_AGE5_MUNI: dict[str, DatasetEntry] = {}
 for _year, _sid, _cleaner, _params, _levels in (
-    (1980, "0000030127", age5_municipality.clean_1980, {}, {4, 6}),
-    (1985, "0000030449", age5_municipality.clean_1985, {}, {4, 6}),
-    (1990, "0000031405", age5_municipality.clean_1990, {}, {4, 6}),
-    (1995, "0000032223", age5_municipality.clean_1995, {}, {4, 6}),
-    (2000, "0000032965", age5_municipality.clean_2000, {"cdCat01": "00700", "cdCat03": _AGE5_2000_CODES}, {4, 6}),
-    (2005, "0000033783", age5_municipality.clean_2005, {"cdCat01": "00700", "cdCat03": _AGE5_2005_CODES}, {4, 6}),
-    (2010, "0003038591", age5_municipality.clean_2010, {}, None),
-    (2015, "0003149862", age5_municipality.clean_2015, {}, None),
-    (2020, "0003445162", age5_municipality.clean_2020, {}, None),
+    (1980, "0000030127", age5year_municipality.clean_1980, {}, {4, 6}),
+    (1985, "0000030449", age5year_municipality.clean_1985, {}, {4, 6}),
+    (1990, "0000031405", age5year_municipality.clean_1990, {}, {4, 6}),
+    (1995, "0000032223", age5year_municipality.clean_1995, {}, {4, 6}),
+    (2000, "0000032965", age5year_municipality.clean_2000, {"cdCat01": "00700", "cdCat03": _AGE5_2000_CODES}, {4, 6}),
+    (2005, "0000033783", age5year_municipality.clean_2005, {"cdCat01": "00700", "cdCat03": _AGE5_2005_CODES}, {4, 6}),
+    (2010, "0003038591", age5year_municipality.clean_2010, {}, None),
+    (2015, "0003149862", age5year_municipality.clean_2015, {}, None),
+    (2020, "0003445162", age5year_municipality.clean_2020, {}, None),
 ):
-    _key = f"population_by_age5_{_year}"
+    _key = f"age5year_municipality_{_year}"
     _source_params: dict[str, Any] = {"stats_data_id": _sid}
     if _params:
         _source_params["filters"] = _params
@@ -494,18 +521,19 @@ for _year, _sid, _cleaner, _params, _levels in (
         source="estat",
         source_params=_source_params,
         cleaner=_cleaner,
-        stem=f"census_population_by_age5_{_year}",
-        table_name="population_by_age5",
+        stem=f"census_age5year_municipality_{_year}",
+        table_name="age5year",
+        universe="population",
         index_columns=_POPULATION_BY_AGE5_MUNI_GRAIN,
         muni_levels=frozenset(_levels) if _levels else None,
     )
-# 1990/1995 の**総数**（各歳表 00401・国籍軸なし＝nat_const=0）。日本人版（population_by_age5_1990/1995＝
+# 1990/1995 の**総数**（各歳表 00401・国籍軸なし＝nat_const=0）。日本人版（age5year_municipality_1990/1995＝
 # 5歳階級表 006）とは別ソースで、同年に総数(nat=0)・日本人(nat=1)を別 Dataset で持つ（表形式の非対称＝
 # sources/estat-census-catalog.md「年齢（5歳階級）」節。2000/2005 は単一表に国籍軸ありで両出しだったのと
 # 構造が違う）。令和型 level4/6・
 # 巨大各歳表ゆえサーバ側絞り込み（cdCat01=00700・cdCat02=5歳コード〈900不詳あり＝_AGE5_2000_CODES と同一〉）を掛ける。
 for _year, _sid in ((1990, "0000031401"), (1995, "0000032219")):
-    _key = f"population_by_age5_{_year}_total"
+    _key = f"age5year_municipality_{_year}_total"
     _POPULATION_BY_AGE5_MUNI[_key] = Dataset(
         key=_key,
         source="estat",
@@ -513,19 +541,21 @@ for _year, _sid in ((1990, "0000031401"), (1995, "0000032219")):
             "stats_data_id": _sid,
             "filters": {"cdCat01": "00700", "cdCat02": _AGE5_2000_CODES},
         },
-        cleaner=age5_municipality.clean_1990_1995_total,
-        stem=f"census_population_by_age5_{_year}_total",
-        table_name="population_by_age5",
+        cleaner=age5year_municipality.clean_1990_1995_total,
+        stem=f"census_age5year_municipality_{_year}_total",
+        table_name="age5year",
+        universe="population",
         index_columns=_POPULATION_BY_AGE5_MUNI_GRAIN,
         muni_levels=frozenset({4, 6}),
     )
-_POPULATION_BY_AGE5_MUNI["population_by_age5_timeseries"] = StitchedDataset(
-    key="population_by_age5_timeseries",
-    upstreams=[f"population_by_age5_{y}" for y in _POPULATION_BY_AGE5_MUNI_YEARS]
-    + ["population_by_age5_1990_total", "population_by_age5_1995_total"],
+_POPULATION_BY_AGE5_MUNI["age5year_municipality_timeseries"] = StitchedDataset(
+    key="age5year_municipality_timeseries",
+    upstreams=[f"age5year_municipality_{y}" for y in _POPULATION_BY_AGE5_MUNI_YEARS]
+    + ["age5year_municipality_1990_total", "age5year_municipality_1995_total"],
     title="国勢調査 年齢5歳階級×男女別人口 市区町村別時系列（1980年〜2020年 5年間隔・国籍別・合併補正済み）",
-    stem="census_population_by_age5_timeseries",
-    table_name="population_by_age5",
+    stem="census_age5year_municipality_timeseries",
+    table_name="age5year",
+    universe="population",
     index_columns=_POPULATION_BY_AGE5_MUNI_GRAIN,
     grain=_POPULATION_BY_AGE5_MUNI_GRAIN,
     default_join="aggregate_to_base",
@@ -536,13 +566,14 @@ _POPULATION_BY_AGE5_MUNI["population_by_age5_timeseries"] = StitchedDataset(
 # 軸構造＝households.py／一覧＝docs/distributions/households.md。
 # 単一 ID に全国＋47都道府県＋全年を含む＝合併なし・射影不要で単独 Dataset 完結（sex 軸なし）。
 _HOUSEHOLDS: dict[str, DatasetEntry] = {
-    "households": Dataset(
-        key="households",
+    "households_prefecture_timeseries": Dataset(
+        key="households_prefecture_timeseries",
         source="estat",
         source_params={"stats_data_id": "0003410420"},
         cleaner=households.clean_households,
-        stem="census_households",
+        stem="census_households_prefecture_timeseries",
         table_name="households",
+        universe="households",
         index_columns=["area_code", "household_type_code", "year"],
     ),
 }
@@ -552,13 +583,14 @@ _HOUSEHOLDS: dict[str, DatasetEntry] = {
 # 軸構造＝family_type.py／一覧＝docs/distributions/family_type.md。
 # households(0003410420) と同型の single-ID fact（全国＋47県＋全年）。分類軸が20コードの4階層ツリー。
 _FAMILY_TYPE: dict[str, DatasetEntry] = {
-    "family_type": Dataset(
-        key="family_type",
+    "family_type_prefecture_timeseries": Dataset(
+        key="family_type_prefecture_timeseries",
         source="estat",
         source_params={"stats_data_id": "0003414255"},
         cleaner=family_type.clean_family_type,
-        stem="census_family_type",
+        stem="census_family_type_prefecture_timeseries",
         table_name="family_type",
+        universe="households",
         index_columns=["area_code", "family_type_code", "year"],
     ),
 }
@@ -575,6 +607,7 @@ _LABOR_FORCE: dict[str, DatasetEntry] = {
         cleaner=labor_force.clean_labor_force,
         stem="census_labor_force_national",
         table_name="labor_force",
+        universe="population",
         index_columns=["sex_code", "labor_status_code", "year"],
     ),
     "labor_force_prefecture": Dataset(
@@ -584,15 +617,17 @@ _LABOR_FORCE: dict[str, DatasetEntry] = {
         cleaner=labor_force.clean_labor_force,
         stem="census_labor_force_prefecture",
         table_name="labor_force",
+        universe="population",
         index_columns=["area_code", "sex_code", "labor_status_code", "year"],
     ),
     # 派生（射影フロー）: 全国＋47都道府県を area 軸で縦結合した 1950〜2020 時系列（配布正典）。
-    "labor_force_timeseries": ProjectedDataset(
-        key="labor_force_timeseries",
+    "labor_force_prefecture_timeseries": ProjectedDataset(
+        key="labor_force_prefecture_timeseries",
         upstreams=["labor_force_national", "labor_force_prefecture"],
         title="国勢調査 労働力状態3区分×男女別人口 全国・都道府県別時系列（1950年〜2020年 5年間隔）",
-        stem="census_labor_force_timeseries",
+        stem="census_labor_force_prefecture_timeseries",
         table_name="labor_force",
+        universe="population",
         index_columns=["area_code", "sex_code", "labor_status_code", "year"],
         grain=["area_code", "sex_code", "labor_status_code", "year"],
     ),
@@ -610,6 +645,7 @@ _INDUSTRY: dict[str, DatasetEntry] = {
         cleaner=industry.clean_national,
         stem="census_industry_national",
         table_name="industry",
+        universe="employed",
         index_columns=["sex_code", "industry_code", "year"],
     ),
     "industry_prefecture": Dataset(
@@ -619,16 +655,18 @@ _INDUSTRY: dict[str, DatasetEntry] = {
         cleaner=industry.clean_prefecture,
         stem="census_industry_prefecture",
         table_name="industry",
+        universe="employed",
         index_columns=["area_code", "sex_code", "industry_code", "year"],
     ),
     # 派生（射影フロー）: 全国(1995-2020)＋47都道府県(2005-2020)を area 軸で縦結合。
     # 年カバレッジ非対称でも union は area×分類×year の disjoint で成立する。
-    "industry_timeseries": ProjectedDataset(
-        key="industry_timeseries",
+    "industry_prefecture_timeseries": ProjectedDataset(
+        key="industry_prefecture_timeseries",
         upstreams=["industry_national", "industry_prefecture"],
         title="国勢調査 産業大分類×男女別就業者数 全国・都道府県別時系列（全国1995年〜/都道府県2005年〜2020年）",
-        stem="census_industry_timeseries",
+        stem="census_industry_prefecture_timeseries",
         table_name="industry",
+        universe="employed",
         index_columns=["area_code", "sex_code", "industry_code", "year"],
         grain=["area_code", "sex_code", "industry_code", "year"],
     ),
@@ -646,6 +684,7 @@ _OCCUPATION_MAJOR12: dict[str, DatasetEntry] = {
         cleaner=occupation.clean_major12_national,
         stem="census_occupation_major12_national",
         table_name="occupation_major12",
+        universe="employed",
         index_columns=["sex_code", "occupation_code", "year"],
     ),
     "occupation_major12_prefecture": Dataset(
@@ -655,15 +694,17 @@ _OCCUPATION_MAJOR12: dict[str, DatasetEntry] = {
         cleaner=occupation.clean_major12_prefecture,
         stem="census_occupation_major12_prefecture",
         table_name="occupation_major12",
+        universe="employed",
         index_columns=["area_code", "sex_code", "occupation_code", "year"],
     ),
     # 派生（射影フロー）: 全国(1995-2020)＋47都道府県(2005-2020)を area 軸で縦結合（年カバレッジ非対称）。
-    "occupation_major12_timeseries": ProjectedDataset(
-        key="occupation_major12_timeseries",
+    "occupation_major12_prefecture_timeseries": ProjectedDataset(
+        key="occupation_major12_prefecture_timeseries",
         upstreams=["occupation_major12_national", "occupation_major12_prefecture"],
         title="国勢調査 職業大分類(12区分)×男女別就業者数 全国・都道府県別時系列（全国1995〜/都道府県2005〜2020）",
-        stem="census_occupation_major12_timeseries",
+        stem="census_occupation_major12_prefecture_timeseries",
         table_name="occupation_major12",
+        universe="employed",
         index_columns=["area_code", "sex_code", "occupation_code", "year"],
         grain=["area_code", "sex_code", "occupation_code", "year"],
     ),
@@ -681,6 +722,7 @@ _OCCUPATION_MAJOR10: dict[str, DatasetEntry] = {
         cleaner=occupation.clean_major10_national,
         stem="census_occupation_major10_national",
         table_name="occupation_major10",
+        universe="employed",
         index_columns=["sex_code", "occupation_code", "year"],
     ),
     "occupation_major10_prefecture": Dataset(
@@ -690,15 +732,17 @@ _OCCUPATION_MAJOR10: dict[str, DatasetEntry] = {
         cleaner=occupation.clean_major10_prefecture,
         stem="census_occupation_major10_prefecture",
         table_name="occupation_major10",
+        universe="employed",
         index_columns=["area_code", "sex_code", "occupation_code", "year"],
     ),
     # 派生（射影フロー）: 全国(1950-2005)＋47都道府県(1980-2005)を area 軸で縦結合（年カバレッジ非対称）。
-    "occupation_major10_timeseries": ProjectedDataset(
-        key="occupation_major10_timeseries",
+    "occupation_major10_prefecture_timeseries": ProjectedDataset(
+        key="occupation_major10_prefecture_timeseries",
         upstreams=["occupation_major10_national", "occupation_major10_prefecture"],
         title="国勢調査 職業大分類(10区分)×男女別就業者数 全国・都道府県別時系列（全国1950〜/都道府県1980〜2005）",
-        stem="census_occupation_major10_timeseries",
+        stem="census_occupation_major10_prefecture_timeseries",
         table_name="occupation_major10",
+        universe="employed",
         index_columns=["area_code", "sex_code", "occupation_code", "year"],
         grain=["area_code", "sex_code", "occupation_code", "year"],
     ),

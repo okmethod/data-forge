@@ -28,7 +28,7 @@ from data_forge.area.history import ingest as area_ingest
 from data_forge.datasets import Dataset, ProjectedDataset, StitchedDataset, get_dataset
 from data_forge.output import export_all
 from data_forge.public_scope import PublicScopePolicy, find_violations
-from data_forge.sources.estat import age5_municipality as estat_age5_muni
+from data_forge.sources.estat import age5year_municipality as estat_age5year_municipality
 from data_forge.sources.estat import fetch as estat_fetch
 from data_forge.sources.estat.client import get_stats_list
 
@@ -103,8 +103,8 @@ def _cmd_area_check(ds: Dataset | StitchedDataset | ProjectedDataset, args: argp
 
 # クロスファクト検算（§data-quality-assurance.md 三角測量）＋日本人スライスの保存則検算。
 # 照合相手 ds.key → 検算スペックのリスト（1 データセットに複数検算を束ねる）。
-# ハブ（総人口の正典）の既定は population_timeseries。within-fact 検算は hub_key に自 ds を指す。
-_CROSSFACT_HUB = "population_timeseries"
+# ハブ（総人口の正典）の既定は population_municipality_timeseries。within-fact 検算は hub_key に自 ds を指す。
+_CROSSFACT_HUB = "population_municipality_timeseries"
 
 
 @dataclass(frozen=True)
@@ -128,15 +128,15 @@ class _CrossFactSpec:
 _JP_TOTAL = (pl.col("nationality_code") == "1") & (pl.col("age_class_code") == "100")  # 日本人×年齢総数
 
 # C2: age5（市区町村ミクロ系列）の 5歳階級コード → 年齢3区分コード（by_age の age_class_code 1/2/3 に対応）。
-# コード体系は市区町村版 age5_municipality.AGE_CLASS が正典
+# コード体系は市区町村版 age5year_municipality.AGE_CLASS が正典
 # （回次跨の県版 age5.AGE5 とは別体系＝140=15〜19歳・240=65〜69歳）。
 # 境界は 15歳（130→140）と 65歳（230→240）でコード昇順にクリーンに割れる。
 # バンド集合は正典から採り（総数 100・不詳 999 を除く＝3区分は不詳を含まない）drift を防ぐ。
-_AGE5_BANDS = [c for c in estat_age5_muni.AGE_CLASS if c not in ("100", "999")]  # 110〜310（5歳階級のみ）
+_AGE5_BANDS = [c for c in estat_age5year_municipality.AGE_CLASS if c not in ("100", "999")]  # 110〜310（5歳階級のみ）
 _AGE5_TO_AGE3 = {c: ("1" if c < "140" else "2" if c < "240" else "3") for c in _AGE5_BANDS}
 
 _CROSSFACT: dict[str, list[_CrossFactSpec]] = {
-    "population_by_age5_timeseries": [
+    "age5year_municipality_timeseries": [
         # C1: age5 の 国籍総数(nat=0)×年齢総数(age_class=100) スライス == population。
         _CrossFactSpec(
             name="C1 総数×年齢総数 == population",
@@ -156,7 +156,7 @@ _CROSSFACT: dict[str, list[_CrossFactSpec]] = {
         _CrossFactSpec(
             name="C2 age5→3区分 == population_by_age",
             keys=["area_code", "sex_code", "age3_code", "year"],
-            hub_key="population_by_age_timeseries",
+            hub_key="age3class_municipality_timeseries",
             hub_slice=pl.col("age_class_code").is_in(["1", "2", "3"]),  # by_age の3区分（総数0/不詳9を除く）
             hub_with=[pl.col("age_class_code").alias("age3_code")],
             other_slice=(pl.col("nationality_code") == "0") & pl.col("age_class_code").is_in(_AGE5_BANDS),
@@ -187,7 +187,7 @@ _CROSSFACT: dict[str, list[_CrossFactSpec]] = {
         _CrossFactSpec(
             name="J2 日本人 年齢保存（within-fact）",
             keys=["area_code", "sex_code", "year"],
-            hub_key="population_by_age5_timeseries",
+            hub_key="age5year_municipality_timeseries",
             hub_slice=_JP_TOTAL,
             other_slice=(pl.col("nationality_code") == "1") & (pl.col("age_class_code") != "100"),
             known_diff_years=frozenset({2005}),  # 2005 各歳表は 5歳階級再掲が不詳を含まず総数 T01 は含む
@@ -200,13 +200,13 @@ _CROSSFACT: dict[str, list[_CrossFactSpec]] = {
         _CrossFactSpec(
             name="J3 日本人 男女保存（within-fact）",
             keys=["area_code", "year"],
-            hub_key="population_by_age5_timeseries",
+            hub_key="age5year_municipality_timeseries",
             hub_slice=_JP_TOTAL & (pl.col("sex_code") == "0"),
             other_slice=_JP_TOTAL & pl.col("sex_code").is_in(["1", "2"]),
         ),
     ],
     # C3: by_age の 年齢総数(age_class=0) スライス == population（既存「総数スライス一致」の明文化）。
-    "population_by_age_timeseries": [
+    "age3class_municipality_timeseries": [
         _CrossFactSpec(
             name="C3 年齢総数 == population",
             keys=["area_code", "sex_code", "year"],
@@ -430,14 +430,14 @@ def build_parser() -> argparse.ArgumentParser:
     }
     for name, handler in area_handlers.items():
         p = sub.add_parser(name, help=f"area overrides 整備支援: {name}")
-        p.add_argument("dataset", help="派生データセットキー（例: population_timeseries）")
+        p.add_argument("dataset", help="派生データセットキー（例: population_municipality_timeseries）")
         p.add_argument("--refresh", action="store_true", help="キャッシュを無視して再取得")
         p.add_argument("--base-year", type=int, default=None, help="基準年（既定=最新年）")
         p.set_defaults(handler=handler)
 
     # クロスファクト検算（総人口スライスを population ハブと突合＝§data-quality-assurance.md 三角測量）
     pc = sub.add_parser("crossfact-check", help="クロスファクト検算: 総人口スライスを population ハブと突合")
-    pc.add_argument("dataset", help="照合相手データセットキー（例: population_by_age5_timeseries）")
+    pc.add_argument("dataset", help="照合相手データセットキー（例: age5year_municipality_timeseries）")
     pc.add_argument("--refresh", action="store_true", help="キャッシュを無視して再取得")
     pc.add_argument("--base-year", type=int, default=None, help="両ファクトの畳込基準年（既定=最新年）")
     pc.set_defaults(handler=_cmd_crossfact_check)

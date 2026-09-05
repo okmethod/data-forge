@@ -25,7 +25,7 @@ nationality は年で扱いが違う: 1980/1985=総数のみ定数注入・1990/
 
 import polars as pl
 
-from data_forge.sources.estat import age5_municipality as m
+from data_forge.sources.estat import age5year_municipality
 
 _COLUMNS = [
     "area_code",
@@ -79,7 +79,7 @@ def test_2020_schema_axes_and_both_nationalities():
         # 国籍=日本人(1) は捨てず nationality=日本人 として残す
         _row_2020(area="00000", level="1", kokuseki="1", sex="0", age="00", value=90),
     ]
-    df = m.clean_2020(pl.DataFrame(rows))
+    df = age5year_municipality.clean_2020(pl.DataFrame(rows))
     assert df.columns == _COLUMNS
     assert "R1" not in df["age_class_code"].to_list()  # 再掲は落ちる
     # 総数・日本人の両方が出る
@@ -110,7 +110,7 @@ def test_2020_age_unknown_is_real_not_injected():
         _row_2020(area="00000", level="1", kokuseki="0", sex="0", age="21", value=5),
         _row_2020(area="00000", level="1", kokuseki="0", sex="0", age="22", value=8),
     ]
-    df = m.clean_2020(pl.DataFrame(rows))
+    df = age5year_municipality.clean_2020(pl.DataFrame(rows))
     unknown = df.filter(pl.col("age_class_code") == "999").row(0, named=True)
     assert unknown["population"] == 8  # 生値。導出注入(65)ではない
     assert unknown["age_class"] == "年齢不詳"
@@ -121,7 +121,7 @@ def test_2020_is_current_flags_obsolete_municipality():
         _row_2020(area="12231", level="4", kokuseki="0", sex="0", age="00", value=100),  # 現存市
         _row_2020(area="0120B", level="7", kokuseki="0", sex="0", age="00", value=50),  # 旧市区町村
     ]
-    df = m.clean_2020(pl.DataFrame(rows))
+    df = age5year_municipality.clean_2020(pl.DataFrame(rows))
     flags = {r["area_code"]: r["is_current"] for r in df.iter_rows(named=True)}
     assert flags["12231"] is True
     assert flags["0120B"] is False  # level7 → is_current=False
@@ -162,7 +162,7 @@ def test_2015_swapped_axes_and_extra_collapse():
             area="00000", level="1", did="00710", kokuseki="0000", tsuki="0010", age="0000", sex="0000", value=13
         ),
     ]
-    df = m.clean_2015(pl.DataFrame(rows))
+    df = age5year_municipality.clean_2015(pl.DataFrame(rows))
     assert df.columns == _COLUMNS
     # 男女が cat03 から正しく解決される（入替に耐える・総数国籍）
     by_sex = _by_sex(df)
@@ -219,7 +219,7 @@ def test_2000_picks_age5_recap_drops_single_year_and_both_nationalities():
         _row_2000(area="00000", level="1", did="00701", kokuseki="000", age="T01", sex="000", value=7),
         _row_2000(area="00000", level="1", did="00700", kokuseki="001", age="T01", sex="000", value=180),
     ]
-    df = m.clean_2000(pl.DataFrame(rows))
+    df = age5year_municipality.clean_2000(pl.DataFrame(rows))
     assert df.columns == _COLUMNS
     # 各歳（0歳/5歳）は落ち、5歳階級の再掲だけ残る
     assert set(df.filter(pl.col("nationality_code") == "0")["age_class_code"].to_list()) == {
@@ -280,7 +280,7 @@ def test_2005_picks_age5_recap_maps_sex_births_no_age_unknown():
         _row_2005(area="00000", level="1", did="00701", kokuseki="000", age="T01", sex="000", value=7),
         _row_2005(area="00000", level="1", did="00700", kokuseki="001", age="T01", sex="000", value=180),
     ]
-    df = m.clean_2005(pl.DataFrame(rows))
+    df = age5year_municipality.clean_2005(pl.DataFrame(rows))
     assert df.columns == _COLUMNS
     # 各歳・出生月クロスは落ち、5歳階級の再掲だけ残る（不詳 999 は存在しない）
     assert set(df.filter(pl.col("nationality_code") == "0")["age_class_code"].to_list()) == {
@@ -330,7 +330,7 @@ def test_2010_axes_and_both_nationalities():
         # 国籍=日本人(100) は nationality=日本人 として残す
         _row_2010(**base, kokuseki="100", sex="000", age="000", value=140),
     ]
-    df = m.clean_2010(pl.DataFrame(rows))
+    df = age5year_municipality.clean_2010(pl.DataFrame(rows))
     assert df.columns == _COLUMNS
     assert set(df["nationality_code"].to_list()) == {"0", "1"}
     assert (
@@ -382,7 +382,7 @@ def test_1980_no_tab_axis_and_did_collapse():
         # 潰されるべき: DID(00701) は捨てられる（cat01=全域 のみ採る）
         _row_1980(area="00000", level="1", did="00701", sex="000", age="000", value=11),
     ]
-    df = m.clean_1980(pl.DataFrame(rows))
+    df = age5year_municipality.clean_1980(pl.DataFrame(rows))
     assert df.columns == _COLUMNS
     # 1980 は総人口のみ＝nationality は総数(0) を定数注入
     assert set(df["nationality_code"].to_list()) == {"0"}
@@ -406,7 +406,7 @@ def test_1980_age_unknown_is_real_not_injected():
         _row_1980(**base, sex="000", age="001", value=50),
         _row_1980(**base, sex="000", age="022", value=9),
     ]
-    df = m.clean_1980(pl.DataFrame(rows))
+    df = age5year_municipality.clean_1980(pl.DataFrame(rows))
     unknown = df.filter(pl.col("age_class_code") == "999").row(0, named=True)
     assert unknown["population"] == 9  # 生値。導出注入(200-50=150)ではない
     assert unknown["age_class"] == "年齢不詳"
@@ -440,7 +440,7 @@ def test_1985_code_offset_and_stats_rows_excluded():
         # DID(00701) は潰される
         _row_1985(area="00000", level="1", did="00701", sex="000", age="001", value=11),
     ]
-    df = m.clean_1985(pl.DataFrame(rows))
+    df = age5year_municipality.clean_1985(pl.DataFrame(rows))
     assert df.columns == _COLUMNS
     # 平均年齢/中位数は age_class_code に混入しない
     assert set(df["age_class_code"].to_list()) <= {"100", "110", "270", "310", "999"}
@@ -477,7 +477,7 @@ def test_1990_japanese_constant_and_no_unknown():
         # DID(00701) は潰される
         _row_1990(area="00000", level="1", did="00701", sex="000", age="000", value=11),
     ]
-    df = m.clean_1990(pl.DataFrame(rows))
+    df = age5year_municipality.clean_1990(pl.DataFrame(rows))
     assert df.columns == _COLUMNS
     # 1990 は日本人人口のみ＝nationality=日本人(1) を定数注入
     assert set(df["nationality_code"].to_list()) == {"1"}
@@ -515,7 +515,7 @@ def test_1995_swapped_axes_japanese_and_100plus_code():
         # DID(00701) は潰される
         _row_1995(area="00000", level="1", did="00701", sex="000", age="T01", value=11),
     ]
-    df = m.clean_1995(pl.DataFrame(rows))
+    df = age5year_municipality.clean_1995(pl.DataFrame(rows))
     assert df.columns == _COLUMNS
     assert set(df["nationality_code"].to_list()) == {"1"}  # 日本人のみ
     # 軸入替: 男女は cat03 から解決
@@ -557,7 +557,7 @@ def test_1990_1995_total_picks_age5_recap_injects_total_nationality():
         # DID(00701) は潰される
         _row_1990_1995_total(area="00000", level="1", did="00701", sex="000", age="T01", year=1990, value=7),
     ]
-    df = m.clean_1990_1995_total(pl.DataFrame(rows))
+    df = age5year_municipality.clean_1990_1995_total(pl.DataFrame(rows))
     assert df.columns == _COLUMNS
     # 国籍軸なし＝総数(0) を定数注入（日本人版 clean_1990/1995 とは別ソース）
     assert set(df["nationality_code"].to_list()) == {"0"}

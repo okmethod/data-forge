@@ -14,7 +14,7 @@ from data_forge.datasets import (
     get_dataset,
 )
 
-_PREFECTURE_KEYS = ("daynight_population_prefecture_timeseries",)
+_PREFECTURE_KEYS = ("daynight_prefecture_timeseries",)
 
 
 def test_all_stems_unique() -> None:
@@ -35,7 +35,7 @@ def test_prefecture_datasets_default_to_prefecture_join() -> None:
 def test_prefecture_datasets_share_upstreams_with_municipality_view() -> None:
     """県粒度ビューは市区町村時系列と同一 upstream（同じ素材を粒度違いで出すだけ）。"""
     pairs = {
-        "daynight_population_prefecture_timeseries": "daynight_population_timeseries",
+        "daynight_prefecture_timeseries": "daynight_municipality_timeseries",
     }
     for pref_key, muni_key in pairs.items():
         pref, muni = get_dataset(pref_key), get_dataset(muni_key)
@@ -65,18 +65,18 @@ def test_age5_prefecture_timeseries_is_projected_flow() -> None:
 
     既製の時系列帳票（回次跨・全国＋県）を area union するだけなので、default_join（正規化モード）も
     preliminary_upstreams（速報 splice）も持たないことを固定する。
-    市区町村ミクロ（population_by_age5_timeseries）は逆に合併畳込 Stitched（aggregate_to_base）である。
+    市区町村ミクロ（age5year_municipality_timeseries）は逆に合併畳込 Stitched（aggregate_to_base）である。
     """
-    ds = get_dataset("population_by_age5_prefecture_timeseries")
+    ds = get_dataset("age5year_prefecture_timeseries")
     assert isinstance(ds, ProjectedDataset)
     assert not hasattr(ds, "default_join")
     assert not hasattr(ds, "preliminary_upstreams")
 
-    micro = get_dataset("population_by_age5_timeseries")
+    micro = get_dataset("age5year_municipality_timeseries")
     assert isinstance(micro, StitchedDataset)
     assert micro.default_join == "aggregate_to_base"
     # 2系列は同じ table_name（bare）を共有する＝1 family・N:1 ハブ。
-    assert ds.table_name == micro.table_name == "population_by_age5"
+    assert ds.table_name == micro.table_name == "age5year"
 
 
 def test_population_prefecture_timeseries_is_longterm_macro() -> None:
@@ -89,7 +89,7 @@ def test_population_prefecture_timeseries_is_longterm_macro() -> None:
     assert isinstance(ds, StitchedDataset)
     assert ds.default_join == "union"
     assert ds.upstreams == ["population_prefecture"]
-    assert ds.preliminary_upstreams == ["population_2025_preliminary"]
+    assert ds.preliminary_upstreams == ["population_municipality_2025_preliminary"]
 
     base = get_dataset("population_prefecture")
     assert isinstance(base, Dataset)
@@ -101,20 +101,20 @@ def test_by_age_prefecture_timeseries_is_projected_macro() -> None:
     """3区分の県時系列は回次跨世紀マクロ＝射影フロー（ProjectedDataset・1920〜2020）。
 
     戦略B: 旧・空間rollup 版（市区町村ミクロ→県・1980〜）から回次跨 raw 長期へ張り替えた。
-    ミクロ（population_by_age_timeseries）は逆に合併畳込 Stitched のまま。table_name は共有。
+    ミクロ（age3class_municipality_timeseries）は逆に合併畳込 Stitched のまま。table_name は共有。
     """
-    ds = get_dataset("population_by_age_prefecture_timeseries")
+    ds = get_dataset("age3class_prefecture_timeseries")
     assert isinstance(ds, ProjectedDataset)
-    assert ds.upstreams == ["population_by_age_prefecture"]
+    assert ds.upstreams == ["age3class_prefecture"]
 
-    base = get_dataset("population_by_age_prefecture")
+    base = get_dataset("age3class_prefecture")
     assert isinstance(base, Dataset)
     assert base.source_params["stats_data_id"] == "0003410383"
 
-    micro = get_dataset("population_by_age_timeseries")
+    micro = get_dataset("age3class_municipality_timeseries")
     assert isinstance(micro, StitchedDataset)
     assert micro.default_join == "aggregate_to_base"
-    assert ds.table_name == micro.table_name == base.table_name == "population_by_age"
+    assert ds.table_name == micro.table_name == base.table_name == "age3class"
 
 
 def test_age5_municipality_reiwa_tables_override_muni_levels() -> None:
@@ -126,8 +126,8 @@ def test_age5_municipality_reiwa_tables_override_muni_levels() -> None:
     落とす（＝日本人カバレッジが壊れた 1990/1995 のバグ）。この不変条件を設定レベルで固定する。
     2010/2015/2020 はグローバル既定が {4,6} ゆえ override 不要（muni_levels=None 可）。
     """
-    keys = [f"population_by_age5_{y}" for y in (1980, 1985, 1990, 1995, 2000, 2005)]
-    keys += ["population_by_age5_1990_total", "population_by_age5_1995_total"]
+    keys = [f"age5year_municipality_{y}" for y in (1980, 1985, 1990, 1995, 2000, 2005)]
+    keys += ["age5year_municipality_1990_total", "age5year_municipality_1995_total"]
     for key in keys:
         ds = get_dataset(key)
         assert ds.muni_levels == frozenset({4, 6}), f"{key}: 令和型表は muni_levels={{4,6}} 必須"
