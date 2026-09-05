@@ -31,30 +31,38 @@
 - **年齢保存**: 年少 + 生産 + 老年 + 不詳 == 総数
 - **男女保存**: 男 + 女 == 総数
 - **総数スライス一致**: 年齢総数 / 夜間のスライスが基底 population とビット一致（各データセット doc で実証）
-- **地理保存（全国==Σ県）**: 案A（地理粒度排他）で全国/県を別配布に分けた 7 family で `*_national_timeseries == Σ *_prefecture_timeseries`（分割が値を落とさない/二重化しない保証。分類軸×year の per-age／per-class 粒度で突合＝総数だけ保存し内訳が誤配分される bug も捕捉する。実例＝age5 の 85+ 誤流入は clean_national で 85+細分を 310 へ畳んで解消）。旧回の原資料集計差は符号不定ゆえ**両符号**の known_diff で受容する点だけ conformed dimension（diff≥0 限定）と異なる。実装は `cross_fact` の `mode="conservation"`・許容年の正典は cli.py の `_CROSSFACT`。
+- **地理保存（全国==Σ県）**: 地理粒度排他（全国と都道府県を同一配布に混ぜず別データセットへ分ける方針）で全国/県を別配布に分けた 7 family で `*_national_timeseries == Σ *_prefecture_timeseries`（分割が値を落とさない/二重化しない保証。分類軸×year の per-age／per-class 粒度で突合＝総数だけ保存し内訳が誤配分される bug も捕捉する。実例＝age5 の 85+ 誤流入は clean_national で 85+細分を 310 へ畳んで解消）。旧回の原資料集計差は符号不定ゆえ**両符号**の known_diff で受容する点だけ conformed dimension（diff≥0 限定）と異なる。実装は `cross_fact` の `mode="conservation"`・許容年の正典は cli.py の `_CROSSFACT`。
+
+#### 不詳の扱い（導出注入・補完値版の統一）＝ fact 共通の閉じ方
+
+e-Stat の不詳（未回答・不明）の扱いは全 fact で 2 つの規約に揃える。
+各 fact doc は**具体式・対象年・実測値だけ**を記し、方針は本節を正典とする。
+
+- **不詳の導出注入**: cat 軸に独立した「不詳」コードを持たない fact は、**不詳 = 総数 − Σ(内訳)** を計算して不詳行（多くは code 999）として注入し、`Σ(内訳) + 不詳 == 総数` を全地域・全年で恒等成立させる（保存を閉じる）。再掲コード（内訳の再集計）は減算に含めない。適用＝ age3class（年齢不詳 9）/ age5year（年齢不詳 999）/ labor_force（労働力状態不詳 999）/ family_type（家族類型不詳 999）。industry / occupation は「分類不能」が実カテゴリとして原表に在るため注入不要。
+- **補完値版の統一**: e-Stat 時系列製品は近年（多くは 2015/2020）に「不詳補完値」版（`time_code` 末尾 `000010`）が通常版（末尾 `000000`）と併存する。混在は方法論の継ぎ目＋二重計上になるため**通常版に統一**し、不詳は上記の導出注入で明示保持する（＝速報/確定の重複禁止と同じ variant dedup の思想）。対象年・例外は各 fact doc。
 
 ### クロスファクト検算（conformed dimension の三角測量）
 
-3ファクト（population / population_by_age / population_by_age5）は市区町村×year×sex で、**総人口を共有軸（conformed dimension）として冗長に持つ**。  
-別ソース・別系統から同じ総人口へ到達することを相互照合し、方針A「重複軸はハブと一致検証して捨てる」をテストで実体化する。  
+3ファクト（population / age3class / age5year）は市区町村×year×sex で、**総人口を共有軸（conformed dimension）として冗長に持つ**。  
+別ソース・別系統から同じ総人口へ到達することを相互照合し、「重複軸はハブと一致検証したうえで捨てる」という方針をテストで実体化する。  
 ハブ（正典）は総人口をアトム粒度まで完全に持つ **population**。系統は A＝各回基本集計 / B＝派生表。期待は全て **diff=0**。
 
-| #      | 恒等式                                         | 粒度              | 系統 |
-| ------ | ---------------------------------------------- | ----------------- | ---- |
-| **C1** | age5(nat=0・年齢総数) == population            | 市区町村×year×sex | A×A  |
-| **C2** | age5(nat=0)を3区分へ畳込 == population_by_age  | 市区町村×year×sex | A×B  |
-| **C3** | population_by_age(年齢総数) == population      | 市区町村×year×sex | B×A  |
-| **C4** | age5→県rollup == population_by_age5_prefecture | 県×year           | A×B  |
-| **C5** | daynight(夜間) == population                   | 全国              | −×A  |
+| #      | 恒等式                                | 粒度              | 系統 |
+| ------ | ------------------------------------- | ----------------- | ---- |
+| **C1** | age5(nat=0・年齢総数) == population   | 市区町村×year×sex | A×A  |
+| **C2** | age5(nat=0)を3区分へ畳込 == age3class | 市区町村×year×sex | A×B  |
+| **C3** | age3class(年齢総数) == population     | 市区町村×year×sex | B×A  |
+| **C4** | age5→県rollup == age5year_prefecture  | 県×year           | A×B  |
+| **C5** | daynight(夜間) == population          | 全国              | −×A  |
 
 - **C1 が最も堅い**: population も age5 も同じ各回基本集計（回次別・同一調査母集団）ゆえ厳密 diff=0 が期待できる。実測ステータスは「検証手段の索引」の crossfact 検証で得る。
-  - **粒度指定の落とし穴**（C1 が顕在化させた知見）: 一部の各歳表は市区町村を持つのに、既定の粒度指定のままだと中間集計（郡／支庁）を葉に拾って粒度が非対称になる。該当年は粒度指定を明示上書きして市区町村フルへ揃える（具体年は population_by_age5 / estat-census-catalog の各 doc が正典）。
+  - **粒度指定の落とし穴**（C1 が顕在化させた知見）: 一部の各歳表は市区町村を持つのに、既定の粒度指定のままだと中間集計（郡／支庁）を葉に拾って粒度が非対称になる。該当年は粒度指定を明示上書きして市区町村フルへ揃える（具体年は age5year / estat-census-catalog の各 doc が正典）。
 - **年別の許容カテゴリ**: 全年が diff=0 とは限らないため年別に status を分類し、**真の不一致のみ**を失敗とする（許容年は年別リストで管理）。
   - **scope_out**: 照合相手が未収録の年（population 速報のみ等）。照合相手側=0 を期待＝スコープ外として許容。
-  - **known_diff**: 定義差が既知の年。例＝各歳表が「年齢不詳を除く」ゆえ age5 総数 = population − 年齢不詳（照合相手 ≤ ハブ）。差の向き（diff≥0）が保たれる限り許容。※C3 の by_age は不詳を含むソースゆえ同年でも diff=0。
-- **C4/C5** は既存の実装・実証を本枠へ収めたもの（`population_by_age5_prefecture` / `daynight_population` の各 doc が正典）。
-- **C2 は by_age の唯一の区分レベル検証**: C1（age5 総数）と C3（by_age 総数）は総数しか照合しないため、区分の割当ミスや境界ズレ（総数は保存するバグ）を素通りさせる。C2 だけが by_age（別ソースの3区分表）の内訳を age5 の 5歳階級畳込と区分ごとに突合する。実装は cross_fact の `other_with` で 5歳階級コード→3区分コード（`age3_code`）へ写像し keys に含めて突合（境界 15/65 は 5歳バンド端で割れ straddle 無し。コード体系は市区町村版 `age5_municipality.AGE_CLASS`＝140=15〜19歳・240=65〜69歳で、県版 `age5.AGE5` とは別体系。総数100・不詳999 を fold から除く）。
-  - **許容カテゴリ**: 2005 は各歳表の「埋め込み不詳」（5歳バンド Σ ≤ 総数＝未分類残差が老年帯に残る）で老年帯のみ by_age ≥ age5 fold となり known_diff（C1 の 2005 と同因・同向 diff≥0）。2025 は age5 未収録＝scope_out。実測ステータスは crossfact 検証で得る。
+  - **known_diff**: 定義差が既知の年。例＝各歳表が「年齢不詳を除く」ゆえ age5 総数 = population − 年齢不詳（照合相手 ≤ ハブ）。差の向き（diff≥0）が保たれる限り許容。※C3 の age3class は不詳を含むソースゆえ同年でも diff=0。
+- **C4/C5** は既存の実装・実証を本枠へ収めたもの（`age5year_prefecture` / `daynight` の各 doc が正典）。
+- **C2 は age3class の唯一の区分レベル検証**: C1（age5 総数）と C3（age3class 総数）は総数しか照合しないため、区分の割当ミスや境界ズレ（総数は保存するバグ）を素通りさせる。C2 だけが age3class（別ソースの3区分表）の内訳を age5 の 5歳階級畳込と区分ごとに突合する。実装は cross_fact の `other_with` で 5歳階級コード→3区分コード（`age3_code`）へ写像し keys に含めて突合（境界 15/65 は 5歳バンド端で割れ straddle 無し。コード体系は市区町村版 `age5year_municipality.AGE_CLASS`＝140=15〜19歳・240=65〜69歳で、県版 `age5year.AGE5` とは別体系。総数100・不詳999 を fold から除く）。
+  - **許容カテゴリ**: 2005 は各歳表の「埋め込み不詳」（5歳バンド Σ ≤ 総数＝未分類残差が老年帯に残る）で老年帯のみ age3class ≥ age5 fold となり known_diff（C1 の 2005 と同因・同向 diff≥0）。2025 は age5 未収録＝scope_out。実測ステータスは crossfact 検証で得る。
 - **日本人スライスの検算（J1〜J3）**: age5 ミクロ系列は国籍軸（総数=0 / 日本人=1・外国人コード無し）を持つため、日本人(=1)は総人口ハブと**等値にならない**（diff=外国人≠0）。よって別立てで検算する（`crossfact-check` が C1/C3 と同時に駆動）。
   - **J1 上界（bound）**: 日本人(年齢総数) ≤ population。diff=総人口−日本人=外国人≥0 の部分集合関係のみ保証し、`diff<0`（日本人>総人口＝支庁二重計上等）と `hub>0 かつ日本人欠落` を弾く（hub==0 の空セルは許容）。1980/1985/2025 は日本人未収録＝scope_out。
   - **J2 年齢保存（within-fact）**: 日本人 Σ(5歳階級) == 日本人 年齢総数。2005 は 5歳階級再掲が年齢不詳を含まず総数(T01)は含むため総数≥Σ5歳＝known_diff（差の向き diff≥0 で許容）。

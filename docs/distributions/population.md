@@ -9,25 +9,23 @@
 
 ## データセット一覧
 
-| キー                               | 内容                                                         | statsDataId |
-| ---------------------------------- | ------------------------------------------------------------ | ----------- |
-| `population_1980`                  | 男女別人口（全国/都道府県/市区町村, 1980年）                 | 0003412413  |
-| `population_1985`                  | 男女別人口（全国/都道府県/市区町村, 1985年）                 | 0003412414  |
-| `population_1990`                  | 男女別人口（全国/都道府県/市区町村, 1990年）                 | 0003412415  |
-| `population_1995`                  | 男女別人口（全国/都道府県/市区町村, 1995年）                 | 0003412416  |
-| `population_2000`                  | 男女別人口（全国/都道府県/市区町村, 2000年）                 | 0003391075  |
-| `population_2005`                  | 男女別人口（全国/都道府県/市区町村, 2005年）                 | 0003408216  |
-| `population_2010`                  | 男女別人口（全国/都道府県/市区町村, 2010年）                 | 0003038587  |
-| `population_2015`                  | 男女別人口（全国/都道府県/市区町村, 2015年）                 | 0003149040  |
-| `population_2020`                  | 男女別人口（全国/都道府県/市区町村, 2020年）                 | 0003445078  |
-| `population_2025_preliminary`      | 男女別人口 **速報**（人口速報集計, 2025年）                  | 0004050397  |
-| `population_timeseries`            | 男女別人口の時系列（1980〜2020確定＋2025速報, 派生）         | 合成        |
-| `population_prefecture`            | 男女別人口 都道府県 世紀マクロ（回次跨帳票・1920〜2020）     | 0003410379  |
-| `population_prefecture_timeseries` | 都道府県 世紀マクロ の配布正典（1920〜2020＋2025速報, 派生） | 合成        |
+| キー                                       | 内容                                                         | statsDataId |
+| ------------------------------------------ | ------------------------------------------------------------ | ----------- |
+| `population_municipality_1980`             | 男女別人口（全国/都道府県/市区町村, 1980年）                 | 0003412413  |
+| `population_municipality_1985`             | 男女別人口（全国/都道府県/市区町村, 1985年）                 | 0003412414  |
+| `population_municipality_1990`             | 男女別人口（全国/都道府県/市区町村, 1990年）                 | 0003412415  |
+| `population_municipality_1995`             | 男女別人口（全国/都道府県/市区町村, 1995年）                 | 0003412416  |
+| `population_municipality_2000`             | 男女別人口（全国/都道府県/市区町村, 2000年）                 | 0003391075  |
+| `population_municipality_2005`             | 男女別人口（全国/都道府県/市区町村, 2005年）                 | 0003408216  |
+| `population_municipality_2010`             | 男女別人口（全国/都道府県/市区町村, 2010年）                 | 0003038587  |
+| `population_municipality_2015`             | 男女別人口（全国/都道府県/市区町村, 2015年）                 | 0003149040  |
+| `population_municipality_2020`             | 男女別人口（全国/都道府県/市区町村, 2020年）                 | 0003445078  |
+| `population_municipality_2025_preliminary` | 男女別人口 **速報**（人口速報集計, 2025年）                  | 0004050397  |
+| `population_municipality_timeseries`       | 男女別人口の時系列（1980〜2020確定＋2025速報, 派生）         | 合成        |
+| `population_prefecture`                    | 男女別人口 都道府県 世紀マクロ（回次跨帳票・1920〜2020）     | 0003410379  |
+| `population_prefecture_timeseries`         | 都道府県 世紀マクロ の配布正典（1920〜2020＋2025速報, 派生） | 合成        |
 
-出典はいずれも「政府統計の総合窓口(e-Stat)」。
-
-> **都道府県 世紀マクロ（1920〜）**：`population_prefecture_timeseries` は回次跨帳票 **0003410379「男女別人口及び人口性比 － 全国，都道府県（大正9年～令和2年）」** から独立取得する（5歳階級の `population_by_age5_prefecture` と同型）。
+> **都道府県 世紀マクロ（1920〜）**：`population_prefecture_timeseries` は回次跨帳票 **0003410379「男女別人口及び人口性比 － 全国，都道府県（大正9年～令和2年）」** から独立取得する（5歳階級の `age5year_prefecture` と同型）。
 > 出力シェイプは 47都道府県・全国行なし（全国は Σ県で復元）・2025速報を splice。
 > 1980-2020 の重複年は市区町村ミクロの県 rollup と一致する（唯一の差＝東京都1980 の +37人＝特別区部の区未定分。回次跨帳票側が区未定分を含む正しい県総数）。
 
@@ -79,14 +77,14 @@
 ## 派生データセット（複数年結合）の正規化モード
 
 年をまたぐと市町村合併・市部/郡部・人口集中地区などで地域集合が年ごとに変わる。
-`population_timeseries` は結合時の地域正規化を `--join` で選べる。**既定は配布正典の `aggregate_to_base`（合併畳み込み済み）**。
-生（畳み込み無し）版が必要なら専用データセット `population_timeseries_raw`（既定 `union`）を使う。
+`population_municipality_timeseries` は結合時の地域正規化を `--join` で選べる。**既定は配布正典の `aggregate_to_base`（合併畳み込み済み）**。
+生（畳み込み無し）版が必要なら専用データセット `population_municipality_timeseries_raw`（既定 `union`）を使う。
 
 ```bash
-uv run data-forge run population_timeseries                      # 既定=aggregate_to_base（畳込済）
-uv run data-forge run population_timeseries_raw                  # 生（union）版・比較デモ用
-uv run data-forge run population_timeseries --join intersection  # 共通地域のみ
-uv run data-forge run population_timeseries --join grid          # 欠損をnull行で明示
+uv run data-forge run population_municipality_timeseries                      # 既定=aggregate_to_base（畳込済）
+uv run data-forge run population_municipality_timeseries_raw                  # 生（union）版・比較デモ用
+uv run data-forge run population_municipality_timeseries --join intersection  # 共通地域のみ
+uv run data-forge run population_municipality_timeseries --join grid          # 欠損をnull行で明示
 ```
 
 | モード         | 意味                                                           | 例（2005〜2020, 行数） |
@@ -105,7 +103,7 @@ uv run data-forge run population_timeseries --join grid          # 欠損をnull
 
 国勢調査は調査年の翌年に**速報**（人口速報集計＝総人口・世帯数のみ）が出て、確定は年齢別・昼夜間などが段階リリースされる。速報→確定で数値が微修正される（不詳の補完差）。
 
-方針は **「速報を確定系列に素で混ぜない」**。速報は独立の基底データセット（例 `population_2025_preliminary`）として先行取込し、時系列へ合成する際は**汎用の来歴列 `data_status` で暫定を明示**する。
+方針は **「速報を確定系列に素で混ぜない」**。速報は独立の基底データセット（例 `population_municipality_2025_preliminary`）として先行取込し、時系列へ合成する際は**汎用の来歴列 `data_status` で暫定を明示**する。
 確定が出たら正典系列へ統合し、速報は破棄する。
 
 | 値            | 意味                               |
@@ -113,12 +111,12 @@ uv run data-forge run population_timeseries --join grid          # 欠損をnull
 | `confirmed`   | 確定値（既定。過去の確定集計）     |
 | `preliminary` | 速報値（後で確定へ置換される暫定） |
 
-- **列は速報が乗った fact にだけ生える**（速報 upstream が無い出力には付かない）。現状 `population_timeseries` / `population_prefecture_timeseries` が 2025 速報を含む。
+- **列は速報が乗った fact にだけ生える**（速報 upstream が無い出力には付かない）。現状 `population_municipality_timeseries` / `population_prefecture_timeseries` が 2025 速報を含む。
 - **配布物の利用者は `data_status` を必読**。この列を無視すると速報行を確定と誤認する。
 - splice の内部（確定を集約し終えた後段で継ぎ足す・area scope 自動追従〈確定ビューの `area_code` へ intersection〉・境界変更の coverage gap）は [provenance.py](../../apps/pipeline/src/data_forge/provenance.py)（`splice_preliminary`・`StitchedDataset.preliminary_upstreams`）が正典。
 
 > 速報は令和7年国勢調査「人口速報集計」（statsDataId `0004050397`、2020 と同型の令和型）。
-> 単体 `population_2025_preliminary` は全国/県/市区町村の8列（`data_status` 無し）を出力する。
+> 単体 `population_municipality_2025_preliminary` は全国/県/市区町村の8列（`data_status` 無し）を出力する。
 > カバレッジの不揃い（速報は総人口のみ・年齢別/昼夜間に2025は無い）は既存前提どおり特別視しない（fact ごとの年スパン差＝`grid` の null 機構で表現）。確定が出たら正典系列へ統合し速報は破棄する。
 
 ---
@@ -126,4 +124,4 @@ uv run data-forge run population_timeseries --join grid          # 欠損をnull
 ## 地域マスタ（合併をまたぐ集約）
 
 年をまたぐと市町村合併・政令市移行で地域集合が変わるため、実用グレードの連続時系列には**地域マスタ（アトム軸スタースキーマ）** が必要になる。
-これは総人口に限らず全ファクトが共有する**conformed dimension** なので、設計・運用は独立の正典 [area_master.md](area_master.md) にまとめた（`population_timeseries --join aggregate_to_base / crosswalk`、人口保存・孤児検証、堀＝overrides 運用など）。
+これは総人口に限らず全ファクトが共有する**conformed dimension** なので、設計・運用は独立の正典 [area_master.md](area_master.md) にまとめた（`population_municipality_timeseries --join aggregate_to_base / crosswalk`、人口保存・孤児検証、堀＝overrides 運用など）。
