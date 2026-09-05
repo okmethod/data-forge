@@ -107,11 +107,15 @@ def cross_fact(
         mode        … "equality"（既定・diff==0 を期待）／"bound"（上界検算＝other ≤ hub の
                       部分集合関係のみ保証。status="bound"・ok=(diff>=0 かつ other>0)。
                       hub>0 なのに other==0（スライス欠落）を見逃さないため実在も要求するが、
-                      hub==0 の空セル（そもそも住民がいない自治体）は other==0 でも許容する）。
+                      hub==0 の空セル（そもそも住民がいない自治体）は other==0 でも許容する）／
+                      "conservation"（地理保存＝全国 hub と Σ県 other の一致。equality と同じく diff==0 を
+                      期待するが、known_diff_years は**両符号**の集計差を許容する＝旧回の 区未定分/按分/
+                      沖縄扱い 等の原資料集計差を年ごとに文書化して受容する。equality の known_diff は
+                      other≤hub 前提で diff>=0 のみ許容だったのに対し、地理保存は符号が定まらないため緩める）。
 
     列: *keys / hub / other / diff / status / ok。
         status … match（diff==0）／bound／scope_out／known_diff／mismatch。
-        ok     … match、scope_out(other==0)、known_diff(diff>=0)、
+        ok     … match、scope_out(other==0)、known_diff(diff>=0／conservation は両符号)、
                  bound(diff>=0 かつ (other>0 または hub==0))。
     """
     h = hub.with_columns(*hub_with) if hub_with else hub
@@ -129,7 +133,7 @@ def cross_fact(
         scoped = pl.when(pl.col("year").is_in(list(scope_years))).then(pl.lit("scope_out"))
         if mode == "bound":
             status = scoped.otherwise(pl.lit("bound"))
-        else:
+        else:  # equality / conservation は status 割り当てが同一（差は known_diff の符号許容のみ）
             status = (
                 scoped.when(pl.col("year").is_in(list(known_diff_years)))
                 .then(pl.lit("known_diff"))
@@ -141,11 +145,15 @@ def cross_fact(
         status = pl.lit("bound")
     else:
         status = pl.when(pl.col("diff") == 0).then(pl.lit("match")).otherwise(pl.lit("mismatch"))
+    # 地理保存（conservation）は known_diff を両符号で受容。それ以外は other≤hub 前提で diff>=0 のみ。
+    known_ok = pl.col("status") == "known_diff"
+    if mode != "conservation":
+        known_ok = known_ok & (pl.col("diff") >= 0)
     return rep.with_columns(status.alias("status")).with_columns(
         (
             (pl.col("status") == "match")
             | ((pl.col("status") == "scope_out") & (pl.col("other") == 0))
-            | ((pl.col("status") == "known_diff") & (pl.col("diff") >= 0))
+            | known_ok
             | (
                 (pl.col("status") == "bound")
                 & (pl.col("diff") >= 0)

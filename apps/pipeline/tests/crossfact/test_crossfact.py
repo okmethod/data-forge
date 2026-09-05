@@ -244,3 +244,31 @@ def test_cross_fact_known_diff_year_accepts_directional_gap():
     ).sort("area_code")
     assert dict(zip(rep["area_code"], rep["status"], strict=True)) == {"01100": "known_diff", "09999": "known_diff"}
     assert dict(zip(rep["area_code"], rep["ok"], strict=True)) == {"01100": True, "09999": False}
+
+
+def _geo(rows: list[tuple[str, int, int]]) -> pl.DataFrame:
+    """地理保存の hub/other 相当（分類軸1本×year の測定量）を手組みする（keys に area_code を含めない）。"""
+    return pl.DataFrame([{"code": c, "year": y, "population": v} for c, y, v in rows])
+
+
+def test_cross_fact_conservation_accepts_known_diff_of_either_sign():
+    # 地理保存（mode="conservation"）: 全国 hub == Σ県 other。known_diff_years は原資料の集計差を
+    # **両符号**で受容する（equality の known_diff は diff>=0 のみ＝負符号を弾く点との対比）。
+    hub = _geo([("100", 1985, 1000), ("100", 1950, 1000), ("100", 2020, 1000)])
+    other = _geo([("100", 1985, 1006), ("100", 1950, 994), ("100", 2020, 1000)])
+    common = {
+        "keys": ["code", "year"],
+        "known_diff_years": frozenset({1985, 1950}),
+    }
+    cons = reconcile.cross_fact(hub, other, mode="conservation", **common).sort("year")
+    # 1985: diff=-6（負）／1950: diff=+6（正）／2020: match。全て ok。
+    assert dict(zip(cons["year"], cons["diff"], strict=True)) == {1950: 6, 1985: -6, 2020: 0}
+    assert dict(zip(cons["year"], cons["status"], strict=True)) == {
+        1950: "known_diff",
+        1985: "known_diff",
+        2020: "match",
+    }
+    assert cons["ok"].all()
+    # 対比: equality モードは同じ入力で負符号(1985)を弾く。
+    eq = reconcile.cross_fact(hub, other, mode="equality", **common).sort("year")
+    assert dict(zip(eq["year"], eq["ok"], strict=True)) == {1950: True, 1985: False, 2020: True}

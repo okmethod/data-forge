@@ -113,12 +113,13 @@ class _CrossFactSpec:
 
     name: str  # 検算名（C1・日本人上界 等。実走ログの見出しに使う）
     keys: list[str]
-    other_slice: pl.Expr
+    other_slice: pl.Expr | None = None  # other を絞る述語（地理保存は絞らず None）
     hub_key: str = _CROSSFACT_HUB  # ハブのデータセットキー（within-fact は自 ds を指す）
     hub_slice: pl.Expr | None = None  # within-fact でハブ側を総数スライスへ絞る述語
     hub_with: list[pl.Expr] | None = None  # 集約前に足す派生列（折り畳み検算の粒度写像）
     other_with: list[pl.Expr] | None = None  # 同上（other 側）
-    mode: str = "equality"  # "equality"（diff=0）／"bound"（上界＝diff>=0 かつ other>0）
+    value: str = "population"  # 突合する測定量列（就業系=workers・世帯系=households）
+    mode: str = "equality"  # "equality"（diff=0）／"bound"（上界）／"conservation"（全国==Σ県・両符号 known_diff）
     scope_years: frozenset[int] = frozenset()  # other 未収録の年（other==0 を許容）
     known_diff_years: frozenset[int] = frozenset()  # 定義差で diff!=0 が期待される年（diff>=0 を許容）
     reasons: dict[int, str] = field(default_factory=dict)  # 年 → 許容理由（表示用）
@@ -218,6 +219,119 @@ _CROSSFACT: dict[str, list[_CrossFactSpec]] = {
 }
 
 
+# 地理保存則（G）: 案A で全国/県を別配布に分けた各 family で、全国(_national_timeseries) == Σ都道府県
+# (_prefecture_timeseries) を分類軸×year で検算する（split が値を落とさない/二重化しない保証）。
+# hub=全国・other=県 を area_code を含めない keys で突合＝other 側は自動で47県合算される。
+# scope_years＝県が未収録の旧回（全国のみ・other==0 を許容）。known_diff_years＝原資料の集計差
+# （区未定分/按分・沖縄扱い等）で全国とΣ県が僅かにズレる旧回（両符号を文書化して受容）。
+def _geo_conservation_spec(
+    family: str,
+    axes: list[str],
+    value: str,
+    *,
+    scope_years: frozenset[int] = frozenset(),
+    known_diff_years: frozenset[int] = frozenset(),
+    reasons: dict[int, str] | None = None,
+) -> _CrossFactSpec:
+    return _CrossFactSpec(
+        name=f"G 全国 == Σ都道府県（{value}）",
+        keys=[*axes, "year"],
+        hub_key=f"{family}_national_timeseries",
+        value=value,
+        mode="conservation",
+        scope_years=scope_years,
+        known_diff_years=known_diff_years,
+        reasons=reasons or {},
+    )
+
+
+_CROSSFACT.update(
+    {
+        f"{family}_prefecture_timeseries": [spec]
+        for family, spec in {
+            "labor_force": _geo_conservation_spec(
+                "labor_force",
+                ["sex_code", "labor_status_code"],
+                "population",
+                known_diff_years=frozenset({1950, 1960, 1965, 1985}),
+                reasons={
+                    1950: "旧回の原資料集計差（区未定分/按分）で 全国 と Σ県 が僅少ズレ（両符号）",
+                    1960: "旧回の原資料集計差（区未定分/按分）で 全国 と Σ県 が僅少ズレ（両符号）",
+                    1965: "旧回の原資料集計差（区未定分/按分）で 全国 と Σ県 が僅少ズレ（両符号）",
+                    1985: "旧回の原資料集計差で Σ県 が 全国 を僅少上回る（負符号）",
+                },
+            ),
+            "industry": _geo_conservation_spec(
+                "industry",
+                ["sex_code", "industry_code"],
+                "workers",
+                scope_years=frozenset({1995, 2000}),
+                reasons={
+                    1995: "都道府県 産業表は 2005〜＝旧回は全国のみ（other==0）＝スコープ外",
+                    2000: "都道府県 産業表は 2005〜＝旧回は全国のみ（other==0）＝スコープ外",
+                },
+            ),
+            "occupation_major12": _geo_conservation_spec(
+                "occupation_major12",
+                ["sex_code", "occupation_code"],
+                "workers",
+                scope_years=frozenset({1995, 2000}),
+                reasons={
+                    1995: "都道府県 職業(12区分)表は 2005〜＝旧回は全国のみ（other==0）＝スコープ外",
+                    2000: "都道府県 職業(12区分)表は 2005〜＝旧回は全国のみ（other==0）＝スコープ外",
+                },
+            ),
+            "occupation_major10": _geo_conservation_spec(
+                "occupation_major10",
+                ["sex_code", "occupation_code"],
+                "workers",
+                scope_years=frozenset({1950, 1955, 1960, 1965, 1970, 1975}),
+                known_diff_years=frozenset({1980, 1985, 1990, 1995}),
+                reasons={
+                    **{
+                        y: "都道府県 職業(10区分)表は 1980〜＝旧回は全国のみ（other==0）＝スコープ外"
+                        for y in (1950, 1955, 1960, 1965, 1970, 1975)
+                    },
+                    1980: "全国表と県表で職業大分類の境界振り分けが相違（コード対で±相殺・総数は一致）",
+                    1985: "全国表と県表で職業大分類の境界振り分けが相違（コード対で±相殺・総数は一致）",
+                    1990: "全国表と県表で職業大分類の境界振り分けが相違（コード対で±相殺・総数は一致）",
+                    1995: "全国表と県表で職業大分類の境界振り分けが相違（コード対で±相殺・総数は一致）",
+                },
+            ),
+            # age5 は全国表/県表で 年齢不詳(999) と 85歳以上(310) のコード付けが構造的に相違する
+            # （全国表は近年 85+ を細分 320-370 のみで持ち age5 の 310 集約が立たず不詳へ流入＝clean_national の
+            # 85+ 吸収は別途要調査＝フォローアップ）。ゆえに per-age ではなく**総人口（総数スライス）**で保存検算する。
+            "age5year": _CrossFactSpec(
+                name="G 全国 == Σ都道府県（総人口）",
+                keys=["sex_code", "year"],
+                hub_key="age5year_national_timeseries",
+                hub_slice=pl.col("age_class_code") == "100",
+                other_slice=pl.col("age_class_code") == "100",
+                value="population",
+                mode="conservation",
+                known_diff_years=frozenset({1945, 1950}),
+                reasons={
+                    1945: "1945年は臨時の人口調査（沖縄含む扱い等）で 全国表 と 県表 の集計母数が相違（負符号）",
+                    1950: "旧回の原資料集計差で 全国総人口 と Σ県総人口 が僅少ズレ",
+                },
+            ),
+            "households": _geo_conservation_spec(
+                "households",
+                ["household_type_code"],
+                "households",
+                known_diff_years=frozenset({1960}),
+                reasons={1960: "1960年は原資料の集計差で 全国 と Σ県 が僅少ズレ（32世帯）"},
+            ),
+            "family_type": _geo_conservation_spec(
+                "family_type",
+                ["family_type_code"],
+                "households",
+            ),
+        }.items()
+    }
+)
+
+
 def _run_crossfact_spec(spec: _CrossFactSpec, other: pl.DataFrame, hub: pl.DataFrame) -> int:
     """検算1件を走らせ結果を表示し、真の不一致キー数を返す。"""
     rep = area_reconcile.cross_fact(
@@ -228,6 +342,7 @@ def _run_crossfact_spec(spec: _CrossFactSpec, other: pl.DataFrame, hub: pl.DataF
         other_slice=spec.other_slice,
         hub_with=spec.hub_with,
         other_with=spec.other_with,
+        value=spec.value,
         scope_years=spec.scope_years,
         known_diff_years=spec.known_diff_years,
         mode=spec.mode,
