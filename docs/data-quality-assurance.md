@@ -31,7 +31,7 @@
 - **年齢保存**: 年少 + 生産 + 老年 + 不詳 == 総数
 - **男女保存**: 男 + 女 == 総数
 - **総数スライス一致**: 年齢総数 / 夜間のスライスが基底 population とビット一致（各データセット doc で実証）
-- **地理保存（全国==Σ県）**: 案A（地理粒度排他）で全国/県を別配布に分けた 7 family で `*_national_timeseries == Σ *_prefecture_timeseries`（分割が値を落とさない/二重化しない保証）。旧回の原資料集計差は符号不定ゆえ**両符号**の known_diff で受容する点だけ conformed dimension（diff≥0 限定）と異なる。実装は `cross_fact` の `mode="conservation"`・許容年の正典は cli.py の `_CROSSFACT`。
+- **地理保存（全国==Σ県）**: 案A（地理粒度排他）で全国/県を別配布に分けた 7 family で `*_national_timeseries == Σ *_prefecture_timeseries`（分割が値を落とさない/二重化しない保証。分類軸×year の per-age／per-class 粒度で突合＝総数だけ保存し内訳が誤配分される bug も捕捉する。実例＝age5 の 85+ 誤流入は clean_national で 85+細分を 310 へ畳んで解消）。旧回の原資料集計差は符号不定ゆえ**両符号**の known_diff で受容する点だけ conformed dimension（diff≥0 限定）と異なる。実装は `cross_fact` の `mode="conservation"`・許容年の正典は cli.py の `_CROSSFACT`。
 
 ### クロスファクト検算（conformed dimension の三角測量）
 
@@ -146,6 +146,3 @@ grain 列の組で重複がないことを保証し、静かに通さず reject 
 - **日本人スライスの空間集約保存**
   - 現状: 日本人(=1)の検算は上界(J1)・年齢/男女保存(J2/J3)まで（設計は「クロスファクト検算」節）。県 rollup を等値照合する回次跨の日本人表が無い（macro age5 は総人口専用＝nationality 軸なし）ため、日本人版の空間集約保存（県 rollup == 回次跨）のみ検証網の外
   - 対応方針: macro/回次跨に日本人版を用意できれば J1 を等値（県 rollup vs 回次跨日本人表）へ格上げする
-- **age5year の地理保存が総数止まり**
-  - 現状: 全国表/県表で 年齢不詳(999)・85歳以上(310) のコード付けが構造相違する（全国表は近年 85+ を細分 320-370 のみで持ち age5 の 310 集約が立たず不詳へ流入）ため、地理保存 G は per-age でなく総数スライス(`age_class_code==100`)止まり
-  - 対応方針: `age5.clean_national` で 320-370 を 310 へ吸収すれば per-age の地理保存へ格上げできる

@@ -298,21 +298,18 @@ _CROSSFACT.update(
                     1995: "全国表と県表で職業大分類の境界振り分けが相違（コード対で±相殺・総数は一致）",
                 },
             ),
-            # age5 は全国表/県表で 年齢不詳(999) と 85歳以上(310) のコード付けが構造的に相違する
-            # （全国表は近年 85+ を細分 320-370 のみで持ち age5 の 310 集約が立たず不詳へ流入＝clean_national の
-            # 85+ 吸収は別途要調査＝フォローアップ）。ゆえに per-age ではなく**総人口（総数スライス）**で保存検算する。
-            "age5year": _CrossFactSpec(
-                name="G 全国 == Σ都道府県（総人口）",
-                keys=["sex_code", "year"],
-                hub_key="age5year_national_timeseries",
-                hub_slice=pl.col("age_class_code") == "100",
-                other_slice=pl.col("age_class_code") == "100",
-                value="population",
-                mode="conservation",
-                known_diff_years=frozenset({1945, 1950}),
+            # age5 は per-age（5歳階級ごと）で保存検算する。全国表が近年 85+ を細分(320-370)で持つ回は
+            # clean_national が 320-370 を 85歳以上(310) へ畳んで共通粒度へ揃える（総数スライスでは総数が
+            # 保存し不詳が 85+ を吸収するため band 誤配分を見逃す＝per-age だけが捕捉する）。
+            # 残差は pre-1960 の回次跨（全国表 vs 県表）の史料集計差のみ＝両符号 known_diff で受容。
+            "age5year": _geo_conservation_spec(
+                "age5year",
+                ["sex_code", "age_class_code"],
+                "population",
+                known_diff_years=frozenset({1920, 1925, 1930, 1935, 1945, 1950, 1955}),
                 reasons={
-                    1945: "1945年は臨時の人口調査（沖縄含む扱い等）で 全国表 と 県表 の集計母数が相違（負符号）",
-                    1950: "旧回の原資料集計差で 全国総人口 と Σ県総人口 が僅少ズレ",
+                    y: "回次跨の全国表と県表で史料の集計が相違する旧回（両符号・pre-1960）"
+                    for y in (1920, 1925, 1930, 1935, 1945, 1950, 1955)
                 },
             ),
             "households": _geo_conservation_spec(

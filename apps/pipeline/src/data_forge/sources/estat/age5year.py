@@ -11,7 +11,10 @@ cat02=年齢5歳階級・time=1920〜2020）で、差は次の3点だけ:
     (1) 全国表(380)は area 軸を持たない → 00000/全国/level1 を合成する。
     (2) 都道府県表(381)のみ area=47都道府県(level2)を持つ（全国行なし）。
     (3) 5歳階級コード集合は全国表が85歳以上を更に細分（85〜89…110歳以上=320〜370）する。
-両者で安定比較できる「85歳以上」(310)までを共通粒度とし、全国のみの細分(320-370)と
+両者で安定比較できる「85歳以上」(310)を共通の終端粒度とする。全国表は 2005 以降 310 を持たず
+320-370 のみで 85+ を提供する回があるため、320-370 を **310 へ畳んで**共通粒度へ揃える
+（畳まないと 85+ が 5歳階級合計から抜け、導出注入する年齢不詳へ流入する＝2020 全国で 85+ 約602万人が
+不詳へ誤流入し不詳が二重に膨らむ）。県表は 310 を直接持ち 320-370 を持たない＝畳み対象なし。
 （再掲）15歳未満/15〜64歳/65歳以上(380-400=5歳階級から導出可能)は捨てる。
 
 年齢不詳は cat02 に独立コードが無いため、各回で **総数 − 5歳階級合計** として導出注入する
@@ -58,6 +61,8 @@ AGE5 = {
 }
 _AGE_TOTAL = "100"  # 総数（不詳導出の被減数）
 _AGE_UNKNOWN = ("999", "年齢不詳")  # 導出注入行（310 より後にソートされる）
+# 全国表のみ 85歳以上を細分する回（2005-2020）のコード（85〜89…110歳以上）。共通粒度 85歳以上(310)へ畳む。
+_AGE5_85PLUS_PARTS = ("320", "330", "340", "350", "360", "370")
 
 
 def clean_age5(tidy: pl.DataFrame, *, national: bool) -> pl.DataFrame:
@@ -73,10 +78,18 @@ def clean_age5(tidy: pl.DataFrame, *, national: bool) -> pl.DataFrame:
     df = (
         tidy.filter(pl.col("tab_code") == "020")
         .filter(pl.col("cat01_code").is_in(list(SEX)))  # 男女
-        .filter(pl.col("cat02_code").is_in(list(AGE5)))  # 5歳階級＋総数（細分/再掲を除外）
+        # 5歳階級＋総数＋（全国表の）85+細分を採る。再掲(380-400)は含めない。
+        .filter(pl.col("cat02_code").is_in([*AGE5, *_AGE5_85PLUS_PARTS]))
         # 2015/2020 は「不詳補完値」版(time_code 末尾 000010)が併存する。population_by_age と
         # 同方針で通常版(000000)に統一する（補完版を混ぜると方法論の継ぎ目が生じ二重計上になる）。
         .filter(pl.col("time_code").str.slice(4) == "000000")
+        # 85+細分(320-370)を共通粒度の 85歳以上(310)へ畳む（畳んだ後 AGE5 の名称写像が通る）。
+        .with_columns(
+            pl.when(pl.col("cat02_code").is_in(_AGE5_85PLUS_PARTS))
+            .then(pl.lit("310"))
+            .otherwise(pl.col("cat02_code"))
+            .alias("cat02_code")
+        )
     )
     if national:
         area_cols = [
@@ -90,17 +103,31 @@ def clean_age5(tidy: pl.DataFrame, *, national: bool) -> pl.DataFrame:
             pl.col("area_name"),
             pl.col("area_level").cast(pl.Int8, strict=False).alias("area_level"),
         ]
-    fact = df.select(
-        *area_cols,
-        pl.col("cat01_code").replace_strict({k: v[0] for k, v in SEX.items()}).alias("sex_code"),
-        pl.col("cat01_code").replace_strict({k: v[1] for k, v in SEX.items()}).alias("sex"),
-        pl.col("cat02_code").alias("age_class_code"),
-        pl.col("cat02_code").replace_strict(AGE5).alias("age_class"),
-        # time_code 例: "2020000000" の先頭4桁が年
-        pl.col("time_code").str.slice(0, 4).cast(pl.Int16).alias("year"),
-        # value は文字列。数字以外（"-" 等の欠損記号）は null に落とす
-        pl.col("value").str.replace_all(r"[^0-9-]", "").cast(pl.Int64, strict=False).alias("population"),
-    ).with_columns((pl.col("area_level") != _OBSOLETE_AREA_LEVEL).alias("is_current"))
+    fact = (
+        df.select(
+            *area_cols,
+            pl.col("cat01_code").replace_strict({k: v[0] for k, v in SEX.items()}).alias("sex_code"),
+            pl.col("cat01_code").replace_strict({k: v[1] for k, v in SEX.items()}).alias("sex"),
+            pl.col("cat02_code").alias("age_class_code"),
+            pl.col("cat02_code").replace_strict(AGE5).alias("age_class"),
+            # time_code 例: "2020000000" の先頭4桁が年
+            pl.col("time_code").str.slice(0, 4).cast(pl.Int16).alias("year"),
+            # value は文字列。数字以外（"-" 等の欠損記号）は null に落とす
+            pl.col("value").str.replace_all(r"[^0-9-]", "").cast(pl.Int64, strict=False).alias("population"),
+        )
+        # 310 へ畳んだ 85+細分を1行へ合算する（全 null の単一セルは null を保つ＝0 に化けさせない）。
+        .group_by(
+            ["area_code", "area_name", "area_level", "sex_code", "sex", "age_class_code", "age_class", "year"],
+            maintain_order=True,
+        )
+        .agg(
+            pl.when(pl.col("population").is_null().all())
+            .then(None)
+            .otherwise(pl.col("population").sum())
+            .alias("population")
+        )
+        .with_columns((pl.col("area_level") != _OBSOLETE_AREA_LEVEL).alias("is_current"))
+    )
     return _inject_age_unknown(fact)
 
 
