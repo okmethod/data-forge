@@ -25,7 +25,7 @@ Note（実装判断のみ）:
 import polars as pl
 
 from data_forge.area.levels import is_current_expr
-from data_forge.sources.estat.transform import int_value, scope_area, year_from_time_code
+from data_forge.sources.estat.transform import area_passthrough_cols, int_value, scope_area, year_from_time_code
 
 # cat01（世帯の家族類型16区分A_時系列）→ 名称。20コードのツリー（@level は cat01_level から採る）。
 FAMILY_TYPE = {
@@ -79,9 +79,7 @@ def clean_family_type(tidy: pl.DataFrame, *, scope: str = "all") -> pl.DataFrame
     fact = (
         households.join(members, on=keys, how="left")
         .select(
-            pl.col("area_code"),
-            pl.col("area_name"),
-            pl.col("area_level").cast(pl.Int8, strict=False).alias("area_level"),
+            *area_passthrough_cols(),
             pl.col("cat01_code").alias("family_type_code"),
             pl.col("cat01_code").replace_strict(FAMILY_TYPE).alias("family_type"),
             pl.col("cat01_level").cast(pl.Int8, strict=False).alias("family_type_level"),

@@ -38,6 +38,7 @@ from data_forge.area.levels import always_current_expr, is_current_expr
 from data_forge.sources.estat.transform import (
     NATIONAL_AREA_CODE,
     area_axis_cols,
+    area_passthrough_cols,
     code_name_cols,
     int_value,
     year_from_time_code,
@@ -80,9 +81,7 @@ def clean_population(
     return (
         df.filter(pl.col(axis_code).is_in(list(sex_by_code)))
         .select(
-            pl.col("area_code"),
-            pl.col("area_name"),
-            pl.col("area_level").cast(pl.Int8, strict=False).alias("area_level"),
+            *area_passthrough_cols(),
             *code_name_cols(axis_code, sex_by_code, "sex"),
             # time_code 例: "2020000000" の先頭4桁が年
             year_from_time_code(),
@@ -200,9 +199,7 @@ def clean_population_by_age(tidy: pl.DataFrame) -> pl.DataFrame:
         .filter(pl.col("cat02_code").is_in(list(AGE_TS)))  # 男女（コード体系は同じ）
         .filter(pl.col("cat01_code").is_in(list(AGE_TS)))  # 年齢3区分＋総数
         .select(
-            pl.col("area_code"),
-            pl.col("area_name"),
-            pl.col("area_level").cast(pl.Int8, strict=False).alias("area_level"),
+            *area_passthrough_cols(),
             *code_name_cols("cat02_code", SEX_2005, "sex"),
             *code_name_cols("cat01_code", AGE_TS, "age_class"),
             year_from_time_code(),
@@ -271,9 +268,7 @@ def clean_by_age_prefecture(tidy: pl.DataFrame) -> pl.DataFrame:
         .filter(pl.col("time_code").str.slice(4) == "000000")
         .filter(pl.col("area_code") != NATIONAL_AREA_CODE)
         .select(
-            pl.col("area_code"),
-            pl.col("area_name"),
-            pl.col("area_level").cast(pl.Int8, strict=False).alias("area_level"),
+            *area_passthrough_cols(),
             pl.lit("0").alias("sex_code"),
             pl.lit("総数").alias("sex"),
             *code_name_cols("cat01_code", AGE_3CLASS_LT, "age_class"),

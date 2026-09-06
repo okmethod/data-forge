@@ -52,6 +52,19 @@ def year_from_time_code() -> pl.Expr:
     return pl.col("time_code").str.slice(0, 4).cast(pl.Int16).alias("year")
 
 
+def area_passthrough_cols() -> list[pl.Expr]:
+    """原 area 列（code/name）をそのまま採り、area_level だけ Int8 に整える3列。
+
+    ソースの area 行をそのまま配布する表（households / family_type / daynight / population 等）が共用。
+    area_level は年で dtype が揺れるため strict=False で寄せる（未変換は null）。
+    """
+    return [
+        pl.col("area_code"),
+        pl.col("area_name"),
+        pl.col("area_level").cast(pl.Int8, strict=False).alias("area_level"),
+    ]
+
+
 def code_name_cols(src: str, mapping: dict[str, tuple[str, str]], name: str) -> list[pl.Expr]:
     """コード→(出力コード, 名称) の辞書で src 列を <name>_code / <name> の2列へ写像する。
 
@@ -68,7 +81,7 @@ def area_axis_cols(national: bool) -> list[pl.Expr]:
     """全国表と都道府県表が別 ID に分かれる census 表の area 3列（code/name/level）を選ぶ。
 
     national=True … area 軸を持たない全国集計表：00000/全国/level1 を合成する。
-    national=False … 都道府県表（47県, level2）：原 area 列を Int8 に整えてそのまま採る。
+    national=False … 都道府県表（47県, level2）：原 area 列をそのまま採る（area_passthrough_cols）。
     industry / occupation / age5year が共用（単一 ID 内で全国↔県が同居する households 系は scope_area を使う）。
     """
     if national:
@@ -77,11 +90,7 @@ def area_axis_cols(national: bool) -> list[pl.Expr]:
             pl.lit(NATIONAL_AREA_NAME).alias("area_name"),
             pl.lit(1).cast(pl.Int8).alias("area_level"),
         ]
-    return [
-        pl.col("area_code"),
-        pl.col("area_name"),
-        pl.col("area_level").cast(pl.Int8, strict=False).alias("area_level"),
-    ]
+    return area_passthrough_cols()
 
 
 def _as_list(value: Any) -> list[Any]:

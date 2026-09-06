@@ -34,7 +34,7 @@ age_class_code は 5歳刻みの独自連番（100=総数 / 999=不詳・100歳�
 import polars as pl
 
 from data_forge.area.levels import is_current_expr
-from data_forge.sources.estat.transform import int_value, year_from_time_code
+from data_forge.sources.estat.transform import area_passthrough_cols, int_value, year_from_time_code
 
 # 出力 age_class_code → 名称（5歳刻み・100歳以上を終端に保持・独自連番）。
 AGE_CLASS = {
@@ -234,9 +234,7 @@ def _clean(
         nat_code = pl.lit(nat_const)
         nat_name = pl.lit(NATIONALITY_NAME[nat_const])
     return df.select(
-        pl.col("area_code"),
-        pl.col("area_name"),
-        pl.col("area_level").cast(pl.Int8, strict=False).alias("area_level"),
+        *area_passthrough_cols(),
         pl.col(f"{sex_col}_code").replace_strict(sex_map).alias("sex_code"),
         pl.col(f"{sex_col}_code").replace_strict({k: SEX_NAME[v] for k, v in sex_map.items()}).alias("sex"),
         nat_code.alias("nationality_code"),
