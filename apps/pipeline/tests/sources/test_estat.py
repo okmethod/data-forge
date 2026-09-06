@@ -9,12 +9,14 @@
 
 import pytest
 
-from data_forge.sources.estat import client, fetch
+from data_forge.sources.estat import client, fetch, schema
 
 
 def _data_page(values, *, next_key=None, status=0):
-    """getStatsData の1ページ相当のレスポンス dict を組む。"""
+    """getStatsData の1ページ相当のレスポンス dict を組む（外枠 strict 検証を通る最小構造）。"""
     stat_data = {
+        "TABLE_INF": {"@id": "X"},
+        "CLASS_INF": {"CLASS_OBJ": []},
         "DATA_INF": {"VALUE": values},
         "RESULT_INF": {} if next_key is None else {"NEXT_KEY": next_key},
     }
@@ -60,6 +62,45 @@ def test_get_stats_data_raises_on_api_error(monkeypatch):
     monkeypatch.setattr(client, "_get_json", lambda c, url, params: _data_page([], status=1))
 
     with pytest.raises(RuntimeError, match="STATUS=1"):
+        client.get_stats_data("x")
+
+
+# --- schema: 外枠 strict 検証（構造崩れ＝即例外 / 内側 passthrough）---
+
+
+def test_validate_accepts_well_formed_page():
+    # 正常な骨格＋未知の軸キー（@tab 等）は passthrough で通る。
+    schema.validate_stats_data(_data_page([{"@tab": "001", "$": "1"}]))
+
+
+def test_validate_normalizes_nothing_but_raises_on_missing_statistical_data():
+    data = {"GET_STATS_DATA": {"RESULT": {"STATUS": 0}}}  # STATISTICAL_DATA 欠落
+    with pytest.raises(schema.ValidationError):
+        schema.validate_stats_data(data)
+
+
+@pytest.mark.parametrize("drop", ["TABLE_INF", "CLASS_INF", "DATA_INF"])
+def test_validate_raises_on_missing_skeleton_key(drop):
+    data = _data_page([{"$": "1"}])
+    del data["GET_STATS_DATA"]["STATISTICAL_DATA"][drop]
+    with pytest.raises(schema.ValidationError):
+        schema.validate_stats_data(data)
+
+
+def test_validate_raises_on_missing_value():
+    data = _data_page([{"$": "1"}])
+    del data["GET_STATS_DATA"]["STATISTICAL_DATA"]["DATA_INF"]["VALUE"]
+    with pytest.raises(schema.ValidationError):
+        schema.validate_stats_data(data)
+
+
+def test_get_stats_data_raises_on_broken_structure(monkeypatch):
+    # 取得経路（_fetch_data_page）で構造崩れが例外化される（STATUS=0 でも骨格欠落は弾く）。
+    broken = {"GET_STATS_DATA": {"RESULT": {"STATUS": 0}, "STATISTICAL_DATA": {}}}
+    monkeypatch.setattr(client, "get_estat_app_id", lambda: "APPID")
+    monkeypatch.setattr(client, "_get_json", lambda c, url, params: broken)
+
+    with pytest.raises(schema.ValidationError):
         client.get_stats_data("x")
 
 

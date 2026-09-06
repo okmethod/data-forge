@@ -9,6 +9,7 @@ from typing import Any
 import httpx
 
 from data_forge.config import get_estat_app_id
+from data_forge.sources.estat.schema import validate_stats_data
 
 _API_BASE = "https://api.e-stat.go.jp/rest/3.0/app/json"  # ホスト＋APIバージョン（共通）
 _DATA_URL = f"{_API_BASE}/getStatsData"
@@ -55,7 +56,8 @@ def _fetch_data_page(
         params["startPosition"] = start_position
 
     data = _get_json(client, _DATA_URL, params)
-    _raise_for_api_error(data, "GET_STATS_DATA")
+    _raise_for_api_error(data, "GET_STATS_DATA")  # STATUS≠0（ERROR_MSG 同梱）を先に弾く
+    validate_stats_data(data)  # 続けて骨格の構造崩れを例外化（検証済み前提を transform に渡す）
     return data
 
 
