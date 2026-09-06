@@ -23,10 +23,7 @@ Note（実装判断のみ）:
 import polars as pl
 
 from data_forge.area.levels import is_current_expr
-from data_forge.sources.estat.transform import area_axis_cols, int_value
-
-# cat01（男女_時系列）→ (sex_code, sex名称)。コード体系は population.SEX_2005 と同じ 100/110/120。
-SEX = {"100": ("0", "総数"), "110": ("1", "男"), "120": ("2", "女")}
+from data_forge.sources.estat.transform import SEX, area_axis_cols, int_value
 
 # cat02（年齢5歳階級_時系列）で全国・都道府県 両表に共通存在するコードのみ採用。
 # 85歳以上(310)を終端とし、全国のみの細分(320-370)と（再掲）15歳未満/15-64/65+(380-400)は捨てる。

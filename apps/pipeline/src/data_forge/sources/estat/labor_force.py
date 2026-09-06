@@ -17,13 +17,11 @@ Note（実装判断のみ）:
 import polars as pl
 
 from data_forge.area.levels import is_current_expr
-from data_forge.sources.estat.transform import int_value
+from data_forge.sources.estat.transform import SEX, int_value
 
 # 表章項目(tab): 320=15歳以上人口（採用）/ 1240=労働力率（率は count から導出可能ゆえ捨てる）。
 _TAB_POPULATION = "320"
 
-# cat02（男女_時系列）→ (sex_code, sex名称)。コード体系は age5year.SEX と同じ 100/110/120。
-SEX = {"100": ("0", "総数"), "110": ("1", "男"), "120": ("2", "女")}
 
 # cat01（労働力状態3区分_時系列）→ 名称。総数(100)＝労働力人口(110)+非労働力人口(140)+不詳、
 # 労働力人口(110)＝就業者(120)+完全失業者(130)（120/130 は 110 の再掲）。コードは e-Stat のまま採る。

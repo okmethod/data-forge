@@ -21,6 +21,11 @@ _CITATION_BASE = "出典：政府統計の総合窓口(e-Stat)（https://www.e-s
 NATIONAL_AREA_CODE = "00000"
 NATIONAL_AREA_NAME = "全国"
 
+# census「男女_時系列」軸 {軸コード → (sex_code, sex名称)}。100/110/120＝総数/男/女。
+# age5year / industry / occupation / labor_force が共用（同コードだが cat01/cat02 は表ごと）。
+# population は年別に軸コードが変わるため population.SEX_YYYY を独自に持つ。
+SEX = {"100": ("0", "総数"), "110": ("1", "男"), "120": ("2", "女")}
+
 
 def scope_area(fact: pl.DataFrame, scope: str) -> pl.DataFrame:
     """配布スキーマの地理粒度を排他選択する: national=全国のみ / prefecture=47都道府県のみ / all=両方。

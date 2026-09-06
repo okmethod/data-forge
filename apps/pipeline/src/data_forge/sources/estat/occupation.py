@@ -21,13 +21,11 @@ Note（実装判断のみ）:
 import polars as pl
 
 from data_forge.area.levels import is_current_expr
-from data_forge.sources.estat.transform import area_axis_cols, int_value
+from data_forge.sources.estat.transform import SEX, area_axis_cols, int_value
 
 # 表章項目(tab): 334=就業者数（採用）。構成比(2020_45)は count から導出可能ゆえ捨てる。
 _TAB_WORKERS = "334"
 
-# cat02（男女_時系列）→ (sex_code, sex名称)。コード体系は industry.SEX と同じ 100/110/120。
-SEX = {"100": ("0", "総数"), "110": ("1", "男"), "120": ("2", "女")}
 
 # cat01 職業大分類（major12。定義は docs occupation.md SSoT）→ 名称。総数(100)＋大分類(110〜220)。
 # 220=分類不能の職業（実カテゴリ）。中間集計（再掲）は無くフラット。コードは e-Stat のまま採る。
