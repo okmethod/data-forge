@@ -19,6 +19,8 @@ Note（実装判断のみ）:
 
 import polars as pl
 
+from data_forge.sources.estat.transform import int_value
+
 # area @level=7 は「旧市区町村（合併消滅）」。現存自治体と区別する（population と同じ規約）。
 _OBSOLETE_AREA_LEVEL = 7
 
@@ -46,7 +48,7 @@ def clean_daynight_population(tidy: pl.DataFrame) -> pl.DataFrame:
             pl.col("cat01_code").replace_strict({k: v[0] for k, v in DAYNIGHT.items()}).alias("daynight_code"),
             pl.col("cat01_code").replace_strict({k: v[1] for k, v in DAYNIGHT.items()}).alias("daynight"),
             pl.col("time_code").str.slice(0, 4).cast(pl.Int16).alias("year"),
-            pl.col("value").str.replace_all(r"[^0-9-]", "").cast(pl.Int64, strict=False).alias("population"),
+            int_value().alias("population"),
         )
         .with_columns((pl.col("area_level") != _OBSOLETE_AREA_LEVEL).alias("is_current"))
         .sort("area_code", "daynight_code")

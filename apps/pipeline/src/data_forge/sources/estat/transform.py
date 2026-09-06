@@ -36,6 +36,11 @@ def scope_area(fact: pl.DataFrame, scope: str) -> pl.DataFrame:
     raise ValueError(f"未知の scope: {scope!r}（all/national/prefecture のいずれか）")
 
 
+def int_value() -> pl.Expr:
+    """tidy な value（文字列）を Int64 へ。数字以外（"-" 等の欠損記号）は null に落とす。"""
+    return pl.col("value").str.replace_all(r"[^0-9-]", "").cast(pl.Int64, strict=False)
+
+
 def _as_list(value: Any) -> list[Any]:
     return value if isinstance(value, list) else [value]
 

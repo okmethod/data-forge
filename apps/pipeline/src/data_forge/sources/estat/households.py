@@ -24,7 +24,7 @@ Note（実装判断のみ）:
 
 import polars as pl
 
-from data_forge.sources.estat.transform import scope_area
+from data_forge.sources.estat.transform import int_value, scope_area
 
 # area @level=7 は「旧市区町村（合併消滅）」。本表には出現しないが規約統一のため保持する。
 _OBSOLETE_AREA_LEVEL = 7
@@ -44,11 +44,6 @@ _TAB_HOUSEHOLDS = "040"  # 世帯数（単位: 世帯）
 _TAB_MEMBERS = "050"  # 世帯人員（単位: 人）
 
 
-def _int_value() -> pl.Expr:
-    """value（文字列）を Int64 へ。数字以外（"-" 等の欠損記号）は null に落とす。"""
-    return pl.col("value").str.replace_all(r"[^0-9-]", "").cast(pl.Int64, strict=False)
-
-
 def clean_households(tidy: pl.DataFrame, *, scope: str = "all") -> pl.DataFrame:
     """世帯の種類別 世帯数・世帯人員の tidy → 配布用8列へ写像する。
 
@@ -58,8 +53,8 @@ def clean_households(tidy: pl.DataFrame, *, scope: str = "all") -> pl.DataFrame:
     """
     base = tidy.filter(pl.col("cat01_code").is_in(list(HOUSEHOLD_TYPE)) & ~pl.col("area_code").is_in(_DID_AREA_CODES))
     keys = ["area_code", "area_name", "area_level", "cat01_code", "time_code"]
-    households = base.filter(pl.col("tab_code") == _TAB_HOUSEHOLDS).select(*keys, _int_value().alias("households"))
-    members = base.filter(pl.col("tab_code") == _TAB_MEMBERS).select(*keys, _int_value().alias("household_members"))
+    households = base.filter(pl.col("tab_code") == _TAB_HOUSEHOLDS).select(*keys, int_value().alias("households"))
+    members = base.filter(pl.col("tab_code") == _TAB_MEMBERS).select(*keys, int_value().alias("household_members"))
     fact = households.join(members, on=keys, how="left")
     result = (
         fact.select(

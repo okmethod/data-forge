@@ -34,6 +34,8 @@ from collections.abc import Callable, Sequence
 
 import polars as pl
 
+from data_forge.sources.estat.transform import int_value
+
 # area @level=7 は「旧市区町村（2000年時点の廃止自治体）」。現存自治体と区別する。
 _OBSOLETE_AREA_LEVEL = 7
 
@@ -78,8 +80,7 @@ def clean_population(
             pl.col(axis_code).replace_strict({k: v[1] for k, v in sex_by_code.items()}).alias("sex"),
             # time_code 例: "2020000000" の先頭4桁が年
             pl.col("time_code").str.slice(0, 4).cast(pl.Int16).alias("year"),
-            # value は文字列。数字以外（"-" 等の欠損記号）は null に落とす
-            pl.col("value").str.replace_all(r"[^0-9-]", "").cast(pl.Int64, strict=False).alias("population"),
+            int_value().alias("population"),
         )
         .with_columns(
             (pl.col("area_level") != _OBSOLETE_AREA_LEVEL).alias("is_current"),
@@ -203,7 +204,7 @@ def clean_population_by_age(tidy: pl.DataFrame) -> pl.DataFrame:
             pl.col("cat01_code").replace_strict({k: v[0] for k, v in AGE_TS.items()}).alias("age_class_code"),
             pl.col("cat01_code").replace_strict({k: v[1] for k, v in AGE_TS.items()}).alias("age_class"),
             pl.col("time_code").str.slice(0, 4).cast(pl.Int16).alias("year"),
-            pl.col("value").str.replace_all(r"[^0-9-]", "").cast(pl.Int64, strict=False).alias("population"),
+            int_value().alias("population"),
         )
         .with_columns((pl.col("area_level") != _OBSOLETE_AREA_LEVEL).alias("is_current"))
     )
@@ -276,7 +277,7 @@ def clean_by_age_prefecture(tidy: pl.DataFrame) -> pl.DataFrame:
             pl.col("cat01_code").replace_strict({k: v[0] for k, v in AGE_3CLASS_LT.items()}).alias("age_class_code"),
             pl.col("cat01_code").replace_strict({k: v[1] for k, v in AGE_3CLASS_LT.items()}).alias("age_class"),
             pl.col("time_code").str.slice(0, 4).cast(pl.Int16).alias("year"),
-            pl.col("value").str.replace_all(r"[^0-9-]", "").cast(pl.Int64, strict=False).alias("population"),
+            int_value().alias("population"),
         )
         .with_columns((pl.col("area_level") != _OBSOLETE_AREA_LEVEL).alias("is_current"))
     )
