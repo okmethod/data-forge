@@ -18,7 +18,7 @@ Note（実装判断のみ）:
 import polars as pl
 
 from data_forge.area.levels import is_current_expr
-from data_forge.sources.estat.transform import SEX, area_axis_cols, int_value
+from data_forge.sources.estat.transform import SEX, area_axis_cols, code_name_cols, int_value
 
 # 表章項目(tab): 334=就業者数（採用）。構成比(2020_44)は count から導出可能ゆえ捨てる。
 _TAB_WORKERS = "334"
@@ -71,8 +71,7 @@ def clean_industry(tidy: pl.DataFrame, *, national: bool) -> pl.DataFrame:
     )
     return df.select(
         *area_axis_cols(national),
-        pl.col("cat02_code").replace_strict({k: v[0] for k, v in SEX.items()}).alias("sex_code"),
-        pl.col("cat02_code").replace_strict({k: v[1] for k, v in SEX.items()}).alias("sex"),
+        *code_name_cols("cat02_code", SEX, "sex"),
         pl.col("cat01_code").alias("industry_code"),
         pl.col("cat01_code").replace_strict(INDUSTRY).alias("industry"),
         # time_code 例: "2020000000" の先頭4桁が年

@@ -47,6 +47,18 @@ def int_value() -> pl.Expr:
     return pl.col("value").str.replace_all(r"[^0-9-]", "").cast(pl.Int64, strict=False)
 
 
+def code_name_cols(src: str, mapping: dict[str, tuple[str, str]], name: str) -> list[pl.Expr]:
+    """コード→(出力コード, 名称) の辞書で src 列を <name>_code / <name> の2列へ写像する。
+
+    e-Stat の軸コード（SEX / AGE_* / DAYNIGHT 等）を配布スキーマの code/name ペアへ一括変換する。
+    src の値は mapping のキーを網羅している前提（replace_strict＝未知値は例外）。
+    """
+    return [
+        pl.col(src).replace_strict({k: v[0] for k, v in mapping.items()}).alias(f"{name}_code"),
+        pl.col(src).replace_strict({k: v[1] for k, v in mapping.items()}).alias(name),
+    ]
+
+
 def area_axis_cols(national: bool) -> list[pl.Expr]:
     """全国表と都道府県表が別 ID に分かれる census 表の area 3列（code/name/level）を選ぶ。
 

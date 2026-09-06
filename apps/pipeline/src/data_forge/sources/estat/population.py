@@ -35,7 +35,7 @@ from collections.abc import Callable, Sequence
 import polars as pl
 
 from data_forge.area.levels import always_current_expr, is_current_expr
-from data_forge.sources.estat.transform import NATIONAL_AREA_CODE, area_axis_cols, int_value
+from data_forge.sources.estat.transform import NATIONAL_AREA_CODE, area_axis_cols, code_name_cols, int_value
 
 # 男女コードマップ: 生の {軸コード → (sex_code, sex名称)}
 SexMap = dict[str, tuple[str, str]]
@@ -74,8 +74,7 @@ def clean_population(
             pl.col("area_code"),
             pl.col("area_name"),
             pl.col("area_level").cast(pl.Int8, strict=False).alias("area_level"),
-            pl.col(axis_code).replace_strict({k: v[0] for k, v in sex_by_code.items()}).alias("sex_code"),
-            pl.col(axis_code).replace_strict({k: v[1] for k, v in sex_by_code.items()}).alias("sex"),
+            *code_name_cols(axis_code, sex_by_code, "sex"),
             # time_code 例: "2020000000" の先頭4桁が年
             pl.col("time_code").str.slice(0, 4).cast(pl.Int16).alias("year"),
             int_value().alias("population"),
@@ -195,10 +194,8 @@ def clean_population_by_age(tidy: pl.DataFrame) -> pl.DataFrame:
             pl.col("area_code"),
             pl.col("area_name"),
             pl.col("area_level").cast(pl.Int8, strict=False).alias("area_level"),
-            pl.col("cat02_code").replace_strict({k: v[0] for k, v in SEX_2005.items()}).alias("sex_code"),
-            pl.col("cat02_code").replace_strict({k: v[1] for k, v in SEX_2005.items()}).alias("sex"),
-            pl.col("cat01_code").replace_strict({k: v[0] for k, v in AGE_TS.items()}).alias("age_class_code"),
-            pl.col("cat01_code").replace_strict({k: v[1] for k, v in AGE_TS.items()}).alias("age_class"),
+            *code_name_cols("cat02_code", SEX_2005, "sex"),
+            *code_name_cols("cat01_code", AGE_TS, "age_class"),
             pl.col("time_code").str.slice(0, 4).cast(pl.Int16).alias("year"),
             int_value().alias("population"),
         )
@@ -270,8 +267,7 @@ def clean_by_age_prefecture(tidy: pl.DataFrame) -> pl.DataFrame:
             pl.col("area_level").cast(pl.Int8, strict=False).alias("area_level"),
             pl.lit("0").alias("sex_code"),
             pl.lit("総数").alias("sex"),
-            pl.col("cat01_code").replace_strict({k: v[0] for k, v in AGE_3CLASS_LT.items()}).alias("age_class_code"),
-            pl.col("cat01_code").replace_strict({k: v[1] for k, v in AGE_3CLASS_LT.items()}).alias("age_class"),
+            *code_name_cols("cat01_code", AGE_3CLASS_LT, "age_class"),
             pl.col("time_code").str.slice(0, 4).cast(pl.Int16).alias("year"),
             int_value().alias("population"),
         )
