@@ -33,9 +33,9 @@ DAYNIGHT = {
 def clean_daynight_population(tidy: pl.DataFrame) -> pl.DataFrame:
     """昼夜間人口の tidy → area × year × 昼夜間 の配布用8列へ写像する（全年共通）。
 
-    cat01=100(夜間人口)/180(昼間人口) だけを採り daynight_code(0/1) へ写像する。
-    本表は全国(00000)行を持つため national 復元は不要（population_by_age と異なる）。
-    tab 軸は単一（020 人口）なので絞り込み不要。
+    手順: cat01=100(夜間人口)/180(昼間人口) だけを採り daynight_code(0/1) へ写像する
+         （tab 軸は単一の 020 人口なので絞り込み不要）。
+         本表は全国(00000)行を持つため national 復元は不要（population_by_age と異なる）。
     """
     return (
         tidy.filter(pl.col("cat01_code").is_in(list(DAYNIGHT)))

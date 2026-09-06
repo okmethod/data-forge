@@ -69,6 +69,9 @@ def clean_population(
         sex_by_code … その軸の {コード → (sex_code, sex)}。人口の総数/男/女のみを列挙する
                       （＝人口性比・世帯数など他の項目コードは自動的に除外される）。
         filters     … 事前の等値フィルタ列（例: 平成型の cat01=全域）。
+
+    手順: filters の等値フィルタを順に適用し、sex_axis の男女コードで絞って
+         配布用スキーマへ select する（総数/男/女のみ・年は time_code 先頭4桁）。
     """
     axis_code = f"{sex_axis}_code"
     df = tidy
@@ -295,8 +298,8 @@ def clean_by_age_prefecture(tidy: pl.DataFrame) -> pl.DataFrame:
 def clean_population_prefecture(tidy: pl.DataFrame) -> pl.DataFrame:
     """回次跨長期表(0003410379) → 男女別総人口×都道府県マクロ（47県・1920〜2020）。
 
-    ミクロ population と同一8列スキーマ。clean_population（tab=020 で人口のみ・性比1120は除外）を
-    流用し、全国(00000)と人口集中地区(00100/00200)を落として47都道府県だけを残す。
+    手順: clean_population（tab=020 で人口のみ・性比1120は除外）を流用し、全国(00000)と
+    人口集中地区(00100/00200)を落として47都道府県だけを残す（ミクロ population と同一8列スキーマ）。
     """
     fact = clean_population(
         tidy,

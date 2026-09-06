@@ -45,9 +45,11 @@ _TAB_MEMBERS = "050"  # 世帯人員（単位: 人）
 def clean_households(tidy: pl.DataFrame, *, scope: str = "all") -> pl.DataFrame:
     """世帯の種類別 世帯数・世帯人員の tidy → 配布用8列へ写像する。
 
-    世帯の種類（cat01）を分類軸に採り、世帯数(tab=040)と世帯人員(tab=050)を
-    area×household_type×year の同一行へ横並びに束ねる。DID 行は除外する。
-    scope で配布時の地理粒度を排他選択する: national=全国 / prefecture=47都道府県 / all=両方。
+    引数:
+        scope … 配布時の地理粒度を排他選択する: national=全国 / prefecture=47都道府県 / all=両方。
+
+    手順: 世帯の種類（cat01）を分類軸に採り、世帯数(tab=040)と世帯人員(tab=050)を
+          area×household_type×year の同一行へ横並びに束ねる。DID 行は除外する。
     """
     base = tidy.filter(pl.col("cat01_code").is_in(list(HOUSEHOLD_TYPE)) & ~pl.col("area_code").is_in(_DID_AREA_CODES))
     keys = ["area_code", "area_name", "area_level", "cat01_code", "time_code"]

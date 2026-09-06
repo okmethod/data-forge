@@ -65,10 +65,12 @@ _TAB_MEMBERS = "7"  # 一般世帯人員（単位: 人）
 def clean_family_type(tidy: pl.DataFrame, *, scope: str = "all") -> pl.DataFrame:
     """世帯の家族類型別 世帯数・世帯人員の tidy → 配布用9列へ写像する。
 
-    家族類型（cat01）を分類軸に採り、一般世帯数(tab=6)と一般世帯人員(tab=7)を
+    引数:
+        scope … 配布時の地理粒度を排他選択する: national=全国 / prefecture=47都道府県 / all=両方。
+
+    手順: 家族類型（cat01）を分類軸に採り、一般世帯数(tab=6)と一般世帯人員(tab=7)を
     area×family_type×year の同一行へ横並びに束ねる。ツリーの階層は family_type_level に保持し、
     最後に家族類型不詳(999)を導出注入する。
-    scope で配布時の地理粒度を排他選択する: national=全国 / prefecture=47都道府県 / all=両方。
     """
     base = tidy.filter(pl.col("cat01_code").is_in(list(FAMILY_TYPE)))
     keys = ["area_code", "area_name", "area_level", "cat01_code", "cat01_level", "time_code"]
