@@ -65,7 +65,7 @@ apps/pipeline/
 | **table_name** | SQLite テーブル名 ＝ family。複数 key が同一 table を共有（N:1 ハブ） | `age5year`                   |
 
 - **family ＝ table_name**：その fact を最も端的に表す簡潔名。**母集団（人口/世帯/就業者）も粒度も来歴も、弁別に不要な共通軸（男女別など）も名前に入れない**。カバレッジ年次は docs / title で示す。
-- **母集団は名前でなく `universe` メタ属性で持つ**。同一 universe の fact は `datasets.py` の同じサブ辞書（`_POPULATION` 等）に置き、そこがグループの縫い目になる。
+- **母集団は名前でなく `universe` メタ属性で持つ**。グループの縫い目は各エントリの `universe` フィールド（`datasets.py` のサブ辞書は family 単位＝`_AGE5YEAR` 等で、1 family = 1 まとまり）。
   - 母集団: `population`＝人口 / `households`＝世帯 / `employed`＝就業者
 - **基底 key は table_name と一致させない**。必ず suffix を付ける。同一 fact の別パーティション/別ビュー（全国 base・県 base・縫合・県ロールアップ）が同じ table_name を共有する。
 - 分類改訂等で「同名では畳めない別 fact」になる時だけ、弁別子で別 family を立てる（例: `occupation_major12` / `occupation_major10`）。
