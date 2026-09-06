@@ -23,7 +23,14 @@ Note（実装判断のみ）:
 import polars as pl
 
 from data_forge.area.levels import is_current_expr
-from data_forge.sources.estat.transform import SEX, area_axis_cols, code_name_cols, int_value, year_from_time_code
+from data_forge.sources.estat.transform import (
+    SEX,
+    area_axis_cols,
+    code_name_cols,
+    exclude_imputed_version,
+    int_value,
+    year_from_time_code,
+)
 
 # cat02（年齢5歳階級_時系列）で全国・都道府県 両表に共通存在するコードのみ採用。
 # 85歳以上(310)を終端とし、全国のみの細分(320-370)と（再掲）15歳未満/15-64/65+(380-400)は捨てる。
@@ -72,7 +79,7 @@ def clean_age5(tidy: pl.DataFrame, *, national: bool) -> pl.DataFrame:
         .filter(pl.col("cat02_code").is_in([*AGE5, *_AGE5_85PLUS_PARTS]))
         # 2015/2020 は「不詳補完値」版(time_code 末尾 000010)が併存する。population_by_age と
         # 同方針で通常版(000000)に統一する（補完版を混ぜると方法論の継ぎ目が生じ二重計上になる）。
-        .filter(pl.col("time_code").str.slice(4) == "000000")
+        .filter(exclude_imputed_version())
         # 85+細分(320-370)を共通粒度の 85歳以上(310)へ畳む（畳んだ後 AGE5 の名称写像が通る）。
         .with_columns(
             pl.when(pl.col("cat02_code").is_in(_AGE5_85PLUS_PARTS))

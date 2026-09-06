@@ -21,6 +21,7 @@ from data_forge.sources.estat.transform import (
     SEX,
     area_passthrough_cols,
     code_name_cols,
+    exclude_imputed_version,
     int_value,
     year_from_time_code,
 )
@@ -56,7 +57,7 @@ def clean_labor_force(tidy: pl.DataFrame) -> pl.DataFrame:
         tidy.filter(pl.col("tab_code") == _TAB_POPULATION)
         .filter(pl.col("cat01_code").is_in(list(LABOR_STATUS)))  # 労働力状態
         .filter(pl.col("cat02_code").is_in(list(SEX)))  # 男女
-        .filter(pl.col("time_code").str.slice(4) == "000000")  # 不詳補完値版を除外
+        .filter(exclude_imputed_version())
     )
     fact = df.select(
         *area_passthrough_cols(),

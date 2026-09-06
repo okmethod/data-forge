@@ -40,6 +40,7 @@ from data_forge.sources.estat.transform import (
     area_axis_cols,
     area_passthrough_cols,
     code_name_cols,
+    exclude_imputed_version,
     int_value,
     year_from_time_code,
 )
@@ -265,7 +266,7 @@ def clean_by_age_prefecture(tidy: pl.DataFrame) -> pl.DataFrame:
     fact = (
         tidy.filter(pl.col("tab_code") == "1060")
         .filter(pl.col("cat01_code").is_in(list(AGE_3CLASS_LT)))
-        .filter(pl.col("time_code").str.slice(4) == "000000")
+        .filter(exclude_imputed_version())
         .filter(pl.col("area_code") != NATIONAL_AREA_CODE)
         .select(
             *area_passthrough_cols(),

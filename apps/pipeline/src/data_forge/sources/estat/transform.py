@@ -52,6 +52,16 @@ def year_from_time_code() -> pl.Expr:
     return pl.col("time_code").str.slice(0, 4).cast(pl.Int16).alias("year")
 
 
+def exclude_imputed_version() -> pl.Expr:
+    """通常版のみ残す filter 述語（不詳補完値版 time_code 末尾 000010 を除外）。
+
+    2015/2020 の census 表は「不詳補完値」版が通常版と併存する。
+    混ぜると方法論の継ぎ目が二重計上を生むため通常版（末尾 000000）に統一する。
+    age5year / industry / occupation / labor_force が共用。
+    """
+    return pl.col("time_code").str.slice(4) == "000000"
+
+
 def area_passthrough_cols() -> list[pl.Expr]:
     """原 area 列（code/name）をそのまま採り、area_level だけ Int8 に整える3列。
 
