@@ -24,10 +24,8 @@ Note（実装判断のみ）:
 
 import polars as pl
 
+from data_forge.area.levels import is_current_expr
 from data_forge.sources.estat.transform import int_value, scope_area
-
-# area @level=7 は「旧市区町村（合併消滅）」。本表には出現しないが規約統一のため保持する。
-_OBSOLETE_AREA_LEVEL = 7
 
 # cat01（世帯の家族類型16区分A_時系列）→ 名称。20コードのツリー（@level は cat01_level から採る）。
 FAMILY_TYPE = {
@@ -90,7 +88,7 @@ def clean_family_type(tidy: pl.DataFrame, *, scope: str = "all") -> pl.DataFrame
             pl.col("households"),
             pl.col("household_members"),
         )
-        .with_columns((pl.col("area_level") != _OBSOLETE_AREA_LEVEL).alias("is_current"))
+        .with_columns(is_current_expr())
     )
     result = _inject_unknown(fact).sort("area_code", "family_type_code", "year")
     return scope_area(result, scope)

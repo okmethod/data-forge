@@ -24,10 +24,8 @@ Note（実装判断のみ）:
 
 import polars as pl
 
+from data_forge.area.levels import is_current_expr
 from data_forge.sources.estat.transform import int_value, scope_area
-
-# area @level=7 は「旧市区町村（合併消滅）」。本表には出現しないが規約統一のため保持する。
-_OBSOLETE_AREA_LEVEL = 7
 
 # level2 に混じる人口集中地区（DID）系。都道府県と同 level だが地理単位でないため除外する。
 _DID_AREA_CODES = ("00100", "00200")
@@ -68,7 +66,7 @@ def clean_households(tidy: pl.DataFrame, *, scope: str = "all") -> pl.DataFrame:
             pl.col("households"),
             pl.col("household_members"),
         )
-        .with_columns((pl.col("area_level") != _OBSOLETE_AREA_LEVEL).alias("is_current"))
+        .with_columns(is_current_expr())
         .sort("area_code", "household_type_code", "year")
     )
     return scope_area(result, scope)

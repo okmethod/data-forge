@@ -16,10 +16,8 @@ Note（実装判断のみ）:
 
 import polars as pl
 
+from data_forge.area.levels import is_current_expr
 from data_forge.sources.estat.transform import int_value
-
-# area @level=7 は「旧市区町村（合併消滅）」。本表には出現しないが規約統一のため保持する。
-_OBSOLETE_AREA_LEVEL = 7
 
 # 表章項目(tab): 320=15歳以上人口（採用）/ 1240=労働力率（率は count から導出可能ゆえ捨てる）。
 _TAB_POPULATION = "320"
@@ -67,7 +65,7 @@ def clean_labor_force(tidy: pl.DataFrame) -> pl.DataFrame:
         # time_code 例: "2020000000" の先頭4桁が年
         pl.col("time_code").str.slice(0, 4).cast(pl.Int16).alias("year"),
         int_value().alias("population"),
-    ).with_columns((pl.col("area_level") != _OBSOLETE_AREA_LEVEL).alias("is_current"))
+    ).with_columns(is_current_expr())
     return _inject_labor_unknown(fact)
 
 

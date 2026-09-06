@@ -17,10 +17,8 @@ Note（実装判断のみ）:
 
 import polars as pl
 
+from data_forge.area.levels import is_current_expr
 from data_forge.sources.estat.transform import int_value
-
-# area @level=7 は「旧市区町村（合併消滅）」。本表には出現しないが規約統一のため保持する。
-_OBSOLETE_AREA_LEVEL = 7
 
 # 表章項目(tab): 334=就業者数（採用）。構成比(2020_44)は count から導出可能ゆえ捨てる。
 _TAB_WORKERS = "334"
@@ -94,7 +92,7 @@ def clean_industry(tidy: pl.DataFrame, *, national: bool) -> pl.DataFrame:
         # time_code 例: "2020000000" の先頭4桁が年
         pl.col("time_code").str.slice(0, 4).cast(pl.Int16).alias("year"),
         int_value().alias("workers"),
-    ).with_columns((pl.col("area_level") != _OBSOLETE_AREA_LEVEL).alias("is_current"))
+    ).with_columns(is_current_expr())
 
 
 def clean_national(tidy: pl.DataFrame) -> pl.DataFrame:

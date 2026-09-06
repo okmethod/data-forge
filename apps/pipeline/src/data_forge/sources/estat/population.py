@@ -34,10 +34,8 @@ from collections.abc import Callable, Sequence
 
 import polars as pl
 
+from data_forge.area.levels import always_current_expr, is_current_expr
 from data_forge.sources.estat.transform import int_value
-
-# area @level=7 は「旧市区町村（2000年時点の廃止自治体）」。現存自治体と区別する。
-_OBSOLETE_AREA_LEVEL = 7
 
 # 男女コードマップ: 生の {軸コード → (sex_code, sex名称)}
 SexMap = dict[str, tuple[str, str]]
@@ -83,7 +81,7 @@ def clean_population(
             int_value().alias("population"),
         )
         .with_columns(
-            (pl.col("area_level") != _OBSOLETE_AREA_LEVEL).alias("is_current"),
+            is_current_expr(),
         )
         .sort("area_code", "sex_code")
     )
@@ -117,7 +115,7 @@ def _prepend_national_from_prefectures(
             pl.lit("00000").alias("area_code"),
             pl.lit("全国").alias("area_name"),
             pl.lit(1).cast(pl.Int8).alias("area_level"),
-            pl.lit(True).alias("is_current"),
+            always_current_expr(),
         )
         .select(fact.columns)  # 元の列順・列集合へ揃える
     )
@@ -206,7 +204,7 @@ def clean_population_by_age(tidy: pl.DataFrame) -> pl.DataFrame:
             pl.col("time_code").str.slice(0, 4).cast(pl.Int16).alias("year"),
             int_value().alias("population"),
         )
-        .with_columns((pl.col("area_level") != _OBSOLETE_AREA_LEVEL).alias("is_current"))
+        .with_columns(is_current_expr())
     )
     fact = _prepend_national_from_prefectures(
         fact, group_cols=("sex_code", "sex", "age_class_code", "age_class", "year")
@@ -279,7 +277,7 @@ def clean_by_age_prefecture(tidy: pl.DataFrame) -> pl.DataFrame:
             pl.col("time_code").str.slice(0, 4).cast(pl.Int16).alias("year"),
             int_value().alias("population"),
         )
-        .with_columns((pl.col("area_level") != _OBSOLETE_AREA_LEVEL).alias("is_current"))
+        .with_columns(is_current_expr())
     )
     return _inject_age_unknown(fact)
 

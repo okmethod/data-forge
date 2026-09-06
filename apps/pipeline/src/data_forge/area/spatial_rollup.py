@@ -11,6 +11,7 @@
 import polars as pl
 
 from data_forge.area.aggregate import _cat_code_cols
+from data_forge.area.levels import always_current_expr
 
 _PREFECTURE_LEVEL = 2  # 都道府県（全国=1 の直下）
 _REGION_LEVEL = 0  # 地方ブロック（全国=1 と都道府県=2 の間の合成集約層）
@@ -85,7 +86,7 @@ def aggregate_to_admin(atom_fact: pl.DataFrame, *, level: str) -> pl.DataFrame:
         )
         .with_columns(
             pl.lit(area_level).cast(level_dtype).alias("area_level"),
-            pl.lit(True).alias("is_current"),  # 都道府県/地方は現存（level7 消滅の概念なし）
+            always_current_expr(),  # 都道府県/地方は現存（level7 消滅の概念なし）
         )
         .select(atom_fact.columns)
         .sort(["area_code", "year", *cat_codes])

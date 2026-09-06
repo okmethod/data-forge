@@ -22,10 +22,8 @@ Note（実装判断のみ）:
 
 import polars as pl
 
+from data_forge.area.levels import is_current_expr
 from data_forge.sources.estat.transform import int_value
-
-# area @level=7 は「旧市区町村（合併消滅）」。本表には出現しないが規約統一のため保持する。
-_OBSOLETE_AREA_LEVEL = 7
 
 # cat01（男女_時系列）→ (sex_code, sex名称)。コード体系は population.SEX_2005 と同じ 100/110/120。
 SEX = {"100": ("0", "総数"), "110": ("1", "男"), "120": ("2", "女")}
@@ -120,7 +118,7 @@ def clean_age5(tidy: pl.DataFrame, *, national: bool) -> pl.DataFrame:
             .otherwise(pl.col("population").sum())
             .alias("population")
         )
-        .with_columns((pl.col("area_level") != _OBSOLETE_AREA_LEVEL).alias("is_current"))
+        .with_columns(is_current_expr())
     )
     return _inject_age_unknown(fact)
 

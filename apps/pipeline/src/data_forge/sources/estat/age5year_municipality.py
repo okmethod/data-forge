@@ -33,10 +33,8 @@ age_class_code は 5歳刻みの独自連番（100=総数 / 999=不詳・100歳�
 
 import polars as pl
 
+from data_forge.area.levels import is_current_expr
 from data_forge.sources.estat.transform import int_value
-
-# area @level=7 は「旧市区町村（合併消滅）」。2020 表のみ出現（2010/2015 は持たない）。
-_OBSOLETE_AREA_LEVEL = 7
 
 # 出力 age_class_code → 名称（5歳刻み・100歳以上を終端に保持・独自連番）。
 AGE_CLASS = {
@@ -248,7 +246,7 @@ def _clean(
         # time_code 例: "2020000000" の先頭4桁が年
         pl.col("time_code").str.slice(0, 4).cast(pl.Int16).alias("year"),
         int_value().alias("population"),
-    ).with_columns((pl.col("area_level") != _OBSOLETE_AREA_LEVEL).alias("is_current"))
+    ).with_columns(is_current_expr())
 
 
 def clean_1980(tidy: pl.DataFrame) -> pl.DataFrame:

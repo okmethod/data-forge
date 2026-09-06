@@ -26,9 +26,8 @@ combine と相互非依存で、cli.py が clean→atoms→combine→(crosswalk|
 
 import polars as pl
 
+from data_forge.area.levels import is_current_expr
 from data_forge.area.mapping import rollup
-
-_OBSOLETE_AREA_LEVEL = 7  # 旧市区町村（現存でない）
 
 
 def _cat_code_cols(df: pl.DataFrame) -> list[str]:
@@ -111,7 +110,7 @@ def aggregate_to_base(atom_fact: pl.DataFrame, events: pl.DataFrame, *, base_yea
     return (
         agg.join(base_attrs, on="base_code", how="left")
         .rename({"base_code": "area_code"})
-        .with_columns((pl.col("area_level") != _OBSOLETE_AREA_LEVEL).alias("is_current"))
+        .with_columns(is_current_expr())
         .select(atom_fact.columns)
         .sort(["area_code", "year", *cat_codes])
     )

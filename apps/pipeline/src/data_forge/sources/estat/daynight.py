@@ -19,10 +19,8 @@ Note（実装判断のみ）:
 
 import polars as pl
 
+from data_forge.area.levels import is_current_expr
 from data_forge.sources.estat.transform import int_value
-
-# area @level=7 は「旧市区町村（合併消滅）」。現存自治体と区別する（population と同じ規約）。
-_OBSOLETE_AREA_LEVEL = 7
 
 # cat01（常住地又は従業地・通学地による人口）の2総数 → (daynight_code, daynight名称)。
 # 通勤流動の内訳（110〜230）は年で非同型なので採らない。
@@ -50,6 +48,6 @@ def clean_daynight_population(tidy: pl.DataFrame) -> pl.DataFrame:
             pl.col("time_code").str.slice(0, 4).cast(pl.Int16).alias("year"),
             int_value().alias("population"),
         )
-        .with_columns((pl.col("area_level") != _OBSOLETE_AREA_LEVEL).alias("is_current"))
+        .with_columns(is_current_expr())
         .sort("area_code", "daynight_code")
     )
