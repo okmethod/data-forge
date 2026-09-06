@@ -35,7 +35,7 @@ from collections.abc import Callable, Sequence
 import polars as pl
 
 from data_forge.area.levels import always_current_expr, is_current_expr
-from data_forge.sources.estat.transform import int_value
+from data_forge.sources.estat.transform import NATIONAL_AREA_CODE, area_axis_cols, int_value
 
 # 男女コードマップ: 生の {軸コード → (sex_code, sex名称)}
 SexMap = dict[str, tuple[str, str]]
@@ -112,9 +112,7 @@ def _prepend_national_from_prefectures(
         .group_by(list(group_cols))
         .agg(pl.col("population").sum())
         .with_columns(
-            pl.lit("00000").alias("area_code"),
-            pl.lit("全国").alias("area_name"),
-            pl.lit(1).cast(pl.Int8).alias("area_level"),
+            *area_axis_cols(national=True),
             always_current_expr(),
         )
         .select(fact.columns)  # 元の列順・列集合へ揃える
@@ -265,7 +263,7 @@ def clean_by_age_prefecture(tidy: pl.DataFrame) -> pl.DataFrame:
         tidy.filter(pl.col("tab_code") == "1060")
         .filter(pl.col("cat01_code").is_in(list(AGE_3CLASS_LT)))
         .filter(pl.col("time_code").str.slice(4) == "000000")
-        .filter(pl.col("area_code") != "00000")
+        .filter(pl.col("area_code") != NATIONAL_AREA_CODE)
         .select(
             pl.col("area_code"),
             pl.col("area_name"),

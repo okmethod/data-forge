@@ -17,8 +17,9 @@ from data_forge.meta import SourceMeta
 # e-Stat 共通の出典表記ベース（政府統計利用規約）
 _CITATION_BASE = "出典：政府統計の総合窓口(e-Stat)（https://www.e-stat.go.jp/）"
 
-# 単一 ID に同居する 全国(level1) を表す area code。配布時に地理粒度で分離する。
+# 単一 ID に同居する 全国(level1) を表す area code / name。配布時に地理粒度で分離する。
 NATIONAL_AREA_CODE = "00000"
+NATIONAL_AREA_NAME = "全国"
 
 
 def scope_area(fact: pl.DataFrame, scope: str) -> pl.DataFrame:
@@ -39,6 +40,26 @@ def scope_area(fact: pl.DataFrame, scope: str) -> pl.DataFrame:
 def int_value() -> pl.Expr:
     """tidy な value（文字列）を Int64 へ。数字以外（"-" 等の欠損記号）は null に落とす。"""
     return pl.col("value").str.replace_all(r"[^0-9-]", "").cast(pl.Int64, strict=False)
+
+
+def area_axis_cols(national: bool) -> list[pl.Expr]:
+    """全国表と都道府県表が別 ID に分かれる census 表の area 3列（code/name/level）を選ぶ。
+
+    national=True … area 軸を持たない全国集計表：00000/全国/level1 を合成する。
+    national=False … 都道府県表（47県, level2）：原 area 列を Int8 に整えてそのまま採る。
+    industry / occupation / age5year が共用（単一 ID 内で全国↔県が同居する households 系は scope_area を使う）。
+    """
+    if national:
+        return [
+            pl.lit(NATIONAL_AREA_CODE).alias("area_code"),
+            pl.lit(NATIONAL_AREA_NAME).alias("area_name"),
+            pl.lit(1).cast(pl.Int8).alias("area_level"),
+        ]
+    return [
+        pl.col("area_code"),
+        pl.col("area_name"),
+        pl.col("area_level").cast(pl.Int8, strict=False).alias("area_level"),
+    ]
 
 
 def _as_list(value: Any) -> list[Any]:

@@ -21,7 +21,7 @@ Note（実装判断のみ）:
 import polars as pl
 
 from data_forge.area.levels import is_current_expr
-from data_forge.sources.estat.transform import int_value
+from data_forge.sources.estat.transform import area_axis_cols, int_value
 
 # 表章項目(tab): 334=就業者数（採用）。構成比(2020_45)は count から導出可能ゆえ捨てる。
 _TAB_WORKERS = "334"
@@ -86,20 +86,8 @@ def clean_occupation(tidy: pl.DataFrame, *, national: bool, classes: dict[str, s
         .filter(pl.col("cat02_code").is_in(list(SEX)))  # 男女
         .filter(pl.col("time_code").str.slice(4) == "000000")  # 不詳補完値版を除外
     )
-    if national:
-        area_cols = [
-            pl.lit("00000").alias("area_code"),
-            pl.lit("全国").alias("area_name"),
-            pl.lit(1).cast(pl.Int8).alias("area_level"),
-        ]
-    else:
-        area_cols = [
-            pl.col("area_code"),
-            pl.col("area_name"),
-            pl.col("area_level").cast(pl.Int8, strict=False).alias("area_level"),
-        ]
     return df.select(
-        *area_cols,
+        *area_axis_cols(national),
         pl.col("cat02_code").replace_strict({k: v[0] for k, v in SEX.items()}).alias("sex_code"),
         pl.col("cat02_code").replace_strict({k: v[1] for k, v in SEX.items()}).alias("sex"),
         pl.col("cat01_code").alias("occupation_code"),

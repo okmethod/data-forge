@@ -23,7 +23,7 @@ Note（実装判断のみ）:
 import polars as pl
 
 from data_forge.area.levels import is_current_expr
-from data_forge.sources.estat.transform import int_value
+from data_forge.sources.estat.transform import area_axis_cols, int_value
 
 # cat01（男女_時系列）→ (sex_code, sex名称)。コード体系は population.SEX_2005 と同じ 100/110/120。
 SEX = {"100": ("0", "総数"), "110": ("1", "男"), "120": ("2", "女")}
@@ -84,21 +84,9 @@ def clean_age5(tidy: pl.DataFrame, *, national: bool) -> pl.DataFrame:
             .alias("cat02_code")
         )
     )
-    if national:
-        area_cols = [
-            pl.lit("00000").alias("area_code"),
-            pl.lit("全国").alias("area_name"),
-            pl.lit(1).cast(pl.Int8).alias("area_level"),
-        ]
-    else:
-        area_cols = [
-            pl.col("area_code"),
-            pl.col("area_name"),
-            pl.col("area_level").cast(pl.Int8, strict=False).alias("area_level"),
-        ]
     fact = (
         df.select(
-            *area_cols,
+            *area_axis_cols(national),
             pl.col("cat01_code").replace_strict({k: v[0] for k, v in SEX.items()}).alias("sex_code"),
             pl.col("cat01_code").replace_strict({k: v[1] for k, v in SEX.items()}).alias("sex"),
             pl.col("cat02_code").alias("age_class_code"),
