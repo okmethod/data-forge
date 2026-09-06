@@ -441,7 +441,7 @@ _DAYNIGHT_POPULATION: dict[str, DatasetEntry] = {
 # 1 family に2系列が同居する（table_name はどちらも bare "age5year"）:
 #   (1) 市区町村＝ミクロ（回次別・各回別 statsDataId・2010-2020・合併畳込）… _<year> base ＋ _timeseries
 #   (2) 全国/都道府県＝世紀マクロ（回次跨・別 ID・1920-2020）… _national/_prefecture base ＋
-#       案A（地理粒度排他）で _national_timeseries / _prefecture_timeseries を別配布へ射影分離
+#       地理粒度排他で _national_timeseries / _prefecture_timeseries を別配布へ射影分離
 # 粒度は key suffix で表し family名（table_name）には持たせない（命名規約＝モジュール docstring）。
 # 2010-2020 では両系列の県値が重なる＝物理2重保存せず、回次別→県 rollup==回次跨県 を検算オラクル(test)で照合する。
 
@@ -468,7 +468,7 @@ _POPULATION_BY_AGE5: dict[str, DatasetEntry] = {
         index_columns=["area_code", "sex_code", "age_class_code", "year"],
     ),
     # 派生（射影フロー）: 47都道府県のみを area 軸で射影した県粒度 1920〜2020 時系列（世紀マクロ の配布正典）。
-    # 案A（地理粒度排他）: 全国行は含めず _national_timeseries に分離する。
+    # 地理粒度排他: 全国行は含めず _national_timeseries に分離する。
     "age5year_prefecture_timeseries": ProjectedDataset(
         key="age5year_prefecture_timeseries",
         upstreams=["age5year_prefecture"],
@@ -479,7 +479,7 @@ _POPULATION_BY_AGE5: dict[str, DatasetEntry] = {
         index_columns=["area_code", "sex_code", "age_class_code", "year"],
         grain=["area_code", "sex_code", "age_class_code", "year"],
     ),
-    # 派生（射影フロー）: 全国のみ 1920〜2020 時系列（案A で _prefecture から剥離した全国系列）。
+    # 派生（射影フロー）: 全国のみ 1920〜2020 時系列（_prefecture から剥離した全国系列）。
     "age5year_national_timeseries": ProjectedDataset(
         key="age5year_national_timeseries",
         upstreams=["age5year_national"],
@@ -578,7 +578,7 @@ _POPULATION_BY_AGE5_MUNI["age5year_municipality_timeseries"] = StitchedDataset(
 
 # === households（世帯の種類別 世帯数・世帯人員）==============================
 # 軸構造＝households.py／一覧＝docs/distributions/households.md。
-# 単一 ID に全国＋47都道府県＋全年を含む＝合併なし・射影不要。案A（地理粒度排他）で
+# 単一 ID に全国＋47都道府県＋全年を含む＝合併なし・射影不要。地理粒度排他で
 # cleaner の scope により全国/都道府県を別 Dataset に分離する（同一 ID＝fetch はキャッシュ共有）。
 _HOUSEHOLDS: dict[str, DatasetEntry] = {
     "households_prefecture_timeseries": Dataset(
@@ -607,7 +607,7 @@ _HOUSEHOLDS: dict[str, DatasetEntry] = {
 # === family_type（世帯の家族類型16区分別 世帯数・世帯人員）====================
 # 軸構造＝family_type.py／一覧＝docs/distributions/family_type.md。
 # households(0003410420) と同型の single-ID fact（全国＋47県＋全年）。分類軸が20コードの4階層ツリー。
-# 案A（地理粒度排他）で cleaner の scope により全国/都道府県を別 Dataset に分離する（fetch はキャッシュ共有）。
+# 地理粒度排他で cleaner の scope により全国/都道府県を別 Dataset に分離する（fetch はキャッシュ共有）。
 _FAMILY_TYPE: dict[str, DatasetEntry] = {
     "family_type_prefecture_timeseries": Dataset(
         key="family_type_prefecture_timeseries",
@@ -657,7 +657,7 @@ _LABOR_FORCE: dict[str, DatasetEntry] = {
         index_columns=["area_code", "sex_code", "labor_status_code", "year"],
     ),
     # 派生（射影フロー）: 47都道府県のみを area 軸で射影した 1950〜2020 時系列（配布正典）。
-    # 案A（地理粒度排他）: 全国行は含めず _national_timeseries に分離する。
+    # 地理粒度排他: 全国行は含めず _national_timeseries に分離する。
     "labor_force_prefecture_timeseries": ProjectedDataset(
         key="labor_force_prefecture_timeseries",
         upstreams=["labor_force_prefecture"],
@@ -668,7 +668,7 @@ _LABOR_FORCE: dict[str, DatasetEntry] = {
         index_columns=["area_code", "sex_code", "labor_status_code", "year"],
         grain=["area_code", "sex_code", "labor_status_code", "year"],
     ),
-    # 派生（射影フロー）: 全国のみ 1950〜2020 時系列（案A で剥離した全国系列）。
+    # 派生（射影フロー）: 全国のみ 1950〜2020 時系列（剥離した全国系列）。
     "labor_force_national_timeseries": ProjectedDataset(
         key="labor_force_national_timeseries",
         upstreams=["labor_force_national"],
@@ -707,7 +707,7 @@ _INDUSTRY: dict[str, DatasetEntry] = {
         index_columns=["area_code", "sex_code", "industry_code", "year"],
     ),
     # 派生（射影フロー）: 47都道府県のみ(2005-2020)を area 軸で射影。
-    # 案A（地理粒度排他）: 全国行は含めず _national_timeseries に分離する。
+    # 地理粒度排他: 全国行は含めず _national_timeseries に分離する。
     "industry_prefecture_timeseries": ProjectedDataset(
         key="industry_prefecture_timeseries",
         upstreams=["industry_prefecture"],
@@ -718,7 +718,7 @@ _INDUSTRY: dict[str, DatasetEntry] = {
         index_columns=["area_code", "sex_code", "industry_code", "year"],
         grain=["area_code", "sex_code", "industry_code", "year"],
     ),
-    # 派生（射影フロー）: 全国のみ(1995-2020) 時系列（案A で剥離した全国系列）。
+    # 派生（射影フロー）: 全国のみ(1995-2020) 時系列（剥離した全国系列）。
     "industry_national_timeseries": ProjectedDataset(
         key="industry_national_timeseries",
         upstreams=["industry_national"],
@@ -757,7 +757,7 @@ _OCCUPATION_MAJOR12: dict[str, DatasetEntry] = {
         index_columns=["area_code", "sex_code", "occupation_code", "year"],
     ),
     # 派生（射影フロー）: 47都道府県のみ(2005-2020)を area 軸で射影。
-    # 案A（地理粒度排他）: 全国行は含めず _national_timeseries に分離する。
+    # 地理粒度排他: 全国行は含めず _national_timeseries に分離する。
     "occupation_major12_prefecture_timeseries": ProjectedDataset(
         key="occupation_major12_prefecture_timeseries",
         upstreams=["occupation_major12_prefecture"],
@@ -768,7 +768,7 @@ _OCCUPATION_MAJOR12: dict[str, DatasetEntry] = {
         index_columns=["area_code", "sex_code", "occupation_code", "year"],
         grain=["area_code", "sex_code", "occupation_code", "year"],
     ),
-    # 派生（射影フロー）: 全国のみ(1995-2020) 時系列（案A で剥離した全国系列）。
+    # 派生（射影フロー）: 全国のみ(1995-2020) 時系列（剥離した全国系列）。
     "occupation_major12_national_timeseries": ProjectedDataset(
         key="occupation_major12_national_timeseries",
         upstreams=["occupation_major12_national"],
@@ -807,7 +807,7 @@ _OCCUPATION_MAJOR10: dict[str, DatasetEntry] = {
         index_columns=["area_code", "sex_code", "occupation_code", "year"],
     ),
     # 派生（射影フロー）: 47都道府県のみ(1980-2005)を area 軸で射影。
-    # 案A（地理粒度排他）: 全国行は含めず _national_timeseries に分離する。
+    # 地理粒度排他: 全国行は含めず _national_timeseries に分離する。
     "occupation_major10_prefecture_timeseries": ProjectedDataset(
         key="occupation_major10_prefecture_timeseries",
         upstreams=["occupation_major10_prefecture"],
@@ -818,7 +818,7 @@ _OCCUPATION_MAJOR10: dict[str, DatasetEntry] = {
         index_columns=["area_code", "sex_code", "occupation_code", "year"],
         grain=["area_code", "sex_code", "occupation_code", "year"],
     ),
-    # 派生（射影フロー）: 全国のみ(1950-2005) 時系列（案A で剥離した全国系列）。
+    # 派生（射影フロー）: 全国のみ(1950-2005) 時系列（剥離した全国系列）。
     "occupation_major10_national_timeseries": ProjectedDataset(
         key="occupation_major10_national_timeseries",
         upstreams=["occupation_major10_national"],

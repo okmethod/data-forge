@@ -1,7 +1,8 @@
 """国勢調査「人口」grain ファクトのクレンジング（男女別総人口＋年齢3区分×男女＋各マクロ）。
 
-transform.to_tidy() のロング形式を配布用の1枚テーブルへ整形する。特定統計表に依存しない汎用処理は
-transform.py。本モジュールは「人口」grain の cleaner を集約する（詳細は各関数 docstring が正典）:
+transform.to_tidy() のロング形式を配布用の1枚テーブルへ整形する。
+特定統計表に依存しない汎用処理はtransform.py。
+本モジュールは「人口」grain の cleaner を集約する（詳細は各関数 docstring が正典）:
 
 - clean_population（男女別総人口・8列）＝ clean_1980..2020/2025速報。
   同名「男女別人口」でも e-Stat のスキーマ設計は年（テーブル世代）で全く異なる（4変種）。
@@ -14,24 +15,19 @@ transform.py。本モジュールは「人口」grain の cleaner を集約す�
   年齢不詳を「総数−3区分」で導出注入する。
 - clean_by_age_prefecture / clean_population_prefecture＝回次跨の県マクロ（1920〜）。
 
-**正規化の契約は「入力パースの共有」ではなく「共通の出力スキーマへの写像」**。
+Note（実装判断のみ）:
+- 正規化の契約は「入力パースの共有」ではなく**「共通の出力スキーマへの写像」**。
+- 年またぎで信頼できる area キーは area_code のみ。area_name/area_level は年で意味・表記が異なる。
+  例: 2005 は level3=市区町村・名称が「北海道札幌市」形式／2020 は level4=市・6=市区町村。
+  詳細は上記「年ごとのスキーマ差」。
+  多年の正規化（合併の後継自治体への集約や area 属性の統一）は地域マスタ(crosswalk)で行う想定。
+  is_current: area 階層が 7（旧市区町村・合併消滅）でないもの（level7 は 2020型のみ）。
+- by_age/マクロ を別モジュールへ切らず同居させるのは private helper
+  （clean_population・_prepend_national_from_prefectures・SEX_2005 等）を共有するため。
+  別モジュール化すると公開せねばならず surface が増える（モジュール分割は「実例が2つ揃ってから」原則で見送り）。
 
-出力スキーマ（clean_population）:
-  area_code(str) / area_name(str) / area_level(int) /
-  sex_code(str) / sex(str) / year(int) /
-  population(Int64) / is_current(bool)
-  （clean_population_by_age は age_class_code / age_class を足した10列）
-
-NOTE: area_name / area_level は年（テーブル世代）で意味・表記が異なる。
-（例: 2005は level3=市区町村・名称が「北海道札幌市」形式、2020は level4=市/6=市区町村）
-年またぎで信頼できるのは area_code のみ。
-多年の正規化（合併の後継自治体への集約や area 属性の統一）は地域マスタ(crosswalk)で行う想定。
-is_current: area 階層が 7（旧市区町村・合併消滅）でないもの（level7 は 2020型のみ存在）。
-
-NOTE: by_age/マクロ を別モジュール（例: population_by_age.py）へ切らず本ファイルに同居させるのは、
-clean_population・_prepend_national_from_prefectures・SEX_2005 等の private helper を共有するため
-（切ると helper を公開せねばならず surface が増える）。粒度バリアントで age5.py が独立なのと非対称だが、
-モジュール分割は「実例が2つ揃ってから」原則で見送り（本モジュールの俯瞰は上記の構成マップで代替）。
+出力スキーマは clean_population が8列・clean_population_by_age が age_class_code/age_class を足した10列。
+列は各 clean_* の select が正典。
 """
 
 from collections.abc import Callable, Sequence
@@ -240,10 +236,10 @@ def _inject_age_unknown(fact: pl.DataFrame) -> pl.DataFrame:
 # --- population_by_age 世紀マクロ（回次跨・都道府県・1920〜2020）--------------------
 # 回次跨時系列「年齢（3区分）別人口及び年齢別割合 － 全国，都道府県（大正9年～令和2年）」0003410383。
 # ミクロ clean_population_by_age（市区町村・各回別ID・1980〜）とは別ソースの都道府県マクロで、
-# age5.clean_prefecture と同じ役回り（回次跨 raw を1920まで遡る世紀マクロ）。差の要点:
+# age5year.clean_prefecture と同じ役回り（回次跨 raw を1920まで遡る世紀マクロ）。差の要点:
 #   - 本表は **男女軸を持たない**（総数のみ）→ sex は総数固定。aging（高齢化率）物語は総数ベースで充足。
 #   - tab=1060(実数)/105(割合)。cat01=年齢3区分(100総数/105:0-14/120:15-64/130:65+)。DID 軸なし。
-#   - 2015/2020 は不詳補完版(time 末尾000010)が併存 → 通常版(000000)へ統一（age5/by_age ミクロと同方針）。
+#   - 2015/2020 は不詳補完版(time 末尾000010)が併存 → 通常版(000000)へ統一（age5year/by_age ミクロと同方針）。
 #   - 全国(00000)行は落とし **47都道府県のみ**を出す（配布・ダッシュボードは全国=Σ47県で復元＝
 #     空間rollup 版と同一シェイプ＝ドロップイン）。
 # age_class_code はミクロ AGE_TS と同一ターゲット('0'/'1'/'2'/'3'/'9')へ揃える（cat01 の 0-14 は
@@ -290,7 +286,7 @@ def clean_by_age_prefecture(tidy: pl.DataFrame) -> pl.DataFrame:
 # --- population 世紀マクロ（回次跨・都道府県・1920〜2020）--------------------------
 # 回次跨時系列「男女別人口及び人口性比 － 全国，都道府県（大正9年～令和2年）」0003410379。
 # ミクロ population（市区町村・各回別ID・1980〜＋2025速報）とは別ソースの都道府県マクロで、
-# age5.clean_prefecture と同じ役回り（回次跨 raw を1920まで遡る）。要点:
+# age5year.clean_prefecture と同じ役回り（回次跨 raw を1920まで遡る）。要点:
 #   - tab=020(人口)/1120(性比)。cat01=男女(100総数/110男/120女＝SEX_2005)。年齢軸なし。
 #   - area=全国(00000)＋人口集中地区(00100/00200)＋47県。全国と DID を落とし **47都道府県のみ**
 #     （配布・ダッシュボードは全国=Σ47県で復元＝旧・空間rollup 版と同一シェイプ＝ドロップイン）。

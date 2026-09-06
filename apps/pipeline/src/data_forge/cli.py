@@ -219,7 +219,7 @@ _CROSSFACT: dict[str, list[_CrossFactSpec]] = {
 }
 
 
-# 地理保存則（G）: 案A で全国/県を別配布に分けた各 family で、全国(_national_timeseries) == Σ都道府県
+# 地理保存則（G）: 全国/県を別配布に分けた各 family で、全国(_national_timeseries) == Σ都道府県
 # (_prefecture_timeseries) を分類軸×year で検算する（split が値を落とさない/二重化しない保証）。
 # hub=全国・other=県 を area_code を含めない keys で突合＝other 側は自動で47県合算される。
 # scope_years＝県が未収録の旧回（全国のみ・other==0 を許容）。known_diff_years＝原資料の集計差
