@@ -21,9 +21,9 @@ from data_forge.sources.estat.transform import (
     SEX,
     area_passthrough_cols,
     code_name_cols,
-    exclude_imputed_version,
-    int_value,
-    year_from_time_code,
+    exclude_imputed_version_expr,
+    int_value_expr,
+    year_from_time_code_expr,
 )
 
 # 表章項目(tab): 320=15歳以上人口（採用）/ 1240=労働力率（率は count から導出可能ゆえ捨てる）。
@@ -57,7 +57,7 @@ def clean_labor_force(tidy: pl.DataFrame) -> pl.DataFrame:
         tidy.filter(pl.col("tab_code") == _TAB_POPULATION)
         .filter(pl.col("cat01_code").is_in(list(LABOR_STATUS)))  # 労働力状態
         .filter(pl.col("cat02_code").is_in(list(SEX)))  # 男女
-        .filter(exclude_imputed_version())
+        .filter(exclude_imputed_version_expr())
     )
     fact = df.select(
         *area_passthrough_cols(),
@@ -65,8 +65,8 @@ def clean_labor_force(tidy: pl.DataFrame) -> pl.DataFrame:
         pl.col("cat01_code").alias("labor_status_code"),
         pl.col("cat01_code").replace_strict(LABOR_STATUS).alias("labor_status"),
         # time_code 例: "2020000000" の先頭4桁が年
-        year_from_time_code(),
-        int_value().alias("population"),
+        year_from_time_code_expr(),
+        int_value_expr().alias("population"),
     ).with_columns(is_current_expr())
     return _inject_labor_unknown(fact)
 

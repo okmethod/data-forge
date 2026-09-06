@@ -25,7 +25,12 @@ Note（実装判断のみ）:
 import polars as pl
 
 from data_forge.area.levels import is_current_expr
-from data_forge.sources.estat.transform import area_passthrough_cols, int_value, scope_area, year_from_time_code
+from data_forge.sources.estat.transform import (
+    area_passthrough_cols,
+    int_value_expr,
+    scope_area,
+    year_from_time_code_expr,
+)
 
 # cat01（世帯の家族類型16区分A_時系列）→ 名称。20コードのツリー（@level は cat01_level から採る）。
 FAMILY_TYPE = {
@@ -74,8 +79,8 @@ def clean_family_type(tidy: pl.DataFrame, *, scope: str = "all") -> pl.DataFrame
     """
     base = tidy.filter(pl.col("cat01_code").is_in(list(FAMILY_TYPE)))
     keys = ["area_code", "area_name", "area_level", "cat01_code", "cat01_level", "time_code"]
-    households = base.filter(pl.col("tab_code") == _TAB_HOUSEHOLDS).select(*keys, int_value().alias("households"))
-    members = base.filter(pl.col("tab_code") == _TAB_MEMBERS).select(*keys, int_value().alias("household_members"))
+    households = base.filter(pl.col("tab_code") == _TAB_HOUSEHOLDS).select(*keys, int_value_expr().alias("households"))
+    members = base.filter(pl.col("tab_code") == _TAB_MEMBERS).select(*keys, int_value_expr().alias("household_members"))
     fact = (
         households.join(members, on=keys, how="left")
         .select(
@@ -84,7 +89,7 @@ def clean_family_type(tidy: pl.DataFrame, *, scope: str = "all") -> pl.DataFrame
             pl.col("cat01_code").replace_strict(FAMILY_TYPE).alias("family_type"),
             pl.col("cat01_level").cast(pl.Int8, strict=False).alias("family_type_level"),
             # time_code 例: "2020000000" の先頭4桁が年
-            year_from_time_code(),
+            year_from_time_code_expr(),
             pl.col("households"),
             pl.col("household_members"),
         )

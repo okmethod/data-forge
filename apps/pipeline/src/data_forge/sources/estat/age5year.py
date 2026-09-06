@@ -27,9 +27,9 @@ from data_forge.sources.estat.transform import (
     SEX,
     area_axis_cols,
     code_name_cols,
-    exclude_imputed_version,
-    int_value,
-    year_from_time_code,
+    exclude_imputed_version_expr,
+    int_value_expr,
+    year_from_time_code_expr,
 )
 
 # cat02（年齢5歳階級_時系列）で全国・都道府県 両表に共通存在するコードのみ採用。
@@ -79,7 +79,7 @@ def clean_age5(tidy: pl.DataFrame, *, national: bool) -> pl.DataFrame:
         .filter(pl.col("cat02_code").is_in([*AGE5, *_AGE5_85PLUS_PARTS]))
         # 2015/2020 は「不詳補完値」版(time_code 末尾 000010)が併存する。population_by_age と
         # 同方針で通常版(000000)に統一する（補完版を混ぜると方法論の継ぎ目が生じ二重計上になる）。
-        .filter(exclude_imputed_version())
+        .filter(exclude_imputed_version_expr())
         # 85+細分(320-370)を共通粒度の 85歳以上(310)へ畳む（畳んだ後 AGE5 の名称写像が通る）。
         .with_columns(
             pl.when(pl.col("cat02_code").is_in(_AGE5_85PLUS_PARTS))
@@ -95,8 +95,8 @@ def clean_age5(tidy: pl.DataFrame, *, national: bool) -> pl.DataFrame:
             pl.col("cat02_code").alias("age_class_code"),
             pl.col("cat02_code").replace_strict(AGE5).alias("age_class"),
             # time_code 例: "2020000000" の先頭4桁が年
-            year_from_time_code(),
-            int_value().alias("population"),
+            year_from_time_code_expr(),
+            int_value_expr().alias("population"),
         )
         # 310 へ畳んだ 85+細分を1行へ合算する（全 null の単一セルは null を保つ＝0 に化けさせない）。
         .group_by(

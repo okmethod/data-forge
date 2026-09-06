@@ -149,18 +149,22 @@ def cross_fact(
     known_ok = pl.col("status") == "known_diff"
     if mode != "conservation":
         known_ok = known_ok & (pl.col("diff") >= 0)
-    return rep.with_columns(status.alias("status")).with_columns(
-        (
-            (pl.col("status") == "match")
-            | ((pl.col("status") == "scope_out") & (pl.col("other") == 0))
-            | known_ok
-            | (
-                (pl.col("status") == "bound")
-                & (pl.col("diff") >= 0)
-                & ((pl.col("other") > 0) | (pl.col("hub") == 0))
-            )
-        ).alias("ok")
-    ).sort(keys)
+    return (
+        rep.with_columns(status.alias("status"))
+        .with_columns(
+            (
+                (pl.col("status") == "match")
+                | ((pl.col("status") == "scope_out") & (pl.col("other") == 0))
+                | known_ok
+                | (
+                    (pl.col("status") == "bound")
+                    & (pl.col("diff") >= 0)
+                    & ((pl.col("other") > 0) | (pl.col("hub") == 0))
+                )
+            ).alias("ok")
+        )
+        .sort(keys)
+    )
 
 
 def orphans(atom_fact: pl.DataFrame, events: pl.DataFrame, *, base_year: int | None = None) -> pl.DataFrame:
@@ -209,9 +213,7 @@ def dangling_successors(events: pl.DataFrame, atom_fact: pl.DataFrame) -> pl.Dat
     この宇宙のどこにも無い successor_code は着地先の無い dangling 参照＝ほぼ指定ミスなので、
     人手確認用に該当行を返す（rollup は無効化しないので配布は止めず、警告に留める）。
     """
-    universe = set(atom_fact.get_column("area_code").unique().to_list()) | set(
-        events.get_column("old_code").to_list()
-    )
+    universe = set(atom_fact.get_column("area_code").unique().to_list()) | set(events.get_column("old_code").to_list())
     return events.filter(
         pl.col("successor_code").is_not_null()
         & (pl.col("successor_code").str.len_chars() > 0)

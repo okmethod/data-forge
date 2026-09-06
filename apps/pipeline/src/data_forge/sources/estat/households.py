@@ -25,7 +25,12 @@ Note（実装判断のみ）:
 import polars as pl
 
 from data_forge.area.levels import is_current_expr
-from data_forge.sources.estat.transform import area_passthrough_cols, int_value, scope_area, year_from_time_code
+from data_forge.sources.estat.transform import (
+    area_passthrough_cols,
+    int_value_expr,
+    scope_area,
+    year_from_time_code_expr,
+)
 
 # level2 に混じる人口集中地区（DID）系。都道府県と同 level だが地理単位でないため除外する。
 _DID_AREA_CODES = ("00100", "00200")
@@ -53,8 +58,8 @@ def clean_households(tidy: pl.DataFrame, *, scope: str = "all") -> pl.DataFrame:
     """
     base = tidy.filter(pl.col("cat01_code").is_in(list(HOUSEHOLD_TYPE)) & ~pl.col("area_code").is_in(_DID_AREA_CODES))
     keys = ["area_code", "area_name", "area_level", "cat01_code", "time_code"]
-    households = base.filter(pl.col("tab_code") == _TAB_HOUSEHOLDS).select(*keys, int_value().alias("households"))
-    members = base.filter(pl.col("tab_code") == _TAB_MEMBERS).select(*keys, int_value().alias("household_members"))
+    households = base.filter(pl.col("tab_code") == _TAB_HOUSEHOLDS).select(*keys, int_value_expr().alias("households"))
+    members = base.filter(pl.col("tab_code") == _TAB_MEMBERS).select(*keys, int_value_expr().alias("household_members"))
     fact = households.join(members, on=keys, how="left")
     result = (
         fact.select(
@@ -62,7 +67,7 @@ def clean_households(tidy: pl.DataFrame, *, scope: str = "all") -> pl.DataFrame:
             pl.col("cat01_code").alias("household_type_code"),
             pl.col("cat01_code").replace_strict(HOUSEHOLD_TYPE).alias("household_type"),
             # time_code 例: "2020000000" の先頭4桁が年
-            year_from_time_code(),
+            year_from_time_code_expr(),
             pl.col("households"),
             pl.col("household_members"),
         )

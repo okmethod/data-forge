@@ -22,9 +22,9 @@ from data_forge.sources.estat.transform import (
     SEX,
     area_axis_cols,
     code_name_cols,
-    exclude_imputed_version,
-    int_value,
-    year_from_time_code,
+    exclude_imputed_version_expr,
+    int_value_expr,
+    year_from_time_code_expr,
 )
 
 # 表章項目(tab): 334=就業者数（採用）。構成比(2020_44)は count から導出可能ゆえ捨てる。
@@ -74,7 +74,7 @@ def clean_industry(tidy: pl.DataFrame, *, national: bool) -> pl.DataFrame:
         tidy.filter(pl.col("tab_code") == _TAB_WORKERS)
         .filter(pl.col("cat01_code").is_in(list(INDUSTRY)))  # 産業大分類（再掲を除外）
         .filter(pl.col("cat02_code").is_in(list(SEX)))  # 男女
-        .filter(exclude_imputed_version())
+        .filter(exclude_imputed_version_expr())
     )
     return df.select(
         *area_axis_cols(national),
@@ -82,8 +82,8 @@ def clean_industry(tidy: pl.DataFrame, *, national: bool) -> pl.DataFrame:
         pl.col("cat01_code").alias("industry_code"),
         pl.col("cat01_code").replace_strict(INDUSTRY).alias("industry"),
         # time_code 例: "2020000000" の先頭4桁が年
-        year_from_time_code(),
-        int_value().alias("workers"),
+        year_from_time_code_expr(),
+        int_value_expr().alias("workers"),
     ).with_columns(is_current_expr())
 
 

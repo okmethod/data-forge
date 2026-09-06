@@ -50,7 +50,7 @@ def _load_raw() -> dict:
 
 
 def test_extract_meta():
-    meta = transform.extract_meta(_load_raw())
+    meta = transform.extract_source_meta(_load_raw())
     assert meta.source == "estat"
     assert meta.dataset_id == "0003445078"
     assert meta.provider == "総務省"

@@ -34,7 +34,7 @@ age_class_code は 5歳刻みの独自連番（100=総数 / 999=不詳・100歳�
 import polars as pl
 
 from data_forge.area.levels import is_current_expr
-from data_forge.sources.estat.transform import area_passthrough_cols, int_value, year_from_time_code
+from data_forge.sources.estat.transform import area_passthrough_cols, int_value_expr, year_from_time_code_expr
 
 # 出力 age_class_code → 名称（5歳刻み・100歳以上を終端に保持・独自連番）。
 AGE_CLASS = {
@@ -242,8 +242,8 @@ def _clean(
         pl.col(f"{age_col}_code").replace_strict(age_map).alias("age_class_code"),
         pl.col(f"{age_col}_code").replace_strict({k: AGE_CLASS[v] for k, v in age_map.items()}).alias("age_class"),
         # time_code 例: "2020000000" の先頭4桁が年
-        year_from_time_code(),
-        int_value().alias("population"),
+        year_from_time_code_expr(),
+        int_value_expr().alias("population"),
     ).with_columns(is_current_expr())
 
 

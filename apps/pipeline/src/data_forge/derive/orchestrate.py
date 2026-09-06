@@ -35,11 +35,9 @@ JOIN_CHOICES = [*_COMBINE_JOINS, *_TIME_ROLLUP_JOINS, *_SPACE_ROLLUP_JOINS]
 
 def _load_base(ds: Dataset, *, refresh: bool = False) -> tuple[pl.DataFrame, SourceMeta]:
     """基底データセットを fetch→clean し、配布用 DF と出典メタを返す。"""
-    raw = estat_fetch.fetch(
-        ds.source_params["stats_data_id"], refresh=refresh, filters=ds.source_params.get("filters")
-    )
+    raw = estat_fetch.fetch(ds.source_params["stats_data_id"], refresh=refresh, filters=ds.source_params.get("filters"))
     df = ds.cleaner(transform.to_tidy(raw))
-    return df, transform.extract_meta(raw)
+    return df, transform.extract_source_meta(raw)
 
 
 def _upstream_frames(
@@ -83,7 +81,7 @@ def _atom_upstreams(ds: StitchedDataset, *, refresh: bool) -> tuple[list[pl.Data
         atom_frames.append(area_atoms.extract_atoms(fact, hierarchy, year=year, muni_levels=up.muni_levels))
         # 全国行はそのまま渡す（reconcile が分類軸コードで総数スライスを絞るため列を落とさない）。
         nationals.append(fact.filter(pl.col("area_code") == "00000"))
-        metas.append(transform.extract_meta(raw))
+        metas.append(transform.extract_source_meta(raw))
     return atom_frames, metas, pl.concat(nationals)
 
 

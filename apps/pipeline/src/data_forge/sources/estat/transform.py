@@ -27,87 +27,32 @@ NATIONAL_AREA_NAME = "全国"
 SEX = {"100": ("0", "総数"), "110": ("1", "男"), "120": ("2", "女")}
 
 
-def scope_area(fact: pl.DataFrame, scope: str) -> pl.DataFrame:
-    """配布スキーマの地理粒度を排他選択する: national=全国のみ / prefecture=47都道府県のみ / all=両方。
-
-    単一 ID に全国(level1) と 47都道府県(level2) が同居する fact（households / family_type 等）で、
-    配布時に地理粒度を分離するための共通フィルタ。
-    """
-    if scope == "all":
-        return fact
-    if scope == "national":
-        return fact.filter(pl.col("area_code") == NATIONAL_AREA_CODE)
-    if scope == "prefecture":
-        return fact.filter(pl.col("area_code") != NATIONAL_AREA_CODE)
-    raise ValueError(f"未知の scope: {scope!r}（all/national/prefecture のいずれか）")
-
-
-def int_value() -> pl.Expr:
-    """tidy な value（文字列）を Int64 へ。数字以外（"-" 等の欠損記号）は null に落とす。"""
-    return pl.col("value").str.replace_all(r"[^0-9-]", "").cast(pl.Int64, strict=False)
-
-
-def year_from_time_code() -> pl.Expr:
-    """time_code の先頭4桁を調査年 year(Int16) へ（例: "2020000000" → 2020）。"""
-    return pl.col("time_code").str.slice(0, 4).cast(pl.Int16).alias("year")
-
-
-def exclude_imputed_version() -> pl.Expr:
-    """通常版のみ残す filter 述語（不詳補完値版 time_code 末尾 000010 を除外）。
-
-    2015/2020 の census 表は「不詳補完値」版が通常版と併存する。
-    混ぜると方法論の継ぎ目が二重計上を生むため通常版（末尾 000000）に統一する。
-    age5year / industry / occupation / labor_force が共用。
-    """
-    return pl.col("time_code").str.slice(4) == "000000"
-
-
-def area_passthrough_cols() -> list[pl.Expr]:
-    """原 area 列（code/name）をそのまま採り、area_level だけ Int8 に整える3列。
-
-    ソースの area 行をそのまま配布する表（households / family_type / daynight / population 等）が共用。
-    area_level は年で dtype が揺れるため strict=False で寄せる（未変換は null）。
-    """
-    return [
-        pl.col("area_code"),
-        pl.col("area_name"),
-        pl.col("area_level").cast(pl.Int8, strict=False).alias("area_level"),
-    ]
-
-
-def code_name_cols(src: str, mapping: dict[str, tuple[str, str]], name: str) -> list[pl.Expr]:
-    """コード→(出力コード, 名称) の辞書で src 列を <name>_code / <name> の2列へ写像する。
-
-    e-Stat の軸コード（SEX / AGE_* / DAYNIGHT 等）を配布スキーマの code/name ペアへ一括変換する。
-    src の値は mapping のキーを網羅している前提（replace_strict＝未知値は例外）。
-    """
-    return [
-        pl.col(src).replace_strict({k: v[0] for k, v in mapping.items()}).alias(f"{name}_code"),
-        pl.col(src).replace_strict({k: v[1] for k, v in mapping.items()}).alias(name),
-    ]
-
-
-def area_axis_cols(national: bool) -> list[pl.Expr]:
-    """全国表と都道府県表が別 ID に分かれる census 表の area 3列（code/name/level）を選ぶ。
-
-    national=True … area 軸を持たない全国集計表：00000/全国/level1 を合成する。
-    national=False … 都道府県表（47県, level2）：原 area 列をそのまま採る（area_passthrough_cols）。
-    industry / occupation / age5year が共用（単一 ID 内で全国↔県が同居する households 系は scope_area を使う）。
-    """
-    if national:
-        return [
-            pl.lit(NATIONAL_AREA_CODE).alias("area_code"),
-            pl.lit(NATIONAL_AREA_NAME).alias("area_name"),
-            pl.lit(1).cast(pl.Int8).alias("area_level"),
-        ]
-    return area_passthrough_cols()
+# ---------------------------------------------------------------------------
+# raw JSON（GET_STATS_DATA）→ メタ / DataFrame 抽出
+# ---------------------------------------------------------------------------
 
 
 def _as_list(value: Any) -> list[Any]:
     return value if isinstance(value, list) else [value]
 
 
-def extract_meta(raw: dict[str, Any]) -> SourceMeta:
+def _build_axis_lookups(raw: dict[str, Any]) -> dict[str, dict[str, dict[str, str]]]:
+    """軸ID → コード → {name, level} の辞書を構築する。"""
+    class_objs = _as_list(raw["GET_STATS_DATA"]["STATISTICAL_DATA"]["CLASS_INF"]["CLASS_OBJ"])
+    lookups: dict[str, dict[str, dict[str, str]]] = {}
+    for obj in class_objs:
+        axis_id = obj["@id"]
+        table: dict[str, dict[str, str]] = {}
+        for item in _as_list(obj["CLASS"]):
+            table[item["@code"]] = {
+                "name": item.get("@name", ""),
+                "level": item.get("@level", ""),
+            }
+        lookups[axis_id] = table
+    return lookups
+
+
+def extract_source_meta(raw: dict[str, Any]) -> SourceMeta:
     """TABLE_INF から共通の出典メタ（出典表記込み）を組み立てる。"""
     table = raw["GET_STATS_DATA"]["STATISTICAL_DATA"]["TABLE_INF"]
     dataset_id = str(table.get("@id", ""))
@@ -124,22 +69,6 @@ def extract_meta(raw: dict[str, Any]) -> SourceMeta:
         citation=f"{_CITATION_BASE} 「{stat_name} {title}」を加工して作成",
         attributes={"stat_name": stat_name, "survey_date": survey_date},
     )
-
-
-def _build_lookups(raw: dict[str, Any]) -> dict[str, dict[str, dict[str, str]]]:
-    """軸ID → コード → {name, level} の辞書を構築する。"""
-    class_objs = _as_list(raw["GET_STATS_DATA"]["STATISTICAL_DATA"]["CLASS_INF"]["CLASS_OBJ"])
-    lookups: dict[str, dict[str, dict[str, str]]] = {}
-    for obj in class_objs:
-        axis_id = obj["@id"]
-        table: dict[str, dict[str, str]] = {}
-        for item in _as_list(obj["CLASS"]):
-            table[item["@code"]] = {
-                "name": item.get("@name", ""),
-                "level": item.get("@level", ""),
-            }
-        lookups[axis_id] = table
-    return lookups
 
 
 def extract_area_hierarchy(raw: dict[str, Any]) -> pl.DataFrame:
@@ -175,7 +104,7 @@ def extract_area_hierarchy(raw: dict[str, Any]) -> pl.DataFrame:
 
 def to_tidy(raw: dict[str, Any]) -> pl.DataFrame:
     """スタースキーマを名称解決済みのロング形式 DataFrame に変換する。"""
-    lookups = _build_lookups(raw)
+    lookups = _build_axis_lookups(raw)
     values = _as_list(raw["GET_STATS_DATA"]["STATISTICAL_DATA"]["DATA_INF"]["VALUE"])
 
     records: list[dict[str, Any]] = []
@@ -192,3 +121,84 @@ def to_tidy(raw: dict[str, Any]) -> pl.DataFrame:
         records.append(row)
 
     return pl.DataFrame(records)
+
+
+# ---------------------------------------------------------------------------
+# tidy 後の列整形ヘルパ（value / time / area / 汎用マッピング）
+# ---------------------------------------------------------------------------
+
+
+def int_value_expr() -> pl.Expr:
+    """tidy な value（文字列）を Int64 へ落とす Expr。数字以外（"-" 等の欠損記号）は null。"""
+    return pl.col("value").str.replace_all(r"[^0-9-]", "").cast(pl.Int64, strict=False)
+
+
+def year_from_time_code_expr() -> pl.Expr:
+    """time_code の先頭4桁を調査年 year(Int16) へ変換する Expr（例: "2020000000" → 2020）。"""
+    return pl.col("time_code").str.slice(0, 4).cast(pl.Int16).alias("year")
+
+
+def exclude_imputed_version_expr() -> pl.Expr:
+    """通常版のみ残す filter 述語 Expr（不詳補完値版 time_code 末尾 000010 を除外）。
+
+    2015/2020 の census 表は「不詳補完値」版が通常版と併存する。
+    混ぜると方法論の継ぎ目が二重計上を生むため通常版（末尾 000000）に統一する。
+    age5year / industry / occupation / labor_force が共用。
+    """
+    return pl.col("time_code").str.slice(4) == "000000"
+
+
+def scope_area(fact: pl.DataFrame, scope: str) -> pl.DataFrame:
+    """配布スキーマの地理粒度を排他選択する: national=全国のみ / prefecture=47都道府県のみ / all=両方。
+
+    単一 ID に全国(level1) と 47都道府県(level2) が同居する fact（households / family_type 等）で、
+    配布時に地理粒度を分離するための共通フィルタ。
+    """
+    if scope == "all":
+        return fact
+    if scope == "national":
+        return fact.filter(pl.col("area_code") == NATIONAL_AREA_CODE)
+    if scope == "prefecture":
+        return fact.filter(pl.col("area_code") != NATIONAL_AREA_CODE)
+    raise ValueError(f"未知の scope: {scope!r}（all/national/prefecture のいずれか）")
+
+
+def area_passthrough_cols() -> list[pl.Expr]:
+    """原 area 列（code/name）をそのまま採り、area_level だけ Int8 に整える3列。
+
+    ソースの area 行をそのまま配布する表（households / family_type / daynight / population 等）が共用。
+    area_level は年で dtype が揺れるため strict=False で寄せる（未変換は null）。
+    """
+    return [
+        pl.col("area_code"),
+        pl.col("area_name"),
+        pl.col("area_level").cast(pl.Int8, strict=False).alias("area_level"),
+    ]
+
+
+def area_axis_cols(national: bool) -> list[pl.Expr]:
+    """全国表と都道府県表が別 ID に分かれる census 表の area 3列（code/name/level）を選ぶ。
+
+    national=True … area 軸を持たない全国集計表：00000/全国/level1 を合成する。
+    national=False … 都道府県表（47県, level2）：原 area 列をそのまま採る（area_passthrough_cols）。
+    industry / occupation / age5year が共用（単一 ID 内で全国↔県が同居する households 系は scope_area を使う）。
+    """
+    if national:
+        return [
+            pl.lit(NATIONAL_AREA_CODE).alias("area_code"),
+            pl.lit(NATIONAL_AREA_NAME).alias("area_name"),
+            pl.lit(1).cast(pl.Int8).alias("area_level"),
+        ]
+    return area_passthrough_cols()
+
+
+def code_name_cols(src: str, mapping: dict[str, tuple[str, str]], name: str) -> list[pl.Expr]:
+    """コード→(出力コード, 名称) の辞書で src 列を <name>_code / <name> の2列へ写像する。
+
+    e-Stat の軸コード（SEX / AGE_* / DAYNIGHT 等）を配布スキーマの code/name ペアへ一括変換する。
+    src の値は mapping のキーを網羅している前提（replace_strict＝未知値は例外）。
+    """
+    return [
+        pl.col(src).replace_strict({k: v[0] for k, v in mapping.items()}).alias(f"{name}_code"),
+        pl.col(src).replace_strict({k: v[1] for k, v in mapping.items()}).alias(name),
+    ]

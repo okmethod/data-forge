@@ -40,9 +40,9 @@ from data_forge.sources.estat.transform import (
     area_axis_cols,
     area_passthrough_cols,
     code_name_cols,
-    exclude_imputed_version,
-    int_value,
-    year_from_time_code,
+    exclude_imputed_version_expr,
+    int_value_expr,
+    year_from_time_code_expr,
 )
 
 # 男女コードマップ: 生の {軸コード → (sex_code, sex名称)}
@@ -85,8 +85,8 @@ def clean_population(
             *area_passthrough_cols(),
             *code_name_cols(axis_code, sex_by_code, "sex"),
             # time_code 例: "2020000000" の先頭4桁が年
-            year_from_time_code(),
-            int_value().alias("population"),
+            year_from_time_code_expr(),
+            int_value_expr().alias("population"),
         )
         .with_columns(
             is_current_expr(),
@@ -203,8 +203,8 @@ def clean_population_by_age(tidy: pl.DataFrame) -> pl.DataFrame:
             *area_passthrough_cols(),
             *code_name_cols("cat02_code", SEX_2005, "sex"),
             *code_name_cols("cat01_code", AGE_TS, "age_class"),
-            year_from_time_code(),
-            int_value().alias("population"),
+            year_from_time_code_expr(),
+            int_value_expr().alias("population"),
         )
         .with_columns(is_current_expr())
     )
@@ -266,15 +266,15 @@ def clean_by_age_prefecture(tidy: pl.DataFrame) -> pl.DataFrame:
     fact = (
         tidy.filter(pl.col("tab_code") == "1060")
         .filter(pl.col("cat01_code").is_in(list(AGE_3CLASS_LT)))
-        .filter(exclude_imputed_version())
+        .filter(exclude_imputed_version_expr())
         .filter(pl.col("area_code") != NATIONAL_AREA_CODE)
         .select(
             *area_passthrough_cols(),
             pl.lit("0").alias("sex_code"),
             pl.lit("総数").alias("sex"),
             *code_name_cols("cat01_code", AGE_3CLASS_LT, "age_class"),
-            year_from_time_code(),
-            int_value().alias("population"),
+            year_from_time_code_expr(),
+            int_value_expr().alias("population"),
         )
         .with_columns(is_current_expr())
     )
