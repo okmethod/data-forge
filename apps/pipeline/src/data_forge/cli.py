@@ -78,11 +78,29 @@ def _cmd_area_orphans(ds: Dataset | StitchedDataset | ProjectedDataset, args: ar
 
 
 def _cmd_area_check(ds: Dataset | StitchedDataset | ProjectedDataset, args: argparse.Namespace) -> None:
-    """人口保存（各年 アトム合計==全国total）と孤児アトム件数を検証。"""
+    """人口保存と孤児アトムを検証するブロッキングゲート（違反時 exit 1）。
+
+    crossfact-check / public-scope-check と同格のリリースゲート。次のいずれかで exit 1：
+    保存則の未知差分（既知差分は受容）、保存則の空振り（総数スライス不一致＝未検証）、
+    未整備の孤児アトム。これにより「孤児=0／保存則一致」を新統計投入でも素通りさせない
+    不変条件として固定する。dangling_successors は良性の false-positive を含むため advisory
+    （警告のみ・exit には影響しない）。
+    """
     atom_fact, national, events = derive.build_atoms(ds, refresh=args.refresh)
+    failed = False
     cons = area_reconcile.national_conservation(atom_fact, national)
     n_bad = int(cons.filter(~pl.col("ok")).height)
-    print(f"[area-check] {ds.key}: 人口保存 {'✅ 全年一致' if n_bad == 0 else f'⚠️ {n_bad} 年で不一致'}")
+    if cons.height == 0:
+        # 総数スライス（全分類軸コード=="0"）が1行もマッチしないと空表になる。
+        # このとき n_bad==0 だが「全年一致」ではなく検査ゼロ＝空振りなので ✅ を出さない。
+        status = "⚠️ 検査対象0年（総数スライス不一致＝空振り。保存則が未検証）"
+        failed = True
+    elif n_bad == 0:
+        status = "✅ 全年一致"
+    else:
+        status = f"⚠️ {n_bad} 年で不一致"
+        failed = True
+    print(f"[area-check] {ds.key}: 人口保存 {status}")
     for row in cons.filter(pl.col("known")).iter_rows(named=True):
         reason = area_reconcile.KNOWN_DIFF_REASONS.get(row["year"], "")
         print(f"  ⚠️ {row['year']} は既知差分 {row['diff']} 人を受容: {reason}")
@@ -91,6 +109,7 @@ def _cmd_area_check(ds: Dataset | StitchedDataset | ProjectedDataset, args: argp
     if orph.height:
         top = orph.head(5).get_column("area_name").to_list()
         print(f"⚠️ 未整備の消滅アトム {orph.height} 件（例: {top}）→ area-orphans で全件確認")
+        failed = True
     else:
         print("✅ 孤児アトムなし（全消滅アトムが base_year へ到達）")
     dangling = area_reconcile.dangling_successors(events, atom_fact)
@@ -99,6 +118,8 @@ def _cmd_area_check(ds: Dataset | StitchedDataset | ProjectedDataset, args: argp
         print(dangling)
     else:
         print("✅ 全イベントの後継先が実在コードへ着地")
+    if failed:
+        raise SystemExit(1)
 
 
 # クロスファクト検算（§data-quality-assurance.md 三角測量）＋日本人スライスの保存則検算。

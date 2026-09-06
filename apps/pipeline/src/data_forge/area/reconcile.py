@@ -29,6 +29,11 @@ def _total_mask(df: pl.DataFrame) -> pl.Expr:
     population は sex_code=="0" だけだが、population_by_age は sex_code=="0" かつ
     age_class_code=="0"（総数×総数）で grand total 1 行に絞る（さもないと年少+生産+老年+不詳の
     重複で二重計上になる）。`*_code` 列の増減に追従するので fact 非依存。
+
+    ただし age5year は年齢総数コードが "0" でなく "100" のため、
+    本 mask は 0 行マッチ＝保存則が空振りになる（area-check は空表をガードで検知）。
+    age5year の保存則は crossfact C1（age5 の国籍総数×年齢総数 == population）が hub 経由で担保するため、
+    ここでの直接検査は委譲する。
     """
     codes = [c for c in df.columns if c.endswith("_code") and c not in ("area_code", "base_code")]
     return pl.all_horizontal([pl.col(c) == "0" for c in codes])
