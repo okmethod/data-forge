@@ -35,7 +35,13 @@ from collections.abc import Callable, Sequence
 import polars as pl
 
 from data_forge.area.levels import always_current_expr, is_current_expr
-from data_forge.sources.estat.transform import NATIONAL_AREA_CODE, area_axis_cols, code_name_cols, int_value
+from data_forge.sources.estat.transform import (
+    NATIONAL_AREA_CODE,
+    area_axis_cols,
+    code_name_cols,
+    int_value,
+    year_from_time_code,
+)
 
 # 男女コードマップ: 生の {軸コード → (sex_code, sex名称)}
 SexMap = dict[str, tuple[str, str]]
@@ -76,7 +82,7 @@ def clean_population(
             pl.col("area_level").cast(pl.Int8, strict=False).alias("area_level"),
             *code_name_cols(axis_code, sex_by_code, "sex"),
             # time_code 例: "2020000000" の先頭4桁が年
-            pl.col("time_code").str.slice(0, 4).cast(pl.Int16).alias("year"),
+            year_from_time_code(),
             int_value().alias("population"),
         )
         .with_columns(
@@ -196,7 +202,7 @@ def clean_population_by_age(tidy: pl.DataFrame) -> pl.DataFrame:
             pl.col("area_level").cast(pl.Int8, strict=False).alias("area_level"),
             *code_name_cols("cat02_code", SEX_2005, "sex"),
             *code_name_cols("cat01_code", AGE_TS, "age_class"),
-            pl.col("time_code").str.slice(0, 4).cast(pl.Int16).alias("year"),
+            year_from_time_code(),
             int_value().alias("population"),
         )
         .with_columns(is_current_expr())
@@ -268,7 +274,7 @@ def clean_by_age_prefecture(tidy: pl.DataFrame) -> pl.DataFrame:
             pl.lit("0").alias("sex_code"),
             pl.lit("総数").alias("sex"),
             *code_name_cols("cat01_code", AGE_3CLASS_LT, "age_class"),
-            pl.col("time_code").str.slice(0, 4).cast(pl.Int16).alias("year"),
+            year_from_time_code(),
             int_value().alias("population"),
         )
         .with_columns(is_current_expr())

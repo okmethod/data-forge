@@ -25,7 +25,7 @@ Note（実装判断のみ）:
 import polars as pl
 
 from data_forge.area.levels import is_current_expr
-from data_forge.sources.estat.transform import int_value, scope_area
+from data_forge.sources.estat.transform import int_value, scope_area, year_from_time_code
 
 # level2 に混じる人口集中地区（DID）系。都道府県と同 level だが地理単位でないため除外する。
 _DID_AREA_CODES = ("00100", "00200")
@@ -62,7 +62,7 @@ def clean_households(tidy: pl.DataFrame, *, scope: str = "all") -> pl.DataFrame:
             pl.col("cat01_code").alias("household_type_code"),
             pl.col("cat01_code").replace_strict(HOUSEHOLD_TYPE).alias("household_type"),
             # time_code 例: "2020000000" の先頭4桁が年
-            pl.col("time_code").str.slice(0, 4).cast(pl.Int16).alias("year"),
+            year_from_time_code(),
             pl.col("households"),
             pl.col("household_members"),
         )

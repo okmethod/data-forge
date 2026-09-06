@@ -23,7 +23,7 @@ Note（実装判断のみ）:
 import polars as pl
 
 from data_forge.area.levels import is_current_expr
-from data_forge.sources.estat.transform import SEX, area_axis_cols, code_name_cols, int_value
+from data_forge.sources.estat.transform import SEX, area_axis_cols, code_name_cols, int_value, year_from_time_code
 
 # cat02（年齢5歳階級_時系列）で全国・都道府県 両表に共通存在するコードのみ採用。
 # 85歳以上(310)を終端とし、全国のみの細分(320-370)と（再掲）15歳未満/15-64/65+(380-400)は捨てる。
@@ -88,7 +88,7 @@ def clean_age5(tidy: pl.DataFrame, *, national: bool) -> pl.DataFrame:
             pl.col("cat02_code").alias("age_class_code"),
             pl.col("cat02_code").replace_strict(AGE5).alias("age_class"),
             # time_code 例: "2020000000" の先頭4桁が年
-            pl.col("time_code").str.slice(0, 4).cast(pl.Int16).alias("year"),
+            year_from_time_code(),
             int_value().alias("population"),
         )
         # 310 へ畳んだ 85+細分を1行へ合算する（全 null の単一セルは null を保つ＝0 に化けさせない）。

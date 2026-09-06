@@ -20,7 +20,7 @@ Note（実装判断のみ）:
 import polars as pl
 
 from data_forge.area.levels import is_current_expr
-from data_forge.sources.estat.transform import code_name_cols, int_value
+from data_forge.sources.estat.transform import code_name_cols, int_value, year_from_time_code
 
 # cat01（常住地又は従業地・通学地による人口）の2総数 → (daynight_code, daynight名称)。
 # 通勤流動の内訳（110〜230）は年で非同型なので採らない。
@@ -44,7 +44,7 @@ def clean_daynight_population(tidy: pl.DataFrame) -> pl.DataFrame:
             pl.col("area_name"),
             pl.col("area_level").cast(pl.Int8, strict=False).alias("area_level"),
             *code_name_cols("cat01_code", DAYNIGHT, "daynight"),
-            pl.col("time_code").str.slice(0, 4).cast(pl.Int16).alias("year"),
+            year_from_time_code(),
             int_value().alias("population"),
         )
         .with_columns(is_current_expr())

@@ -47,6 +47,11 @@ def int_value() -> pl.Expr:
     return pl.col("value").str.replace_all(r"[^0-9-]", "").cast(pl.Int64, strict=False)
 
 
+def year_from_time_code() -> pl.Expr:
+    """time_code の先頭4桁を調査年 year(Int16) へ（例: "2020000000" → 2020）。"""
+    return pl.col("time_code").str.slice(0, 4).cast(pl.Int16).alias("year")
+
+
 def code_name_cols(src: str, mapping: dict[str, tuple[str, str]], name: str) -> list[pl.Expr]:
     """コード→(出力コード, 名称) の辞書で src 列を <name>_code / <name> の2列へ写像する。
 

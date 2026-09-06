@@ -17,7 +17,7 @@ Note（実装判断のみ）:
 import polars as pl
 
 from data_forge.area.levels import is_current_expr
-from data_forge.sources.estat.transform import SEX, code_name_cols, int_value
+from data_forge.sources.estat.transform import SEX, code_name_cols, int_value, year_from_time_code
 
 # 表章項目(tab): 320=15歳以上人口（採用）/ 1240=労働力率（率は count から導出可能ゆえ捨てる）。
 _TAB_POPULATION = "320"
@@ -60,7 +60,7 @@ def clean_labor_force(tidy: pl.DataFrame) -> pl.DataFrame:
         pl.col("cat01_code").alias("labor_status_code"),
         pl.col("cat01_code").replace_strict(LABOR_STATUS).alias("labor_status"),
         # time_code 例: "2020000000" の先頭4桁が年
-        pl.col("time_code").str.slice(0, 4).cast(pl.Int16).alias("year"),
+        year_from_time_code(),
         int_value().alias("population"),
     ).with_columns(is_current_expr())
     return _inject_labor_unknown(fact)
