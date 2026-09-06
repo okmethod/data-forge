@@ -30,6 +30,7 @@ from data_forge.output import export_all
 from data_forge.public_scope import PublicScopePolicy, find_violations
 from data_forge.sources.estat import age5year_municipality as estat_age5year_municipality
 from data_forge.sources.estat import fetch as estat_fetch
+from data_forge.sources.estat import schema_drift as estat_schema_drift
 from data_forge.sources.estat.client import get_stats_list
 
 # NOTE: 現状ソースは e-Stat 固定。
@@ -435,6 +436,81 @@ def _cmd_public_scope_check(args: argparse.Namespace) -> None:
     print(f"[public-scope-check] ✓ 市区町村粒度コードは許可分のみ {allow}")
 
 
+def _underlying_fetches(ds: Dataset | StitchedDataset | ProjectedDataset) -> list[tuple[str, dict[str, str] | None]]:
+    """データセットが取得する e-Stat 表を (stats_data_id, filters) の一意リストで返す。
+
+    Stitched/Projected は upstream を再帰展開する。同一 statsDataId が複数 upstream から
+    参照されても cache_key で畳んで重複取得・重複検査を避ける。
+    """
+    seen: dict[str, tuple[str, dict[str, str] | None]] = {}
+    stack: list[Dataset | StitchedDataset | ProjectedDataset] = [ds]
+    while stack:
+        cur = stack.pop()
+        if isinstance(cur, StitchedDataset | ProjectedDataset):
+            upstreams = list(cur.upstreams)
+            if isinstance(cur, StitchedDataset):
+                upstreams += cur.preliminary_upstreams
+            stack.extend(get_dataset(k) for k in upstreams)
+            continue
+        stats_data_id = cur.source_params["stats_data_id"]
+        filters = cur.source_params.get("filters")
+        seen.setdefault(estat_fetch.cache_key(stats_data_id, filters), (stats_data_id, filters))
+    return list(seen.values())
+
+
+def _print_signature_diff(diff: estat_schema_drift.SignatureDiff) -> None:
+    if diff.axes_added:
+        print(f"    + 軸追加: {diff.axes_added}")
+    if diff.axes_removed:
+        print(f"    - 軸削除: {diff.axes_removed}")
+    for axis_id, (old, new) in sorted(diff.name_changed.items()):
+        print(f"    ~ 軸名変更 {axis_id}: {old!r} → {new!r}")
+    for axis_id, codes in sorted(diff.codes_added.items()):
+        print(f"    + コード追加 {axis_id}: {codes}")
+    for axis_id, codes in sorted(diff.codes_removed.items()):
+        print(f"    - コード削除 {axis_id}: {codes}")
+
+
+def _cmd_schema_check(ds: Dataset | StitchedDataset | ProjectedDataset, args: argparse.Namespace) -> None:
+    """新年度スキーマ・ドリフトの検出ゲート（入口ガードの軸構成版・違反時 exit 1）。
+
+    取得済みレスポンスの軸シグネチャ（軸ID＋名称＋分類コード）をコミット済みスナップショット
+    （schema_snapshots.json）と突合し、軸の増減・意味の入れ替わり・分類コードの増減を検出する。
+    `--update` でスナップショットを（初回=シード／以降=更新）書き込む。未スナップショットの表は
+    exit 1 で止め、`--update` による意図的なシードを促す（＝新年度投入を素通りさせない）。
+    """
+    registry = estat_schema_drift.load_registry()
+    updated = False
+    failed = False
+    print(f"[schema-check] {ds.key}: {'スナップショット更新' if args.update else '軸ドリフト検査'}")
+    for stats_data_id, filters in _underlying_fetches(ds):
+        key = estat_fetch.cache_key(stats_data_id, filters)
+        raw = estat_fetch.fetch(stats_data_id, refresh=args.refresh, filters=filters)
+        actual = estat_schema_drift.axis_signature(raw)
+        if args.update:
+            registry[key] = actual
+            updated = True
+            print(f"  ✅ {key}: 軸 {sorted(actual)} をスナップショット")
+            continue
+        expected = registry.get(key)
+        if expected is None:
+            print(f"  ⚠️ {key}: 未スナップショット（--update でシード）")
+            failed = True
+            continue
+        diff = estat_schema_drift.diff_signature(expected, actual)
+        if diff.has_drift:
+            print(f"  ⚠️ {key}: 軸ドリフト検出")
+            _print_signature_diff(diff)
+            failed = True
+        else:
+            print(f"  ✅ {key}: 軸構成一致")
+    if updated:
+        estat_schema_drift.save_registry(registry)
+        print("→ schema_snapshots.json を更新（差分をレビューしてコミット）")
+    if failed:
+        raise SystemExit(1)
+
+
 def _cmd_area_ingest(args: argparse.Namespace) -> None:
     """廃置分合の生CSV を正規化イベント（events_parsed.csv）へ変換して保存する。"""
     src = args.path
@@ -567,6 +643,13 @@ def build_parser() -> argparse.ArgumentParser:
         p.add_argument("--refresh", action="store_true", help="キャッシュを無視して再取得")
         p.add_argument("--base-year", type=int, default=None, help="基準年（既定=最新年）")
         p.set_defaults(handler=handler)
+
+    # 新年度スキーマ・ドリフト検出（軸シグネチャをコミット済みスナップショットと突合）
+    pd_ = sub.add_parser("schema-check", help="新年度スキーマ・ドリフト検出: 軸構成をスナップショットと突合")
+    pd_.add_argument("dataset", help="データセットキー（Stitched/Projected は upstream を再帰展開）")
+    pd_.add_argument("--refresh", action="store_true", help="キャッシュを無視して再取得")
+    pd_.add_argument("--update", action="store_true", help="スナップショットを書き込む（初回シード／更新）")
+    pd_.set_defaults(handler=_cmd_schema_check)
 
     # クロスファクト検算（総人口スライスを population ハブと突合＝§data-quality-assurance.md 三角測量）
     pc = sub.add_parser("crossfact-check", help="クロスファクト検算: 総人口スライスを population ハブと突合")

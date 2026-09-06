@@ -29,6 +29,7 @@ e-Stat getStatsData の生レスポンスを取得時点で検証し、構造崩
 
 - **粒度**: 外枠 strict / 内側 passthrough。骨格（`STATISTICAL_DATA` 直下の `TABLE_INF` / `CLASS_INF.CLASS_OBJ` / `DATA_INF.VALUE`、ページング `RESULT_INF.NEXT_KEY` は Optional）の存在と型を縛り、軸依存で変動する `VALUE[]` / `CLASS` の中身は素通しする。軸の実在確認は「クロスファクト検算」の conformed dimension 突合に委ねる。
 - **適用点**: 実 API レスポンスの入口（ページ取得）で1回。`_raise_for_api_error`（STATUS≠0）で意味論エラーを先に弾き、続けて構造を検証する。キャッシュは検証済みオブジェクトを書き込むため二重検証しない。
+- **軸構成のドリフト検出（新年度スキーマ）**: 入口ガードが passthrough で見逃す軸（`CLASS_OBJ`）の増減・意味の入れ替わりは、`schema-check` が軸シグネチャ（軸ID＋名称＋分類コード）をコミット済みスナップショット（`schema_snapshots.json`）と突合して検出する（正典＝`sources/estat/schema_drift.py`）。area/time は年で正当に変動するためコードは pin せず存在のみ見る。
 
 ### 保存則（恒等式）
 
@@ -116,6 +117,7 @@ grain 列の組で重複がないことを保証し、静かに通さず reject 
 **コマンド構文・引数は `uv run data-forge --help`（正典＝[cli.py](../apps/pipeline/src/data_forge/cli.py) の argparse）** を参照。  
 本節は各コマンドが検証設計のどのゲートを駆動するかの対応のみを示す。
 
+- `schema-check`: 「入口ガード」の軸構成版を実データで駆動する **exit 1 ゲート**。軸ドリフト（軸の増減・軸名変更・分類コードの増減）と未スナップショットの表で失敗（`--update` でスナップショットを意図的に固定）。
 - `area-check`: 「保存則」（人口保存）＋「孤児=0」を **exit 1 で止めるブロッキングゲート**（`crossfact-check` 同格。保存則の未知差分／空振り／未整備の孤児アトムで失敗）。後継先の実在（`dangling_successors`）は advisory 警告として併記（exit には影響しない）。
 - `area-orphans`: 孤児アトム棚卸しの支援（消滅アトムを人口降順で一覧し overrides 追記候補を提示。ゲート判定自体は `area-check`）。
 - `crossfact-check`: 「クロスファクト検算」＋日本人スライスの上界/保存則＋地理保存を実データで走らせ年別 status に分類（自動化済みは C1 / C2 / C3 / J1〜J3／G＝全国==Σ県 の7 family）。
@@ -151,9 +153,12 @@ grain 列の組で重複がないことを保証し、静かに通さず reject 
 - **合併後継の妥当性**
   - 現状: 後継コード実在チェック済（`area-check` が `dangling_successors` で「後継先が実在コードへ着地しない行」を警告）。残る穴は「実在するが誤った後継」（別コードへ着地する取り違え）
   - 対応方針: 人口保存・孤児検出との併走で間接検出（着地先を誤れば保存則差分／孤児として顕在化しやすい）
+- **C4/C5 の継続検算不在**
+  - 現状: `crossfact-check` が常時回すのは C1 / C2 / C3・J1〜J3・G のみ（`cli.py` の `_CROSSFACT` 登録分）。C4（age5→県 rollup == age5year_prefecture）と C5（daynight == population 全国）は「クロスファクト検算」節に恒等式として在るが一過性の実証にとどまり、回帰ガードされていない
+  - 対応方針: 両恒等式を `_CROSSFACT` の spec として編入し `crossfact-check` に相乗りさせる（外部データ不要・現枠組みで機械化可能）
 - **新年度スキーマ**
-  - 現状: 確定版投入時は手動で cleaner 追加＝一時的にテスト空白
-  - 対応方針: スキーマ差分の自動検出
+  - 現状: 軸構成のドリフトは `schema-check` がゲート化済（→設計「入口ガード」）。残る人手依存は、スナップショット更新（`--update`）が手動な点と、確定版の cleaner を書くまで保存則／クロスファクト検算が空白になる点（＝軸構成が同じでも変換ロジックの取り違えは素通りする）
+  - 対応方針: 確定版投入手順に `schema-check --update` を組込み（差分レビュー→スナップショット更新→cleaner 追補）、cleaner 追補後に保存則／crossfact を配線して空白を閉じる
 - **日本人スライスの空間集約保存**
   - 現状: 日本人(=1)の検算は上界(J1)・年齢/男女保存(J2/J3)まで（設計は「クロスファクト検算」節）。県 rollup を等値照合する回次跨の日本人表が無い（macro age5 は総人口専用＝nationality 軸なし）ため、日本人版の空間集約保存（県 rollup == 回次跨）のみ検証網の外
   - 対応方針: macro/回次跨に日本人版を用意できれば J1 を等値（県 rollup vs 回次跨日本人表）へ格上げする

@@ -16,7 +16,7 @@
 ```text
 tests/
 ├── fixtures/     # テスト入力（e-Stat 生レスポンス等・tidy 化の起点）
-├── sources/      # 取得層：client のページング/エラー検査・fetch のキャッシュ（モック・実 API 不使用）
+├── sources/      # 取得層：client ページング・fetch キャッシュ・軸ドリフト検出
 ├── cleaners/     # クレンジング：スキーマ変種・欠損 null 化・保存則
 ├── combine/      # 合成：union / intersection / grid＋粒度ガード
 ├── area/         # 地域参照：rollup・基準年集約・孤児検出・既知差分

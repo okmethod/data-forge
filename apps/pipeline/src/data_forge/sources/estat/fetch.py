@@ -15,13 +15,21 @@ from data_forge.config import RAW_DIR
 from data_forge.sources.estat.client import get_stats_data
 
 
+def cache_key(stats_data_id: str, filters: dict[str, str] | None = None) -> str:
+    """キャッシュ／スナップショットの識別子。絞り込みごとに別キャッシュを表す安定キー。
+
+    絞り込みを使う表は取得コードが絞られる（軸コード集合が変わる）ため、
+    キャッシュだけでなくスキーマ・スナップショット（schema_drift）もこのキーで分ける。
+    """
+    if not filters:
+        return stats_data_id
+    # 絞り込み内容を安定ハッシュ化して付す（キー順に依存しない）。
+    digest = hashlib.sha1(json.dumps(filters, sort_keys=True).encode()).hexdigest()[:8]
+    return f"{stats_data_id}_{digest}"
+
+
 def _raw_path(stats_data_id: str, filters: dict[str, str] | None) -> Path:
-    name = stats_data_id
-    if filters:
-        # 絞り込み内容を安定ハッシュ化してファイル名に付す（キー順に依存しない）。
-        digest = hashlib.sha1(json.dumps(filters, sort_keys=True).encode()).hexdigest()[:8]
-        name = f"{stats_data_id}_{digest}"
-    return RAW_DIR / "estat" / f"{name}.json"
+    return RAW_DIR / "estat" / f"{cache_key(stats_data_id, filters)}.json"
 
 
 def fetch(stats_data_id: str, *, refresh: bool = False, filters: dict[str, str] | None = None) -> dict[str, Any]:
