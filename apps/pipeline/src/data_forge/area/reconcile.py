@@ -81,6 +81,7 @@ def cross_fact(
     value: str = "population",
     scope_years: frozenset[int] = frozenset(),
     known_diff_years: frozenset[int] = frozenset(),
+    known_diffs: dict[int, int] | None = None,
     mode: str = "equality",
 ) -> pl.DataFrame:
     """2 スライスを共有軸 `keys` で突合し diff 表を返す（クロスファクト検算／保存則検算）。
@@ -109,6 +110,11 @@ def cross_fact(
         known_diff_years … 定義差で diff!=0 が期待される年（例 age5＝2005 各歳表は「年齢不詳を
                       除く」ゆえ other = hub − 年齢不詳 ≤ hub）。status="known_diff"・
                       ok=(diff>=0)＝定義差の向き（other ≤ hub）が保たれる限り許容する。
+        known_diffs … 既知差の**値を pin する**年→期待 Σ|diff|（年内 全キーの絶対差の総和）。
+                      area の `KNOWN_DIFFS` と同じく「値を明記して固定＝ずれたら失敗」で、向きだけでなく
+                      大きさの回帰も捕捉する（cleaner/transform の取り違えで既知年の差が動けば落ちる）。
+                      指定年は known_diff 扱い（known_diff_years と和集合）＋ Σ|diff|==期待 を満たす限り許容。
+                      "year" を keys に含む検算のみ有効（Σ|diff| は年で集計する）。
         mode        … "equality"（既定・diff==0 を期待）／"bound"（上界検算＝other ≤ hub の
                       部分集合関係のみ保証。status="bound"・ok=(diff>=0 かつ other>0)。
                       hub>0 なのに other==0（スライス欠落）を見逃さないため実在も要求するが、
@@ -120,9 +126,11 @@ def cross_fact(
 
     列: *keys / hub / other / diff / status / ok。
         status … match（diff==0）／bound／scope_out／known_diff／mismatch。
-        ok     … match、scope_out(other==0)、known_diff(diff>=0／conservation は両符号)、
-                 bound(diff>=0 かつ (other>0 または hub==0))。
+        ok     … match、scope_out(other==0)、known_diff(diff>=0／conservation は両符号／
+                 known_diffs 指定年は加えて Σ|diff|==期待)、bound(diff>=0 かつ (other>0 または hub==0))。
     """
+    known_diffs = known_diffs or {}
+    all_known = known_diff_years | frozenset(known_diffs)
     h = hub.with_columns(*hub_with) if hub_with else hub
     h = h.filter(hub_slice) if hub_slice is not None else h
     h = h.group_by(keys).agg(pl.col(value).fill_null(0).sum().alias("hub"))
@@ -140,7 +148,7 @@ def cross_fact(
             status = scoped.otherwise(pl.lit("bound"))
         else:  # equality / conservation は status 割り当てが同一（差は known_diff の符号許容のみ）
             status = (
-                scoped.when(pl.col("year").is_in(list(known_diff_years)))
+                scoped.when(pl.col("year").is_in(list(all_known)))
                 .then(pl.lit("known_diff"))
                 .when(pl.col("diff") == 0)
                 .then(pl.lit("match"))
@@ -154,6 +162,10 @@ def cross_fact(
     known_ok = pl.col("status") == "known_diff"
     if mode != "conservation":
         known_ok = known_ok & (pl.col("diff") >= 0)
+    if known_diffs:  # 値 pin: 指定年は 年内 Σ|diff| が期待と一致する限り許容（ずれたら失敗）
+        expected = pl.col("year").replace_strict(known_diffs, default=None)
+        year_abs = pl.col("diff").abs().sum().over("year")
+        known_ok = known_ok & (expected.is_null() | (year_abs == expected))
     return (
         rep.with_columns(status.alias("status"))
         .with_columns(

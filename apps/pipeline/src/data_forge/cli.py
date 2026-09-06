@@ -144,6 +144,7 @@ class _CrossFactSpec:
     mode: str = "equality"  # "equality"（diff=0）／"bound"（上界）／"conservation"（全国==Σ県・両符号 known_diff）
     scope_years: frozenset[int] = frozenset()  # other 未収録の年（other==0 を許容）
     known_diff_years: frozenset[int] = frozenset()  # 定義差で diff!=0 が期待される年（diff>=0 を許容）
+    known_diffs: dict[int, int] = field(default_factory=dict)  # 既知差の値 pin＝年→期待 Σ|diff|（ずれたら失敗）
     reasons: dict[int, str] = field(default_factory=dict)  # 年 → 許容理由（表示用）
 
 
@@ -157,6 +158,57 @@ _JP_TOTAL = (pl.col("nationality_code") == "1") & (pl.col("age_class_code") == "
 # バンド集合は正典から採り（総数 100・不詳 999 を除く＝3区分は不詳を含まない）drift を防ぐ。
 _AGE5_BANDS = [c for c in estat_age5year_municipality.AGE_CLASS if c not in ("100", "999")]  # 110〜310（5歳階級のみ）
 _AGE5_TO_AGE3 = {c: ("1" if c < "140" else "2" if c < "240" else "3") for c in _AGE5_BANDS}
+
+# C4: age5 ミクロ(回次別)を県 rollup し マクロ(回次跨) age5year_prefecture と 5歳階級ごとに突合する。
+# 2 product は age_class コード体系が別（マクロ=age5year.AGE5／ミクロ=age5year_municipality.AGE_CLASS）で
+# 終端も非対称（マクロ 310＝85歳以上 で打ち切り／ミクロ 280-310＝85-89…100歳以上 で細分）。
+# 両者を意味（5歳バンド下限年齢）で共通 band へ写像し、マクロ 310 へ ミクロ 85+ 細分(280-310)を畳んで揃える。
+# 総数(100)・不詳(999)は map に含めず fold から除く（default=None→スライスで落とす）。
+# 正典＝両 source の code 辞書。
+_MAC_AGE5_TO_BAND = {  # age5year.AGE5 のコード → 5歳バンド下限年齢（85=85歳以上で打ち切り）
+    "110": 0,
+    "120": 5,
+    "130": 10,
+    "150": 15,
+    "160": 20,
+    "170": 25,
+    "180": 30,
+    "190": 35,
+    "200": 40,
+    "210": 45,
+    "220": 50,
+    "230": 55,
+    "240": 60,
+    "250": 65,
+    "260": 70,
+    "280": 75,
+    "290": 80,
+    "310": 85,
+}
+_MIC_AGE_TO_BAND = {  # age5year_municipality.AGE_CLASS のコード → 同上（280-310=85+細分は 85 へ畳む）
+    "110": 0,
+    "120": 5,
+    "130": 10,
+    "140": 15,
+    "150": 20,
+    "160": 25,
+    "170": 30,
+    "180": 35,
+    "190": 40,
+    "200": 45,
+    "210": 50,
+    "220": 55,
+    "230": 60,
+    "240": 65,
+    "250": 70,
+    "260": 75,
+    "270": 80,
+    "280": 85,
+    "290": 85,
+    "300": 85,
+    "310": 85,
+}
+_C4_PRE1980 = frozenset(range(1920, 1980, 5))  # ミクロ(回次別)未収録＝回次跨マクロのみ（scope_out）
 
 _CROSSFACT: dict[str, list[_CrossFactSpec]] = {
     "age5year_municipality_timeseries": [
@@ -226,6 +278,57 @@ _CROSSFACT: dict[str, list[_CrossFactSpec]] = {
             hub_key="age5year_municipality_timeseries",
             hub_slice=_JP_TOTAL & (pl.col("sex_code") == "0"),
             other_slice=_JP_TOTAL & pl.col("sex_code").is_in(["1", "2"]),
+        ),
+        # C4: age5 ミクロ→県 rollup == age5year_prefecture（回次跨マクロ）。別 product 間を県×sex×5歳階級で照合。
+        # 県 rollup は area_code 先頭2桁（pref_code）で束ね、age は共通 band へ写像して突合する。
+        # mode=conservation: 1980-2000 は 2 product の県レベル集計差（秘匿/境界振替）が両符号で ±相殺し、
+        # 2005 はミクロ各歳表が年齢不詳を除く一方向差＝ともに known_diff（両符号受容）。2010-2020 は厳密 diff=0。
+        _CrossFactSpec(
+            name="C4 age5→県rollup == age5year_prefecture",
+            keys=["pref_code", "sex_code", "age_band", "year"],
+            hub_key="age5year_prefecture_timeseries",
+            hub_with=[
+                pl.col("area_code").str.slice(0, 2).alias("pref_code"),
+                pl.col("age_class_code").replace_strict(_MAC_AGE5_TO_BAND, default=None).alias("age_band"),
+            ],
+            hub_slice=pl.col("age_band").is_not_null(),
+            other_with=[
+                pl.col("area_code").str.slice(0, 2).alias("pref_code"),
+                pl.col("age_class_code").replace_strict(_MIC_AGE_TO_BAND, default=None).alias("age_band"),
+            ],
+            other_slice=(pl.col("nationality_code") == "0") & pl.col("age_band").is_not_null(),
+            mode="conservation",
+            scope_years=_C4_PRE1980,
+            # 既知差の値 pin（年→Σ|diff|）。cleaner/transform の取り違えで既知年の差が動けば失敗する。
+            known_diffs={1980: 8666, 1985: 8600, 1990: 8648, 1995: 8508, 2000: 8160, 2005: 28574},
+            reasons={
+                1980: "2 product(回次別ミクロ vs 回次跨マクロ)の県レベル集計差（秘匿/境界振替・両符号・年内±相殺）",
+                1985: "2 product の県レベル集計差（秘匿/境界振替・両符号・年内±相殺）",
+                1990: "2 product の県レベル集計差（秘匿/境界振替・両符号・年内±相殺）",
+                1995: "2 product の県レベル集計差（秘匿/境界振替・両符号・年内±相殺）",
+                2000: "2 product の県レベル集計差（秘匿/境界振替・両符号・年内±相殺）",
+                2005: "ミクロ各歳表が年齢不詳を除く＝マクロ ≥ ミクロ fold（C1/C2 の2005と同因・diff≥0）",
+            },
+        ),
+    ],
+    # C5: daynight 夜間(常住地・daynight_code=0) == population（全国＝keys=["year"] で市区町村を合算）。
+    # 2010-2020 は厳密 diff=0。1990-2005 は従業地・通学地集計の常住地人口ベースが基本集計人口と相違し
+    # pop>night（〜0.1-0.4%・一方向 diff≥0）＝known_diff。1980/1985/2025 は daynight 未収録＝scope_out。
+    "daynight_municipality_timeseries": [
+        _CrossFactSpec(
+            name="C5 夜間(常住地) == population（全国）",
+            keys=["year"],
+            hub_slice=pl.col("sex_code") == "0",
+            other_slice=pl.col("daynight_code") == "0",
+            scope_years=frozenset({1980, 1985, 2025}),
+            # 既知差の値 pin（年→diff＝pop−night）。全国1セル/年ゆえ diff がそのまま Σ|diff|。ずれたら失敗。
+            known_diffs={1990: 326357, 1995: 130973, 2000: 228561, 2005: 482341},
+            reasons={
+                1990: "従業地・通学地集計の常住地(夜間)人口ベースが基本集計人口と相違（pop≥night・2010〜で解消）",
+                1995: "従業地・通学地集計 vs 基本集計 のベース差（pop≥night）",
+                2000: "従業地・通学地集計 vs 基本集計 のベース差（pop≥night）",
+                2005: "従業地・通学地集計 vs 基本集計 のベース差（pop≥night）",
+            },
         ),
     ],
     # C3: by_age の 年齢総数(age_class=0) スライス == population（既存「総数スライス一致」の明文化）。
@@ -364,6 +467,7 @@ def _run_crossfact_spec(spec: _CrossFactSpec, other: pl.DataFrame, hub: pl.DataF
         value=spec.value,
         scope_years=spec.scope_years,
         known_diff_years=spec.known_diff_years,
+        known_diffs=spec.known_diffs,
         mode=spec.mode,
     )
     n_bad = int(rep.filter(~pl.col("ok")).height)

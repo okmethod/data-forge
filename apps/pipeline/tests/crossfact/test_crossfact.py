@@ -9,6 +9,7 @@ match / mismatch / scope_out / known_diff の status 分類が正しいことを
 import polars as pl
 
 from data_forge.area import reconcile
+from data_forge.cli import _MAC_AGE5_TO_BAND, _MIC_AGE_TO_BAND
 
 
 def _pop_hub(rows: list[tuple[str, str, int, int]]) -> pl.DataFrame:
@@ -29,10 +30,7 @@ def _age5_other(rows: list[tuple[str, str, str, str, int, int]]) -> pl.DataFrame
 def _by_age_hub(rows: list[tuple[str, str, str, int, int]]) -> pl.DataFrame:
     """population_by_age 相当（area×sex×age_class×year の3区分人口）を手組みする。"""
     return pl.DataFrame(
-        [
-            {"area_code": a, "sex_code": s, "age_class_code": ac, "year": y, "population": p}
-            for a, s, ac, y, p in rows
-        ]
+        [{"area_code": a, "sex_code": s, "age_class_code": ac, "year": y, "population": p} for a, s, ac, y, p in rows]
     )
 
 
@@ -246,6 +244,89 @@ def test_cross_fact_known_diff_year_accepts_directional_gap():
     assert dict(zip(rep["area_code"], rep["ok"], strict=True)) == {"01100": True, "09999": False}
 
 
+def _c4_report(hub: pl.DataFrame, other: pl.DataFrame) -> pl.DataFrame:
+    """C4 の県 rollup＋5歳バンド写像を cli の band map で組み、cross_fact に掛けた結果を返す。"""
+    return reconcile.cross_fact(
+        hub,
+        other,
+        keys=["pref_code", "sex_code", "age_band", "year"],
+        hub_with=[
+            pl.col("area_code").str.slice(0, 2).alias("pref_code"),
+            pl.col("age_class_code").replace_strict(_MAC_AGE5_TO_BAND, default=None).alias("age_band"),
+        ],
+        hub_slice=pl.col("age_band").is_not_null(),
+        other_with=[
+            pl.col("area_code").str.slice(0, 2).alias("pref_code"),
+            pl.col("age_class_code").replace_strict(_MIC_AGE_TO_BAND, default=None).alias("age_band"),
+        ],
+        other_slice=(pl.col("nationality_code") == "0") & pl.col("age_band").is_not_null(),
+        mode="conservation",
+    ).sort("age_band")
+
+
+def test_cross_fact_c4_folds_micro_85plus_and_rolls_up_to_prefecture():
+    # C4: age5 ミクロ(市区町村・別コード体系)を県 rollup し 5歳バンドへ写像＝マクロ(県)と一致する。
+    # マクロ 250=65-69・310=85歳以上／ミクロ 240=65-69・280-310=85-89…100歳以上（85+は畳んで合流）。
+    # 県 rollup は area_code 先頭2桁（01100/01200→01）。総数100・不詳999・日本人(nat=1)は写像外＝除外。
+    hub = pl.DataFrame(
+        [
+            {"area_code": "01000", "sex_code": "0", "age_class_code": ac, "year": 2020, "population": p}
+            for ac, p in [("100", 999), ("250", 150), ("310", 70), ("999", 5)]  # 総数/不詳は band 外
+        ]
+    )
+    other = pl.DataFrame(
+        [
+            {
+                "area_code": a,
+                "sex_code": "0",
+                "nationality_code": n,
+                "age_class_code": ac,
+                "year": 2020,
+                "population": p,
+            }
+            for a, n, ac, p in [
+                ("01100", "0", "240", 100),  # 65-69（→band65）
+                ("01200", "0", "240", 50),  # 別市区町村（rollup で合流＝150）
+                ("01100", "0", "280", 30),  # 85-89 ┐
+                ("01100", "0", "290", 25),  # 90-94 ├ 85+ 畳込＝70
+                ("01100", "0", "300", 10),  # 95-99 │
+                ("01100", "0", "310", 5),  # 100+ ┘
+                ("01100", "1", "240", 88),  # 日本人（nat=1＝除外）
+            ]
+        ]
+    )
+    rep = _c4_report(hub, other)
+    assert rep["age_band"].to_list() == [65, 85]
+    assert rep["diff"].to_list() == [0, 0]  # 65-69=150 / 85+=70 が両側一致
+    assert rep["ok"].all()
+
+
+def test_cross_fact_c4_flags_per_band_misallocation_within_prefecture():
+    # per-band ゆえ県総数が保存しても 5歳バンド間の誤配分（85+の畳み先違い等）は検出する（mode=conservation）。
+    hub = pl.DataFrame(
+        [
+            {"area_code": "01000", "sex_code": "0", "age_class_code": ac, "year": 2020, "population": p}
+            for ac, p in [("250", 150), ("310", 70)]
+        ]
+    )
+    other = pl.DataFrame(  # 65-69 に+10・85+ に-10（県総数は保存するがバンドがズレる）
+        [
+            {
+                "area_code": "01100",
+                "sex_code": "0",
+                "nationality_code": "0",
+                "age_class_code": ac,
+                "year": 2020,
+                "population": p,
+            }
+            for ac, p in [("240", 160), ("280", 60)]
+        ]
+    )
+    rep = _c4_report(hub, other)
+    assert dict(zip(rep["age_band"], rep["diff"], strict=True)) == {65: -10, 85: 10}
+    assert not rep["ok"].any()  # 両バンドとも真の不一致（既知年でなければ弾く）
+
+
 def _geo(rows: list[tuple[str, int, int]]) -> pl.DataFrame:
     """地理保存の hub/other 相当（分類軸1本×year の測定量）を手組みする（keys に area_code を含めない）。"""
     return pl.DataFrame([{"code": c, "year": y, "population": v} for c, y, v in rows])
@@ -272,3 +353,21 @@ def test_cross_fact_conservation_accepts_known_diff_of_either_sign():
     # 対比: equality モードは同じ入力で負符号(1985)を弾く。
     eq = reconcile.cross_fact(hub, other, mode="equality", **common).sort("year")
     assert dict(zip(eq["year"], eq["ok"], strict=True)) == {1950: True, 1985: False, 2020: True}
+
+
+def test_cross_fact_known_diffs_pins_magnitude_and_fails_on_drift():
+    # known_diffs は既知差の**値**（年→Σ|diff|）を固定＝大きさが動けば known_diff 年でも失敗する
+    # （area の KNOWN_DIFFS と同思想＝cleaner/transform の取り違えで既知差が変わる回帰を捕捉）。
+    # 1985 は 2 セルが ±6（Σ|diff|=12）／1950 は +6（Σ|diff|=6）。
+    hub = _geo([("100", 1985, 1000), ("200", 1985, 1000), ("100", 1950, 1000), ("100", 2020, 1000)])
+    other = _geo([("100", 1985, 1006), ("200", 1985, 994), ("100", 1950, 994), ("100", 2020, 1000)])
+    common = {"keys": ["code", "year"], "mode": "conservation"}
+    # 値が一致する pin なら許容（両符号でも大きさが期待どおり）。
+    ok = reconcile.cross_fact(hub, other, known_diffs={1985: 12, 1950: 6}, **common).sort("code", "year")
+    assert dict(zip(ok["year"], ok["status"], strict=True))  # 1985/1950=known_diff・2020=match
+    assert ok["ok"].all()
+    # pin とズレる（1985 の期待を 12→99 に）なら、その年の全キーを弾く（他年は無傷）。
+    bad = reconcile.cross_fact(hub, other, known_diffs={1985: 99, 1950: 6}, **common).sort("code", "year")
+    verdict = {(c, y): o for c, y, o in zip(bad["code"], bad["year"], bad["ok"], strict=True)}
+    assert verdict[("100", 1985)] is False and verdict[("200", 1985)] is False  # Σ|diff|≠99 で年ごと失敗
+    assert verdict[("100", 1950)] is True and verdict[("100", 2020)] is True  # 他年は許容のまま
