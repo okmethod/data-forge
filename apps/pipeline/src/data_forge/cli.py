@@ -83,7 +83,8 @@ def _cmd_area_check(ds: Dataset | StitchedDataset | ProjectedDataset, args: argp
     crossfact-check / public-scope-check と同格のリリースゲート。次のいずれかで exit 1：
     保存則の未知差分（既知差分は受容）、保存則の空振り（総数スライス不一致＝未検証）、未整備の孤児アトム。
     これにより「孤児=0／保存則一致」を新統計投入でも素通りさせない不変条件として固定する。
-    dangling_successors は良性の false-positive を含むため advisory（警告のみ・exit には影響しない）。
+    dangling_successors / stale_successors は良性の false-positive を含むため
+    advisory（警告のみ・exit には影響しない）。
     """
     atom_fact, national, events = derive.build_atoms(ds, refresh=args.refresh)
     failed = False
@@ -117,6 +118,12 @@ def _cmd_area_check(ds: Dataset | StitchedDataset | ProjectedDataset, args: argp
         print(dangling)
     else:
         print("✅ 全イベントの後継先が実在コードへ着地")
+    stale = area_reconcile.stale_successors(events, atom_fact)
+    if stale.height:
+        print(f"⚠️ 後継先が施行年より後に登場しないイベント {stale.height} 件（時制の取り違え疑い）:")
+        print(stale)
+    else:
+        print("✅ 全イベントの後継先が施行年以降に生存")
     if failed:
         raise SystemExit(1)
 

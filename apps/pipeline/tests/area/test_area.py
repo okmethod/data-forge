@@ -396,6 +396,38 @@ def test_dangling_successors_accepts_intermediate_chain():
     assert reconcile.dangling_successors(ev, fact).height == 0
 
 
+def test_stale_successors_flags_anachronistic_target():
+    # 01202→01201 は 01201 が施行年(2008)後の2020に生存＝OK。
+    # 01203→01900 は 01900 が施行年(2015)より前の2005にしか登場しない＝時制の取り違え。
+    fact = _fact(
+        [
+            ("01201", "A市", 2020, 150),
+            ("01900", "旧市", 2005, 30),  # 2005 にしか居ない＝以後 消滅
+        ]
+    )
+    ev = pl.DataFrame(
+        {
+            "old_code": ["01202", "01203"],
+            "successor_code": ["01201", "01900"],
+            "year": [2008, 2015],
+            "kind": [None, None],
+        },
+        schema=events.EVENTS_SCHEMA,
+    )
+    stale = reconcile.stale_successors(ev, fact)
+    assert stale["old_code"].to_list() == ["01203"]
+
+
+def test_stale_successors_resolves_chain_to_terminal():
+    # A→B→C の多段。B は atom に居ないが終端 C は 2020 に生存＝時制OK（連鎖を吸収）。
+    fact = _fact([("C", "C市", 2020, 100)])
+    ev = pl.DataFrame(
+        {"old_code": ["A", "B"], "successor_code": ["B", "C"], "year": [2005, 2008], "kind": [None, None]},
+        schema=events.EVENTS_SCHEMA,
+    )
+    assert reconcile.stale_successors(ev, fact).height == 0
+
+
 def test_conservation_known_diff_is_accepted():
     # 1980 は既知差分 37（区未定分）を受容＝ok。他年の diff=0 も ok。値は specs.KNOWN_DIFFS で固定。
     assert area_specs.KNOWN_DIFFS[1980] == 37

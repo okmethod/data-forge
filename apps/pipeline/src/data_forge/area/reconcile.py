@@ -3,11 +3,12 @@
 堀（moat）の駆動役。parsed イベントだけでは埋まらない箇所を機械的にフラグし、
 人手 overrides（クッション）で埋める運用を支える。
 
-3 つの検査:
+4 つの検査:
     - national_conservation … 各年、アトム合計 == 全国total か（アトム抽出の健全性）。
     - orphans … base_year までに消滅したのに rollup 先が base_year に無いアトム
                 （＝合併イベント未整備）。人口降順で「次に埋める候補」を返す。
     - dangling_successors … 後継先が実在コードへ着地しないイベント行（後継コードの指定ミス）。
+    - stale_successors … 後継先は実在するが施行年より後に登場しないイベント行（時制の取り違え）。
 """
 
 import polars as pl
@@ -238,4 +239,37 @@ def dangling_successors(events: pl.DataFrame, atom_fact: pl.DataFrame) -> pl.Dat
         pl.col("successor_code").is_not_null()
         & (pl.col("successor_code").str.len_chars() > 0)
         & ~pl.col("successor_code").is_in(list(universe))
+    )
+
+
+def stale_successors(events: pl.DataFrame, atom_fact: pl.DataFrame) -> pl.DataFrame:
+    """後継先は実在するが施行年より後に一度も登場しないイベント行を返す（時制の取り違え検出）。
+
+    dangling_successors が「宇宙のどこにも無い後継」を突くのに対し、
+    本検査は「実在はするが時制が合わない後継」を突く。
+    正しい後継は施行年以降の国勢調査に生存しているはず（新設合併なら合併年から登場・編入なら継続）。
+    全登場年が施行年より前しか無い後継は、廃止済み／別時代のコードへの取り違えが疑われる
+    （実在するため dangling では素通りする穴）。
+
+    多段後継は終端まで解決してから判定する（中間後継は連鎖で吸収されるため rollup を再利用）。
+    実在しない後継は dangling_successors の担当ゆえ二重報告を避け、
+    終端が atom として実在する行のみ対象にする（＝inner join）。
+    rollup を無効化しないので配布は止めず、警告に留める。
+    """
+    if events.height == 0:
+        return events.clear()
+
+    # 後継コードを終端（合併チェーンの行き着く先）へ解決。base_year 無制限で全イベントを適用。
+    terminal_of = dict(
+        zip(
+            *(rollup(events, base_year=10**9).select("code", "base_code").to_dict(as_series=False).values()),
+            strict=True,
+        )
+    )
+    atom_max = atom_fact.group_by("area_code").agg(pl.col("year").max().alias("_succ_max_year"))
+    return (
+        events.with_columns(pl.col("successor_code").replace(terminal_of).alias("_terminal"))
+        .join(atom_max.rename({"area_code": "_terminal"}), on="_terminal", how="inner")
+        .filter(pl.col("_succ_max_year") < pl.col("year"))
+        .drop("_terminal", "_succ_max_year")
     )
