@@ -14,13 +14,8 @@ import polars as pl
 
 from data_forge.area.mapping import rollup
 
-# 既知の人口保存差分（原資料特性で受容する年 → 期待差分）。
-# 孤児やロジック不整合とは別物で、override では解消しない「原資料の真実」。
-# 値が動いたら回帰＝別問題としてテストで固定する。
-KNOWN_DIFFS: dict[int, int] = {1980: 37}
-KNOWN_DIFF_REASONS: dict[int, str] = {
-    1980: "東京都特別区部の区未定分（23区に按分されない集計差）",
-}
+# 既知の人口保存差分・クロスファクト検算スペックは政策レジストリ data_forge.area.specs が正典。
+# 本モジュールは検算の「機構（エンジン）」に徹し、既知差分は引数で受ける（specs.KNOWN_DIFFS を注入）。
 
 
 def _total_mask(df: pl.DataFrame) -> pl.Expr:
@@ -39,18 +34,26 @@ def _total_mask(df: pl.DataFrame) -> pl.Expr:
     return pl.all_horizontal([pl.col(c) == "0" for c in codes])
 
 
-def national_conservation(atom_fact: pl.DataFrame, national: pl.DataFrame) -> pl.DataFrame:
+def national_conservation(
+    atom_fact: pl.DataFrame,
+    national: pl.DataFrame,
+    *,
+    known_diffs: dict[int, int] | None = None,
+) -> pl.DataFrame:
     """各年で「アトム合計（総数）== 全国total」を検査した表を返す。
 
     引数:
         atom_fact … 各年アトムの時系列（fact 依存スキーマ）。
         national  … 全国行のみ（area_code=='00000'）を含む DF。総数スライスを絞るため
                     分類軸コード列（sex_code・あれば age_class_code）を保持していること。
+        known_diffs … 受容する既知差分（年 → 期待差分。既定 None＝差分なし）。政策レジストリの
+                    specs.KNOWN_DIFFS を注入する（cross_fact の known_diffs と対称）。
 
     列: year / national / atom_sum / diff / known_diff / known / ok。
-    `known_diff` は既知差分の期待値（KNOWN_DIFFS、既定 0）。`ok` は diff が期待値に一致するか
+    `known_diff` は既知差分の期待値（known_diffs、既定 0）。`ok` は diff が期待値に一致するか
     （0 一致だけでなく既知差分も許容）。`known` は「0 でない既知差分を受容した」行のフラグ。
     """
+    known_diffs = known_diffs or {}
     atom_sum = (
         atom_fact.filter(_total_mask(atom_fact))
         .group_by("year")
@@ -60,7 +63,7 @@ def national_conservation(atom_fact: pl.DataFrame, national: pl.DataFrame) -> pl
     return (
         nat.join(atom_sum, on="year", how="left")
         .with_columns((pl.col("national") - pl.col("atom_sum")).alias("diff"))
-        .with_columns(pl.col("year").replace_strict(KNOWN_DIFFS, default=0, return_dtype=pl.Int64).alias("known_diff"))
+        .with_columns(pl.col("year").replace_strict(known_diffs, default=0, return_dtype=pl.Int64).alias("known_diff"))
         .with_columns(
             (pl.col("diff") == pl.col("known_diff")).alias("ok"),
             ((pl.col("diff") != 0) & (pl.col("diff") == pl.col("known_diff"))).alias("known"),
@@ -111,8 +114,8 @@ def cross_fact(
                       除く」ゆえ other = hub − 年齢不詳 ≤ hub）。status="known_diff"・
                       ok=(diff>=0)＝定義差の向き（other ≤ hub）が保たれる限り許容する。
         known_diffs … 既知差の**値を pin する**年→期待 Σ|diff|（年内 全キーの絶対差の総和）。
-                      area の `KNOWN_DIFFS` と同じく「値を明記して固定＝ずれたら失敗」で、向きだけでなく
-                      大きさの回帰も捕捉する（cleaner/transform の取り違えで既知年の差が動けば落ちる）。
+                      area 保存の `specs.KNOWN_DIFFS` と同じく「値を明記して固定＝ずれたら失敗」で、
+                      向きだけでなく大きさの回帰も捕捉する（cleaner/transform の取り違えで既知年の差が動けば落ちる）。
                       指定年は known_diff 扱い（known_diff_years と和集合）＋ Σ|diff|==期待 を満たす限り許容。
                       "year" を keys に含む検算のみ有効（Σ|diff| は年で集計する）。
         mode        … "equality"（既定・diff==0 を期待）／"bound"（上界検算＝other ≤ hub の

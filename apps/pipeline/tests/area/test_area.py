@@ -8,6 +8,7 @@ rollup（推移閉包・基準年カットオフ）、基準年集約（人口�
 import polars as pl
 
 from data_forge.area import aggregate, atoms, events, mapping, reconcile, spatial_rollup
+from data_forge.area import specs as area_specs
 
 # --- 合成 area 階層（令和型 level を模す）---
 # 通常市 A(01201)・B(01202)、政令市 P(27100)+行政区(level5)、東京特別区部(13100)+2区(level4)
@@ -396,11 +397,11 @@ def test_dangling_successors_accepts_intermediate_chain():
 
 
 def test_conservation_known_diff_is_accepted():
-    # 1980 は既知差分 37（区未定分）を受容＝ok。他年の diff=0 も ok。値は KNOWN_DIFFS で固定。
-    assert reconcile.KNOWN_DIFFS[1980] == 37
+    # 1980 は既知差分 37（区未定分）を受容＝ok。他年の diff=0 も ok。値は specs.KNOWN_DIFFS で固定。
+    assert area_specs.KNOWN_DIFFS[1980] == 37
     fact = _fact([("01201", "A市", 1980, 100 - 37), ("01201", "A市", 2020, 150)])
     national = pl.DataFrame({"year": [1980, 2020], "sex_code": ["0", "0"], "population": [100, 150]})
-    cons = reconcile.national_conservation(fact, national).sort("year")
+    cons = reconcile.national_conservation(fact, national, known_diffs=area_specs.KNOWN_DIFFS).sort("year")
     assert cons["diff"].to_list() == [37, 0]
     assert cons["ok"].to_list() == [True, True]  # 既知差分は許容
     assert cons["known"].to_list() == [True, False]  # 1980 のみ「受容した既知差分」
@@ -410,7 +411,7 @@ def test_conservation_unknown_diff_still_fails():
     # 既知差分と違う値（40≠37）は依然 NG＝新規混入を検知できる。
     fact = _fact([("01201", "A市", 1980, 60)])
     national = pl.DataFrame({"year": [1980], "sex_code": ["0"], "population": [100]})
-    cons = reconcile.national_conservation(fact, national)
+    cons = reconcile.national_conservation(fact, national, known_diffs=area_specs.KNOWN_DIFFS)
     assert cons["diff"].to_list() == [40]
     assert cons["ok"].to_list() == [False]
     assert cons["known"].to_list() == [False]

@@ -11,7 +11,8 @@ fact = 各年アトム（標準的な市区町村）を合併イベントで基�
     mapping        … rollup（アトム→基準年・推移閉包）
     aggregate      … 時間軸集約 aggregate_to_base / crosswalk
     spatial_rollup … 空間軸集約 prefecture / region
-    reconcile      … 人口保存チェック・孤児アトム検出
+    reconcile      … 人口保存チェック・孤児アトム検出（検算エンジン）
+    specs          … 検算の政策レジストリ（既知差分 KNOWN_DIFFS・crossfact 登録簿 CROSSFACT）
 
 why・保証する不変量（検証結果）は docs/distributions/area_master.md。
 """

@@ -9,7 +9,7 @@ match / mismatch / scope_out / known_diff の status 分類が正しいことを
 import polars as pl
 
 from data_forge.area import reconcile
-from data_forge.cli import _MAC_AGE5_TO_BAND, _MIC_AGE_TO_BAND
+from data_forge.area.specs import _MAC_AGE5_TO_BAND, _MIC_AGE_TO_BAND
 
 
 def _pop_hub(rows: list[tuple[str, str, int, int]]) -> pl.DataFrame:
