@@ -21,7 +21,7 @@ from typing import Any
 
 import polars as pl
 
-from data_forge import config, derive
+from data_forge import config, derive, sanity
 from data_forge.area import reconcile as area_reconcile
 from data_forge.area import specs as area_specs
 from data_forge.area.history import ingest as area_ingest
@@ -191,6 +191,37 @@ def _cmd_crossfact_check(ds: Dataset | StitchedDataset | ProjectedDataset, args:
     total_bad = sum(_run_crossfact_spec(spec, other, load_hub(spec.hub_key)) for spec in specs)
     if total_bad:
         raise SystemExit(1)
+
+
+def _cmd_sanity_check(ds: Dataset | StitchedDataset | ProjectedDataset, args: argparse.Namespace) -> None:
+    """配布ファクトの測定量が非負かを実データで検証するブロッキングゲート（違反時 exit 1）。
+
+    保存則・クロスファクト検算は総数どうしの一致を見るため、
+    導出注入した不詳（総数−Σ内訳）が負に振れても自明化して捕まらない。
+    ここで測定量の値域（≥ 0）を直接突き、その穴を塞ぐ。
+    area-check（市区町村ミクロ系列専用）と対になり、
+    射影ファクト（households/family_type/labor_force/industry/occupation）を含む全ファクトを守る。
+    null 混入は advisory（未収録セル由来があり得るため exit には影響しない）。
+    """
+    df, _ = derive.load(ds, refresh=args.refresh, join=args.join, base_year=args.base_year)
+    cols = sanity.measure_columns(df)
+    print(f"[sanity-check] {ds.key}: 測定量 {cols}")
+    n_null = sanity.null_measure_count(df)
+    if n_null:
+        print(f"  ⚠️ 測定量に null を含む行 {n_null} 件（未収録セル由来か要確認・advisory）")
+    known = sanity.KNOWN_NEGATIVES.get(ds.table_name, [])
+    # 受容した既知負値のみ報告（値がずれれば下の unknown_negatives が未知の負値として exit 1 に落とす）。
+    # 該当0件は family 内の別粒度（例 national）で正常に起きるので警告しない。
+    for spec, hits in sanity.known_negative_hits(df, known):
+        if hits:
+            print(f"  ⚠️ 既知の負値 {spec.value} 人を受容: {spec.reason}")
+    bad = sanity.unknown_negatives(df, known)
+    if bad.height:
+        print(f"⚠️ 測定量が負の行 {bad.height} 件（不詳導出のはみ出し等＝値の破綻・既知例外を除く）:")
+        with pl.Config(tbl_rows=30):
+            print(bad)
+        raise SystemExit(1)
+    print("✅ 全測定量が非負（既知例外を除く）")
 
 
 def _cmd_public_scope_check(args: argparse.Namespace) -> None:
@@ -437,6 +468,16 @@ def build_parser() -> argparse.ArgumentParser:
     pc.add_argument("--refresh", action="store_true", help="キャッシュを無視して再取得")
     pc.add_argument("--base-year", type=int, default=None, help="両ファクトの畳込基準年（既定=最新年）")
     pc.set_defaults(handler=_cmd_crossfact_check)
+
+    # 値サニティ検算（測定量の非負を実データで検証＝保存則/クロスファクトが自明化して見逃す穴を塞ぐ）
+    pf = sub.add_parser("sanity-check", help="値サニティ検算: 配布ファクトの測定量が非負か検証")
+    pf.add_argument("dataset", help="データセットキー（基底/縫合/射影いずれも可）")
+    pf.add_argument("--refresh", action="store_true", help="キャッシュを無視して再取得")
+    pf.add_argument(
+        "--join", choices=derive.JOIN_CHOICES, default=None, help="派生データセットの正規化モード（既定=定義に従う）"
+    )
+    pf.add_argument("--base-year", type=int, default=None, help="aggregate_to_base の基準年（既定=最新年）")
+    pf.set_defaults(handler=_cmd_sanity_check)
 
     return parser
 
