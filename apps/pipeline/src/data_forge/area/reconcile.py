@@ -11,20 +11,43 @@
     - stale_successors … 後継先は実在するが施行年より後に登場しないイベント行（時制の取り違え）。
 """
 
+from dataclasses import dataclass
+
 import polars as pl
 
 from data_forge.area.mapping import rollup
 
 # 既知の人口保存差分・クロスファクト検算スペックは政策レジストリ data_forge.area.specs が正典。
-# 本モジュールは検算の「機構（エンジン）」に徹し、既知差分は引数で受ける（specs.KNOWN_DIFFS を注入）。
+# 本モジュールは検算の「機構（エンジン）」に徹し、既知差分は引数で受ける（値の実体は known_pins が正典）。
+
+
+@dataclass(frozen=True)
+class KnownDiff:
+    """年グレインの既知逸脱値1件（保存則 national_conservation / crossfact が受容する 年 → 期待差分）。
+
+    sanity.KnownNegative（セルグレイン）と対をなす年グレインのレコード。
+    値と理由を同梱して並行 dict のドリフトを断つ。
+    エンジンは値だけを `year_pins` で射影した dict[int, int] で受ける
+    （機構と政策の分離は維持）。実体（KNOWN_DIFFS 等）は data_forge.known_pins が正典。
+    """
+
+    year: int
+    value: int
+    reason: str
+
+
+def year_pins(records: list[KnownDiff]) -> dict[int, int]:
+    """KnownDiff 群を検算エンジン向けの 年 → 逸脱値 dict に射影する。"""
+    return {r.year: r.value for r in records}
 
 
 def _total_mask(df: pl.DataFrame) -> pl.Expr:
     """全分類軸が「総数」（コード=="0"）の行だけを選ぶ述語。
 
-    population は sex_code=="0" だけだが、population_by_age は sex_code=="0" かつ
-    age_class_code=="0"（総数×総数）で grand total 1 行に絞る（さもないと年少+生産+老年+不詳の
-    重複で二重計上になる）。`*_code` 列の増減に追従するので fact 非依存。
+    population は sex_code=="0" だけだが、population_by_age は
+    sex_code=="0" かつ age_class_code=="0"（総数×総数）で grand total 1 行に絞る
+    （さもないと年少+生産+老年+不詳の重複で二重計上になる）。
+    `*_code` 列の増減に追従するので fact 非依存。
 
     ただし age5year は年齢総数コードが "0" でなく "100" のため、
     本 mask は 0 行マッチ＝保存則が空振りになる（area-check は空表をガードで検知）。

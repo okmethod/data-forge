@@ -88,7 +88,9 @@ def _cmd_area_check(ds: Dataset | StitchedDataset | ProjectedDataset, args: argp
     """
     atom_fact, national, events = derive.build_atoms(ds, refresh=args.refresh)
     failed = False
-    cons = area_reconcile.national_conservation(atom_fact, national, known_diffs=known_pins.KNOWN_DIFFS)
+    cons = area_reconcile.national_conservation(
+        atom_fact, national, known_diffs=area_reconcile.year_pins(known_pins.KNOWN_DIFFS)
+    )
     n_bad = int(cons.filter(~pl.col("ok")).height)
     if cons.height == 0:
         # 総数スライス（全分類軸コード=="0"）が1行もマッチしないと空表になる。
@@ -101,8 +103,9 @@ def _cmd_area_check(ds: Dataset | StitchedDataset | ProjectedDataset, args: argp
         status = f"⚠️ {n_bad} 年で不一致"
         failed = True
     print(f"[area-check] {ds.key}: 人口保存 {status}")
+    reasons = {d.year: d.reason for d in known_pins.KNOWN_DIFFS}
     for row in cons.filter(pl.col("known")).iter_rows(named=True):
-        reason = known_pins.KNOWN_DIFF_REASONS.get(row["year"], "")
+        reason = reasons.get(row["year"], "")
         print(f"  ⚠️ {row['year']} は既知差分 {row['diff']} 人を受容: {reason}")
     print(cons)
     orph = area_reconcile.orphans(atom_fact, events, base_year=args.base_year)
