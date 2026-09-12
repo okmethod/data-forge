@@ -207,8 +207,11 @@ CROSSFACT: dict[str, list[CrossFactSpec]] = {
         ),
     ],
     # C5: daynight 夜間(常住地・daynight_code=0) == population（全国＝keys=["year"] で市区町村を合算）。
-    # 2010-2020 は厳密 diff=0。1990-2005 は従業地・通学地集計の常住地人口ベースが基本集計人口と相違し
-    # pop>night（〜0.1-0.4%・一方向 diff≥0）＝known_diff。1980/1985/2025 は daynight 未収録＝scope_out。
+    # 2010-2020 は厳密 diff=0。1990-2005 は従業地・通学地集計（人口等基本集計とは別系統の集計）の常住地人口が
+    # 確定人口を僅かに下回り pop≥night（〜0.1-0.4%・一方向 diff≥0）＝known_diff。
+    # 1980/1985/2025 は未収録＝scope_out。
+    # 差は集計系統/母集団定義の違いで 2010 全数集計化により消滅＝別系統の集計差（精製バグではない）。
+    # 正典＝docs/data-quality-assurance.md §既知の逸脱値レジストリ②。
     "daynight_municipality_timeseries": [
         CrossFactSpec(
             name="C5 夜間(常住地) == population（全国）",
