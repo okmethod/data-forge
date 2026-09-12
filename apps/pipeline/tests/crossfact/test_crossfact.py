@@ -357,7 +357,7 @@ def test_cross_fact_conservation_accepts_known_diff_of_either_sign():
 
 def test_cross_fact_allowed_diffs_pins_magnitude_and_fails_on_drift():
     # allowed_diffs は既知差の**値**（年→Σ|diff|）を固定＝大きさが動けば known_diff 年でも失敗する
-    # （area の KNOWN_DIFFS と同思想＝cleaner/transform の取り違えで既知差が変わる回帰を捕捉）。
+    # （area の CONSERVATION_DIFFS と同思想＝cleaner/transform の取り違えで既知差が変わる回帰を捕捉）。
     # 1985 は 2 セルが ±6（Σ|diff|=12）／1950 は +6（Σ|diff|=6）。
     hub = _geo([("100", 1985, 1000), ("200", 1985, 1000), ("100", 1950, 1000), ("100", 2020, 1000)])
     other = _geo([("100", 1985, 1006), ("200", 1985, 994), ("100", 1950, 994), ("100", 2020, 1000)])

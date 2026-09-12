@@ -89,7 +89,7 @@ def _cmd_area_check(ds: Dataset | StitchedDataset | ProjectedDataset, args: argp
     atom_fact, national, events = derive.build_atoms(ds, refresh=args.refresh)
     failed = False
     cons = area_reconcile.national_conservation(
-        atom_fact, national, allowed_diffs=area_reconcile.year_pins(known_pins.KNOWN_DIFFS)
+        atom_fact, national, allowed_diffs=area_reconcile.year_pins(known_pins.CONSERVATION_DIFFS)
     )
     n_bad = int(cons.filter(~pl.col("ok")).height)
     if cons.height == 0:
@@ -103,7 +103,7 @@ def _cmd_area_check(ds: Dataset | StitchedDataset | ProjectedDataset, args: argp
         status = f"⚠️ {n_bad} 年で不一致"
         failed = True
     print(f"[area-check] {ds.key}: 人口保存 {status}")
-    reasons = {d.year: d.reason for d in known_pins.KNOWN_DIFFS}
+    reasons = {d.year: d.reason for d in known_pins.CONSERVATION_DIFFS}
     for row in cons.filter(pl.col("allowed")).iter_rows(named=True):
         reason = reasons.get(row["year"], "")
         print(f"  ⚠️ {row['year']} は既知差分 {row['diff']} 人を許容: {reason}")
@@ -212,7 +212,7 @@ def _cmd_sanity_check(ds: Dataset | StitchedDataset | ProjectedDataset, args: ar
     n_null = sanity.null_measure_count(df)
     if n_null:
         print(f"  ⚠️ 測定量に null を含む行 {n_null} 件（未収録セル由来か要確認・advisory）")
-    known = known_pins.KNOWN_NEGATIVES.get(ds.table_name, [])
+    known = known_pins.SANITY_NEGATIVES.get(ds.table_name, [])
     # 受容した既知負値のみ報告（値がずれれば下の unknown_negatives が未知の負値として exit 1 に落とす）。
     # 該当0件は family 内の別粒度（例 national）で正常に起きるので警告しない。
     for spec, hits in sanity.known_negative_hits(df, known):

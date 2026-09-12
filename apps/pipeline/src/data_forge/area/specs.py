@@ -4,8 +4,8 @@ reconcile.py は検算の「機構（エンジン）」に徹し、本モジュ�
     - CrossFactSpec / CROSSFACT … クロスファクト検算・保存則検算・地理保存の登録簿
       （データセットキー → 検算スペック。年別の許容カテゴリ・スライス・モードを同梱）。
 
-受容する差分の **pin 値**（KNOWN_DIFFS・C4/C5 の Σ|diff|・KNOWN_NEGATIVES）は差分値の一元管理のため
-`known_pins.py` に分離し、本モジュールの spec はそこを参照する（＝定義は specs・値は known_pins）。
+spec が参照する **pin 値**（C4/C5 の Σ|diff|＝`known_pins.CROSSFACT_C4`/`CROSSFACT_C5`）は
+差分値の一元管理のため `known_pins.py` に分離している（＝定義は specs・値は known_pins）。
 検算の意味論・許容カテゴリの why は docs/data-quality-assurance.md が正典。
 """
 
@@ -38,7 +38,9 @@ class CrossFactSpec:
     scope_years: frozenset[int] = frozenset()  # other 未収録の年（other==0 を許容）
     known_diff_years: frozenset[int] = frozenset()  # 定義差で diff!=0 が期待される年（diff>=0 を許容）
     known_diffs: dict[int, int] = field(default_factory=dict)  # 既知差の値 pin＝年→期待 Σ|diff|（ずれたら失敗）
-    reasons: dict[int, str] = field(default_factory=dict)  # 年 → 許容理由（表示用）
+    # 年→許容理由。scope_out / known_diff_year も含む「年ステータス」の説明で、
+    # pin 値とは別粒度（値を持たず理由だけの年が大半）ゆえ spec 側が正典＝known_pins には移さない。
+    reasons: dict[int, str] = field(default_factory=dict)
 
 
 # 日本人スライスの再利用述語（age5 のミクロ系列のみ nationality 軸を持つ）。

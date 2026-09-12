@@ -20,7 +20,7 @@ class KnownNegative:
     """原資料由来で受容する負値セル1件（値サニティの既知例外）。
 
     `match`（キー列→値の全一致）で対象セルを1点特定し、`value`（負の値）を **pin** する。
-    保存則の `KNOWN_DIFFS` と同じく値を明記して固定＝**ずれたら失敗**
+    保存則の `CONSERVATION_DIFFS` と同じく値を明記して固定＝**ずれたら失敗**
     （cleaner/transform の取り違えで残差が動けば未知の負値として exit 1 に落ちる）。
     """
 
@@ -36,8 +36,8 @@ class KnownNegative:
         return expr
 
 
-# 受容する負値の pin 値（KNOWN_NEGATIVES）は、
-# 差分値を一元管理するため他の既知差分（KNOWN_DIFFS / CROSSFACT）と同じ known_pins.py に集約する。
+# 受容する負値の pin 値（SANITY_NEGATIVES）は、
+# 差分値を一元管理するため他の既知差分（CONSERVATION_DIFFS / CROSSFACT）と同じ known_pins.py に集約する。
 # 型（本 KnownNegative）とエンジンは本モジュールに残す。
 # cli が known_pins から注入し、下記エンジンは spec を引数で受ける。
 

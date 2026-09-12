@@ -4,9 +4,9 @@
 本モジュールは「受容する逸脱の値」だけを一箇所へ集め、
 **値を明記して固定＝ずれたら失敗**（大きさの回帰も捕捉）させる。
 3 系統:
-    - KNOWN_DIFFS（KnownDiff）… 人口保存（national_conservation）の既知差分。
+    - CONSERVATION_DIFFS（KnownDiff）… 人口保存（national_conservation）の既知差分。
     - CROSSFACT_C4 / CROSSFACT_C5 … クロスファクト検算の遡及年 Σ|diff| 値（`area/specs.py` の該当 spec が参照）。
-    - KNOWN_NEGATIVES … 値サニティ（sanity.unknown_negatives）が受容する負値セル。
+    - SANITY_NEGATIVES … 値サニティ（sanity.unknown_negatives）が受容する負値セル。
 
 値の意味・許容理由（why）は docs/data-quality-assurance.md「既知の逸脱値レジストリ」が正典。
 
@@ -19,9 +19,10 @@
 from data_forge.area.reconcile import KnownDiff
 from data_forge.sanity import KnownNegative
 
-# ① 人口保存の既知差分（原資料特性で受容する年 → 期待差分）。reconcile.year_pins で dict 化し
-# national_conservation へ渡す。孤児やロジック不整合とは別物で、override では解消しない「原資料の真実」。
-KNOWN_DIFFS: list[KnownDiff] = [
+# ① 人口保存の既知差分（原資料特性で受容する年 → 期待差分）。
+# reconcile.year_pins で dict 化し national_conservation へ渡す。
+# 孤児やロジック不整合とは別物で、override では解消しない「原資料の真実」。
+CONSERVATION_DIFFS: list[KnownDiff] = [
     KnownDiff(1980, 37, "東京都特別区部の区未定分（23区に按分されない集計差）"),
 ]
 
@@ -30,9 +31,10 @@ KNOWN_DIFFS: list[KnownDiff] = [
 CROSSFACT_C4: dict[int, int] = {1980: 8666, 1985: 8600, 1990: 8648, 1995: 8508, 2000: 8160, 2005: 28574}
 CROSSFACT_C5: dict[int, int] = {1990: 326357, 1995: 130973, 2000: 228561, 2005: 482341}
 
-# ③ 値サニティが受容する既知負値（型・機構は sanity.py）。table_name（＝family）→ 受容する負値セル。
+# ③ 値サニティが受容する既知負値（型・機構は sanity.py）。
+# table_name（＝family）→ 受容する負値セル。
 # 原資料が保存則を満たさず不詳導出（総数−Σ内訳）が負に沈むセルを、原資料確認のうえ値付きで固定受容する。
-KNOWN_NEGATIVES: dict[str, list[KnownNegative]] = {
+SANITY_NEGATIVES: dict[str, list[KnownNegative]] = {
     "labor_force": [
         KnownNegative(
             match={"area_code": "47000", "year": 1955, "sex_code": "1", "labor_status_code": "999"},

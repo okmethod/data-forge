@@ -429,8 +429,8 @@ def test_stale_successors_resolves_chain_to_terminal():
 
 
 def test_conservation_known_diff_is_accepted():
-    # 1980 は既知差分 37（区未定分）を許容＝ok。他年の diff=0 も ok。値は known_pins.KNOWN_DIFFS で固定。
-    pins = reconcile.year_pins(known_pins.KNOWN_DIFFS)
+    # 1980 は既知差分 37（区未定分）を許容＝ok。他年の diff=0 も ok。値は known_pins.CONSERVATION_DIFFS で固定。
+    pins = reconcile.year_pins(known_pins.CONSERVATION_DIFFS)
     assert pins[1980] == 37
     fact = _fact([("01201", "A市", 1980, 100 - 37), ("01201", "A市", 2020, 150)])
     national = pl.DataFrame({"year": [1980, 2020], "sex_code": ["0", "0"], "population": [100, 150]})
@@ -444,7 +444,8 @@ def test_conservation_unknown_diff_still_fails():
     # 既知差分と違う値（40≠37）は依然 NG＝新規混入を検知できる。
     fact = _fact([("01201", "A市", 1980, 60)])
     national = pl.DataFrame({"year": [1980], "sex_code": ["0"], "population": [100]})
-    cons = reconcile.national_conservation(fact, national, allowed_diffs=reconcile.year_pins(known_pins.KNOWN_DIFFS))
+    pins = reconcile.year_pins(known_pins.CONSERVATION_DIFFS)
+    cons = reconcile.national_conservation(fact, national, allowed_diffs=pins)
     assert cons["diff"].to_list() == [40]
     assert cons["ok"].to_list() == [False]
     assert cons["allowed"].to_list() == [False]

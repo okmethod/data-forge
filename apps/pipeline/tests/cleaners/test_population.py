@@ -28,7 +28,7 @@ population 固有のクレンジング（level→is_current・int化・欠損処
 
 共有インフラ側の委譲先:
     人口保存・合併集約 … tests/area/test_area.py（アトム合計 == 全国total・全9年 diff=0、
-        1980 のみ 37 人差＝特別区部の区未定分を KNOWN_DIFFS で受容）。by_age は
+        1980 のみ 37 人差＝特別区部の区未定分を CONSERVATION_DIFFS で受容）。by_age は
         test_aggregate_by_age_folds_and_conserves_age /
         test_national_conservation_by_age_uses_total_slice /
         test_orphans_by_age_dedups_to_total で年齢×男女を保ったまま総数スライスで全国値保存。
