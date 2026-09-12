@@ -1,11 +1,11 @@
 """検算スペック（政策レジストリ）: reconcile エンジンが消費する既知差分と検算登録簿。
 
-reconcile.py は検算の「機構（エンジン）」に徹し、本モジュールが「政策」を一手に持つ:
-    - KNOWN_DIFFS / KNOWN_DIFF_REASONS … 人口保存（national_conservation）の既知差分レジストリ。
-    - CROSSFACT … クロスファクト検算・保存則検算・地理保存の登録簿（データセットキー → 検算スペック）。
+reconcile.py は検算の「機構（エンジン）」に徹し、本モジュールは検算の「スペック定義」を持つ:
+    - CrossFactSpec / CROSSFACT … クロスファクト検算・保存則検算・地理保存の登録簿
+      （データセットキー → 検算スペック。年別の許容カテゴリ・スライス・モードを同梱）。
 
-いずれも「原資料の真実として値を明記して受容し、ずれたら失敗」という同一思想の政策で、
-エンジン（reconcile）と入出力（cli）から独立させて一箇所へ集約する（両検算の家を対称にする）。
+受容する差分の **pin 値**（KNOWN_DIFFS・C4/C5 の Σ|diff|・KNOWN_NEGATIVES）は差分値の一元管理のため
+`known_pins.py` に分離し、本モジュールの spec はそこを参照する（＝定義は specs・値は known_pins）。
 検算の意味論・許容カテゴリの why は docs/data-quality-assurance.md が正典。
 """
 
@@ -13,16 +13,8 @@ from dataclasses import dataclass, field
 
 import polars as pl
 
+from data_forge import known_pins
 from data_forge.sources.estat import age5year_municipality as estat_age5year_municipality
-
-# 既知の人口保存差分（原資料特性で受容する年 → 期待差分）。
-# 孤児やロジック不整合とは別物で、override では解消しない「原資料の真実」。
-# 値が動いたら回帰＝別問題としてテストで固定する（national_conservation へ引数で渡す）。
-KNOWN_DIFFS: dict[int, int] = {1980: 37}
-KNOWN_DIFF_REASONS: dict[int, str] = {
-    1980: "東京都特別区部の区未定分（23区に按分されない集計差）",
-}
-
 
 # クロスファクト検算（§data-quality-assurance.md 三角測量）＋日本人スライスの保存則検算。
 # 照合相手 ds.key → 検算スペックのリスト（1 データセットに複数検算を束ねる）。
@@ -200,8 +192,8 @@ CROSSFACT: dict[str, list[CrossFactSpec]] = {
             other_slice=(pl.col("nationality_code") == "0") & pl.col("age_band").is_not_null(),
             mode="conservation",
             scope_years=_C4_PRE1980,
-            # 既知差の値 pin（年→Σ|diff|）。cleaner/transform の取り違えで既知年の差が動けば失敗する。
-            known_diffs={1980: 8666, 1985: 8600, 1990: 8648, 1995: 8508, 2000: 8160, 2005: 28574},
+            # 既知差の値 pin（年→Σ|diff|）は known_pins.py が正典。取り違えで既知年の差が動けば失敗する。
+            known_diffs=known_pins.CROSSFACT_C4,
             reasons={
                 1980: "2 product(回次別ミクロ vs 回次跨マクロ)の県レベル集計差（秘匿/境界振替・両符号・年内±相殺）",
                 1985: "2 product の県レベル集計差（秘匿/境界振替・両符号・年内±相殺）",
@@ -222,8 +214,8 @@ CROSSFACT: dict[str, list[CrossFactSpec]] = {
             hub_slice=pl.col("sex_code") == "0",
             other_slice=pl.col("daynight_code") == "0",
             scope_years=frozenset({1980, 1985, 2025}),
-            # 既知差の値 pin（年→diff＝pop−night）。全国1セル/年ゆえ diff がそのまま Σ|diff|。ずれたら失敗。
-            known_diffs={1990: 326357, 1995: 130973, 2000: 228561, 2005: 482341},
+            # 既知差の値 pin（年→diff＝pop−night）は known_pins.py が正典。全国1セル/年ゆえ diff がそのまま Σ|diff|。
+            known_diffs=known_pins.CROSSFACT_C5,
             reasons={
                 1990: "従業地・通学地集計の常住地(夜間)人口ベースが基本集計人口と相違（pop≥night・2010〜で解消）",
                 1995: "従業地・通学地集計 vs 基本集計 のベース差（pop≥night）",

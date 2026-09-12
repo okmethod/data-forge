@@ -39,6 +39,7 @@ apps/pipeline/
 │   ├── meta.py        # SourceMeta：出典 citation を運ぶソース非依存の出力契約型
 │   ├── provenance.py  # data_status：行の確からしさ（確定/速報）を表す来歴語彙
 │   ├── sanity.py      # 値サニティ：測定量の非負等を検証
+│   ├── known_pins.py  # 検算エンジン向け既知の逸脱値レジストリ
 │   ├── config.py      # 設定・パス解決
 │   │
 │   ├── area/          # 参照層：基準年集約が畳み込む地域マスタ（アトム軸・データセット非依存）

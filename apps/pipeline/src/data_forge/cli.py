@@ -21,7 +21,7 @@ from typing import Any
 
 import polars as pl
 
-from data_forge import config, derive, sanity
+from data_forge import config, derive, known_pins, sanity
 from data_forge.area import reconcile as area_reconcile
 from data_forge.area import specs as area_specs
 from data_forge.area.history import ingest as area_ingest
@@ -88,7 +88,7 @@ def _cmd_area_check(ds: Dataset | StitchedDataset | ProjectedDataset, args: argp
     """
     atom_fact, national, events = derive.build_atoms(ds, refresh=args.refresh)
     failed = False
-    cons = area_reconcile.national_conservation(atom_fact, national, known_diffs=area_specs.KNOWN_DIFFS)
+    cons = area_reconcile.national_conservation(atom_fact, national, known_diffs=known_pins.KNOWN_DIFFS)
     n_bad = int(cons.filter(~pl.col("ok")).height)
     if cons.height == 0:
         # 総数スライス（全分類軸コード=="0"）が1行もマッチしないと空表になる。
@@ -102,7 +102,7 @@ def _cmd_area_check(ds: Dataset | StitchedDataset | ProjectedDataset, args: argp
         failed = True
     print(f"[area-check] {ds.key}: 人口保存 {status}")
     for row in cons.filter(pl.col("known")).iter_rows(named=True):
-        reason = area_specs.KNOWN_DIFF_REASONS.get(row["year"], "")
+        reason = known_pins.KNOWN_DIFF_REASONS.get(row["year"], "")
         print(f"  ⚠️ {row['year']} は既知差分 {row['diff']} 人を受容: {reason}")
     print(cons)
     orph = area_reconcile.orphans(atom_fact, events, base_year=args.base_year)
@@ -209,7 +209,7 @@ def _cmd_sanity_check(ds: Dataset | StitchedDataset | ProjectedDataset, args: ar
     n_null = sanity.null_measure_count(df)
     if n_null:
         print(f"  ⚠️ 測定量に null を含む行 {n_null} 件（未収録セル由来か要確認・advisory）")
-    known = sanity.KNOWN_NEGATIVES.get(ds.table_name, [])
+    known = known_pins.KNOWN_NEGATIVES.get(ds.table_name, [])
     # 受容した既知負値のみ報告（値がずれれば下の unknown_negatives が未知の負値として exit 1 に落とす）。
     # 該当0件は family 内の別粒度（例 national）で正常に起きるので警告しない。
     for spec, hits in sanity.known_negative_hits(df, known):

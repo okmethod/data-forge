@@ -47,8 +47,8 @@ def national_conservation(
         atom_fact … 各年アトムの時系列（fact 依存スキーマ）。
         national  … 全国行のみ（area_code=='00000'）を含む DF。総数スライスを絞るため
                     分類軸コード列（sex_code・あれば age_class_code）を保持していること。
-        known_diffs … 受容する既知差分（年 → 期待差分。既定 None＝差分なし）。政策レジストリの
-                    specs.KNOWN_DIFFS を注入する（cross_fact の known_diffs と対称）。
+        known_diffs … 受容する既知差分（年 → 期待差分。既定 None＝差分なし）。値レジストリの
+                    known_pins.KNOWN_DIFFS を注入する（cross_fact の known_diffs と対称）。
 
     列: year / national / atom_sum / diff / known_diff / known / ok。
     `known_diff` は既知差分の期待値（known_diffs、既定 0）。`ok` は diff が期待値に一致するか
@@ -115,7 +115,7 @@ def cross_fact(
                       除く」ゆえ other = hub − 年齢不詳 ≤ hub）。status="known_diff"・
                       ok=(diff>=0)＝定義差の向き（other ≤ hub）が保たれる限り許容する。
         known_diffs … 既知差の**値を pin する**年→期待 Σ|diff|（年内 全キーの絶対差の総和）。
-                      area 保存の `specs.KNOWN_DIFFS` と同じく「値を明記して固定＝ずれたら失敗」で、
+                      area 保存の `known_pins.KNOWN_DIFFS` と同じく「値を明記して固定＝ずれたら失敗」で、
                       向きだけでなく大きさの回帰も捕捉する（cleaner/transform の取り違えで既知年の差が動けば落ちる）。
                       指定年は known_diff 扱い（known_diff_years と和集合）＋ Σ|diff|==期待 を満たす限り許容。
                       "year" を keys に含む検算のみ有効（Σ|diff| は年で集計する）。

@@ -36,25 +36,10 @@ class KnownNegative:
         return expr
 
 
-# 政策レジストリ（正典＝コード。docs/data-quality-assurance.md 既知差分レジストリ③はミラー）。
-# table_name（＝family）→ 受容する負値セル。原資料が保存則を満たさず
-# 不詳導出（総数−Σ内訳）が負に沈むセルを、原資料確認のうえ値付きで固定受容する。
-KNOWN_NEGATIVES: dict[str, list[KnownNegative]] = {
-    "labor_force": [
-        KnownNegative(
-            match={"area_code": "47000", "year": 1955, "sex_code": "1", "labor_status_code": "999"},
-            measure="population",
-            value=-100,
-            reason="沖縄1955男: 本土復帰前・抽出集計の百人丸めで原資料のΣ内訳(労+非)が総数を100超過",
-        ),
-        KnownNegative(
-            match={"area_code": "47000", "year": 1985, "sex_code": "2", "labor_status_code": "999"},
-            measure="population",
-            value=-9289,
-            reason="沖縄1985女: e-Stat時系列製品の公表値が内部不整合(労+非=449,374 > 総数440,085)＝原資料由来",
-        ),
-    ],
-}
+# 受容する負値の pin 値（KNOWN_NEGATIVES）は、
+# 差分値を一元管理するため他の既知差分（KNOWN_DIFFS / CROSSFACT）と同じ known_pins.py に集約する。
+# 型（本 KnownNegative）とエンジンは本モジュールに残す。
+# cli が known_pins から注入し、下記エンジンは spec を引数で受ける。
 
 
 def measure_columns(df: pl.DataFrame) -> list[str]:
