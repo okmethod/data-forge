@@ -355,19 +355,19 @@ def test_cross_fact_conservation_accepts_known_diff_of_either_sign():
     assert dict(zip(eq["year"], eq["ok"], strict=True)) == {1950: True, 1985: False, 2020: True}
 
 
-def test_cross_fact_known_diffs_pins_magnitude_and_fails_on_drift():
-    # known_diffs は既知差の**値**（年→Σ|diff|）を固定＝大きさが動けば known_diff 年でも失敗する
+def test_cross_fact_allowed_diffs_pins_magnitude_and_fails_on_drift():
+    # allowed_diffs は既知差の**値**（年→Σ|diff|）を固定＝大きさが動けば known_diff 年でも失敗する
     # （area の KNOWN_DIFFS と同思想＝cleaner/transform の取り違えで既知差が変わる回帰を捕捉）。
     # 1985 は 2 セルが ±6（Σ|diff|=12）／1950 は +6（Σ|diff|=6）。
     hub = _geo([("100", 1985, 1000), ("200", 1985, 1000), ("100", 1950, 1000), ("100", 2020, 1000)])
     other = _geo([("100", 1985, 1006), ("200", 1985, 994), ("100", 1950, 994), ("100", 2020, 1000)])
     common = {"keys": ["code", "year"], "mode": "conservation"}
     # 値が一致する pin なら許容（両符号でも大きさが期待どおり）。
-    ok = reconcile.cross_fact(hub, other, known_diffs={1985: 12, 1950: 6}, **common).sort("code", "year")
+    ok = reconcile.cross_fact(hub, other, allowed_diffs={1985: 12, 1950: 6}, **common).sort("code", "year")
     assert dict(zip(ok["year"], ok["status"], strict=True))  # 1985/1950=known_diff・2020=match
     assert ok["ok"].all()
     # pin とズレる（1985 の期待を 12→99 に）なら、その年の全キーを弾く（他年は無傷）。
-    bad = reconcile.cross_fact(hub, other, known_diffs={1985: 99, 1950: 6}, **common).sort("code", "year")
+    bad = reconcile.cross_fact(hub, other, allowed_diffs={1985: 99, 1950: 6}, **common).sort("code", "year")
     verdict = {(c, y): o for c, y, o in zip(bad["code"], bad["year"], bad["ok"], strict=True)}
     assert verdict[("100", 1985)] is False and verdict[("200", 1985)] is False  # Σ|diff|≠99 で年ごと失敗
     assert verdict[("100", 1950)] is True and verdict[("100", 2020)] is True  # 他年は許容のまま

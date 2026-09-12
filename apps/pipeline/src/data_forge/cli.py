@@ -89,7 +89,7 @@ def _cmd_area_check(ds: Dataset | StitchedDataset | ProjectedDataset, args: argp
     atom_fact, national, events = derive.build_atoms(ds, refresh=args.refresh)
     failed = False
     cons = area_reconcile.national_conservation(
-        atom_fact, national, known_diffs=area_reconcile.year_pins(known_pins.KNOWN_DIFFS)
+        atom_fact, national, allowed_diffs=area_reconcile.year_pins(known_pins.KNOWN_DIFFS)
     )
     n_bad = int(cons.filter(~pl.col("ok")).height)
     if cons.height == 0:
@@ -104,9 +104,9 @@ def _cmd_area_check(ds: Dataset | StitchedDataset | ProjectedDataset, args: argp
         failed = True
     print(f"[area-check] {ds.key}: 人口保存 {status}")
     reasons = {d.year: d.reason for d in known_pins.KNOWN_DIFFS}
-    for row in cons.filter(pl.col("known")).iter_rows(named=True):
+    for row in cons.filter(pl.col("allowed")).iter_rows(named=True):
         reason = reasons.get(row["year"], "")
-        print(f"  ⚠️ {row['year']} は既知差分 {row['diff']} 人を受容: {reason}")
+        print(f"  ⚠️ {row['year']} は既知差分 {row['diff']} 人を許容: {reason}")
     print(cons)
     orph = area_reconcile.orphans(atom_fact, events, base_year=args.base_year)
     if orph.height:
@@ -144,7 +144,7 @@ def _run_crossfact_spec(spec: area_specs.CrossFactSpec, other: pl.DataFrame, hub
         value=spec.value,
         scope_years=spec.scope_years,
         known_diff_years=spec.known_diff_years,
-        known_diffs=spec.known_diffs,
+        allowed_diffs=spec.known_diffs,
         mode=spec.mode,
     )
     n_bad = int(rep.filter(~pl.col("ok")).height)

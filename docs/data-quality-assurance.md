@@ -42,7 +42,7 @@ e-Stat getStatsData の生レスポンスを取得時点で検証し、構造崩
 - **年齢保存**: 年少 + 生産 + 老年 + 不詳 == 総数
 - **男女保存**: 男 + 女 == 総数
 - **総数スライス一致**: 年齢総数 / 夜間のスライスが基底 population とビット一致（各データセット doc で実証）
-- **地理保存（全国==Σ県）**: 地理粒度排他（全国と都道府県を同一配布に混ぜず別データセットへ分ける方針）で全国/県を別配布に分けた 7 family で `*_national_timeseries == Σ *_prefecture_timeseries`（分割が値を落とさない/二重化しない保証。分類軸×year の per-age／per-class 粒度で突合＝総数だけ保存し内訳が誤配分される bug も捕捉する。実例＝age5 の 85+ 誤流入は clean_national で 85+細分を 310 へ畳んで解消）。旧回の原資料集計差は符号不定ゆえ**両符号**の known_diff で受容する点だけ conformed dimension（diff≥0 限定）と異なる。実装は `cross_fact` の `mode="conservation"`・許容年の正典は `area/specs.py` の `CROSSFACT`。
+- **地理保存（全国==Σ県）**: 地理粒度排他（全国と都道府県を同一配布に混ぜず別データセットへ分ける方針）で全国/県を別配布に分けた 7 family で `*_national_timeseries == Σ *_prefecture_timeseries`（分割が値を落とさない/二重化しない保証。分類軸×year の per-age／per-class 粒度で突合＝総数だけ保存し内訳が誤配分される bug も捕捉する。実例＝age5 の 85+ 誤流入は clean_national で 85+細分を 310 へ畳んで解消）。旧回の原資料集計差は符号不定ゆえ**両符号**の known_diff で許容する点だけ conformed dimension（diff≥0 限定）と異なる。実装は `cross_fact` の `mode="conservation"`・許容年の正典は `area/specs.py` の `CROSSFACT`。
 
 #### 不詳の扱い（導出注入・補完値版の統一）＝ fact 共通の閉じ方
 
@@ -71,7 +71,7 @@ e-Stat の不詳（未回答・不明）の扱いは全 fact で 2 つの規約�
 - **年別の許容カテゴリ**: 全年が diff=0 とは限らないため年別に status を分類し、**真の不一致のみ**を失敗とする（許容年は年別リストで管理）。
   - **scope_out**: 照合相手が未収録の年（population 速報のみ等）。照合相手側=0 を期待＝スコープ外として許容。
   - **known_diff**: 定義差が既知の年。例＝各歳表が「年齢不詳を除く」ゆえ age5 総数 = population − 年齢不詳（照合相手 ≤ ハブ）。差の向き（diff≥0）が保たれる限り許容。※C3 の age3class は不詳を含むソースゆえ同年でも diff=0。
-- **C4/C5** も `crossfact-check` が常時回す（`CROSSFACT` 登録済み）。ともに近年（2010〜2020）は厳密 diff=0 だが、遡ると別プロダクト間の集計差が出るため年別 status で受容する。**遡及年の既知差は向きだけでなく値（年→Σ\|diff\|）も pin** してあり、cleaner/transform の取り違えで大きさが動けば失敗する（上記ドリフト防止方針の例外②）:
+- **C4/C5** も `crossfact-check` が常時回す（`CROSSFACT` 登録済み）。ともに近年（2010〜2020）は厳密 diff=0 だが、遡ると別プロダクト間の集計差が出るため年別 status で許容する。**遡及年の既知差は向きだけでなく値（年→Σ\|diff\|）も pin** してあり、cleaner/transform の取り違えで大きさが動けば失敗する（上記ドリフト防止方針の例外②）:
   - **C4**（age5 ミクロ→県 rollup == age5year_prefecture マクロ）: 回次別ミクロは 1980 始まり＝**1920〜1975 は scope_out**。**1980〜2000** は回次別ミクロと回次跨マクロの県レベル集計差（秘匿／境界振替）が**両符号で年内 ±相殺**するため `mode="conservation"` の known_diff。**2005** はミクロ各歳表が年齢不詳を除く一方向差（C1/C2 の 2005 と同因・diff≥0）。県×sex×5歳階級の per-age 突合ゆえ、県総数が保存してもバンド間誤配分を捕捉する（コード体系が別＝マクロ `age5year.AGE5`／ミクロ `age5year_municipality.AGE_CLASS` を 5歳バンド下限年齢で共通化し、マクロ終端 85歳以上へミクロ 85+ 細分を畳む）。
   - **C5**（daynight 夜間＝常住地 == population・全国）: daynight は 1990 始まり＝**1980/1985/2025 は scope_out**。**1990〜2005** は従業地・通学地集計の常住地人口ベースが基本集計人口と相違し pop≥night（〜0.1〜0.4%・一方向 diff≥0）＝known_diff（2010〜で解消）。全国では昼間人口総数＝夜間人口総数（通勤は国内内部）となるのを併せて確認できる。実測値は crossfact 検証で得る（`age5year_prefecture` / `daynight` の各 doc も参照）。
 - **C2 は age3class の唯一の区分レベル検証**: C1（age5 総数）と C3（age3class 総数）は総数しか照合しないため、区分の割当ミスや境界ズレ（総数は保存するバグ）を素通りさせる。C2 だけが age3class（別ソースの3区分表）の内訳を age5 の 5歳階級畳込と区分ごとに突合する。実装は cross_fact の `other_with` で 5歳階級コード→3区分コード（`age3_code`）へ写像し keys に含めて突合（境界 15/65 は 5歳バンド端で割れ straddle 無し。コード体系は市区町村版 `age5year_municipality.AGE_CLASS`＝140=15〜19歳・240=65〜69歳で、県版 `age5year.AGE5` とは別体系。総数100・不詳999 を fold から除く）。

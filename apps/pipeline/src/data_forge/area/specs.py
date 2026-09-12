@@ -175,7 +175,7 @@ CROSSFACT: dict[str, list[CrossFactSpec]] = {
         # C4: age5 ミクロ→県 rollup == age5year_prefecture（回次跨マクロ）。別 product 間を県×sex×5歳階級で照合。
         # 県 rollup は area_code 先頭2桁（pref_code）で束ね、age は共通 band へ写像して突合する。
         # mode=conservation: 1980-2000 は 2 product の県レベル集計差（秘匿/境界振替）が両符号で ±相殺し、
-        # 2005 はミクロ各歳表が年齢不詳を除く一方向差＝ともに known_diff（両符号受容）。2010-2020 は厳密 diff=0。
+        # 2005 はミクロ各歳表が年齢不詳を除く一方向差＝ともに known_diff（両符号許容）。2010-2020 は厳密 diff=0。
         CrossFactSpec(
             name="C4 age5→県rollup == age5year_prefecture",
             keys=["pref_code", "sex_code", "age_band", "year"],
@@ -241,7 +241,7 @@ CROSSFACT: dict[str, list[CrossFactSpec]] = {
 # (_prefecture_timeseries) を分類軸×year で検算する（split が値を落とさない/二重化しない保証）。
 # hub=全国・other=県 を area_code を含めない keys で突合＝other 側は自動で47県合算される。
 # scope_years＝県が未収録の旧回（全国のみ・other==0 を許容）。known_diff_years＝原資料の集計差
-# （区未定分/按分・沖縄扱い等）で全国とΣ県が僅かにズレる旧回（両符号を文書化して受容）。
+# （区未定分/按分・沖縄扱い等）で全国とΣ県が僅かにズレる旧回（両符号を文書化して許容）。
 def _geo_conservation_spec(
     family: str,
     axes: list[str],
@@ -319,7 +319,7 @@ CROSSFACT.update(
             # age5 は per-age（5歳階級ごと）で保存検算する。全国表が近年 85+ を細分(320-370)で持つ回は
             # clean_national が 320-370 を 85歳以上(310) へ畳んで共通粒度へ揃える（総数スライスでは総数が
             # 保存し不詳が 85+ を吸収するため band 誤配分を見逃す＝per-age だけが捕捉する）。
-            # 残差は pre-1960 の回次跨（全国表 vs 県表）の史料集計差のみ＝両符号 known_diff で受容。
+            # 残差は pre-1960 の回次跨（全国表 vs 県表）の史料集計差のみ＝両符号 known_diff で許容。
             "age5year": _geo_conservation_spec(
                 "age5year",
                 ["sex_code", "age_class_code"],

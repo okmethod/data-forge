@@ -23,7 +23,7 @@ from data_forge.area.mapping import rollup
 
 @dataclass(frozen=True)
 class KnownDiff:
-    """年グレインの既知逸脱値1件（保存則 national_conservation / crossfact が受容する 年 → 期待差分）。
+    """年グレインの既知逸脱値1件（保存則 national_conservation / crossfact が許容する 年 → 期待差分）。
 
     sanity.KnownNegative（セルグレイン）と対をなす年グレインのレコード。
     値と理由を同梱して並行 dict のドリフトを断つ。
@@ -62,7 +62,7 @@ def national_conservation(
     atom_fact: pl.DataFrame,
     national: pl.DataFrame,
     *,
-    known_diffs: dict[int, int] | None = None,
+    allowed_diffs: dict[int, int] | None = None,
 ) -> pl.DataFrame:
     """各年で「アトム合計（総数）== 全国total」を検査した表を返す。
 
@@ -70,14 +70,15 @@ def national_conservation(
         atom_fact … 各年アトムの時系列（fact 依存スキーマ）。
         national  … 全国行のみ（area_code=='00000'）を含む DF。総数スライスを絞るため
                     分類軸コード列（sex_code・あれば age_class_code）を保持していること。
-        known_diffs … 受容する既知差分（年 → 期待差分。既定 None＝差分なし）。値レジストリの
-                    known_pins.KNOWN_DIFFS を注入する（cross_fact の known_diffs と対称）。
+        allowed_diffs … 許容する既知差分（年 → 期待差分。既定 None＝差分なし）。値レジストリの
+                    known_pins.KNOWN_DIFFS を year_pins で射影して注入する（cross_fact の allowed_diffs と対称）。
 
-    列: year / national / atom_sum / diff / known_diff / known / ok。
-    `known_diff` は既知差分の期待値（known_diffs、既定 0）。`ok` は diff が期待値に一致するか
-    （0 一致だけでなく既知差分も許容）。`known` は「0 でない既知差分を受容した」行のフラグ。
+    列: year / national / atom_sum / diff / allowed_diff / allowed / ok。
+    `allowed_diff` は既知差分の期待値（allowed_diffs、既定 0）。
+    `ok` は diff が期待値に一致するか（0 一致だけでなく既知差分も許容）。
+    `allowed` は「0 でない既知差分を許容した」行のフラグ。
     """
-    known_diffs = known_diffs or {}
+    allowed_diffs = allowed_diffs or {}
     atom_sum = (
         atom_fact.filter(_total_mask(atom_fact))
         .group_by("year")
@@ -87,10 +88,12 @@ def national_conservation(
     return (
         nat.join(atom_sum, on="year", how="left")
         .with_columns((pl.col("national") - pl.col("atom_sum")).alias("diff"))
-        .with_columns(pl.col("year").replace_strict(known_diffs, default=0, return_dtype=pl.Int64).alias("known_diff"))
         .with_columns(
-            (pl.col("diff") == pl.col("known_diff")).alias("ok"),
-            ((pl.col("diff") != 0) & (pl.col("diff") == pl.col("known_diff"))).alias("known"),
+            pl.col("year").replace_strict(allowed_diffs, default=0, return_dtype=pl.Int64).alias("allowed_diff")
+        )
+        .with_columns(
+            (pl.col("diff") == pl.col("allowed_diff")).alias("ok"),
+            ((pl.col("diff") != 0) & (pl.col("diff") == pl.col("allowed_diff"))).alias("allowed"),
         )
         .sort("year")
     )
@@ -108,7 +111,7 @@ def cross_fact(
     value: str = "population",
     scope_years: frozenset[int] = frozenset(),
     known_diff_years: frozenset[int] = frozenset(),
-    known_diffs: dict[int, int] | None = None,
+    allowed_diffs: dict[int, int] | None = None,
     mode: str = "equality",
 ) -> pl.DataFrame:
     """2 スライスを共有軸 `keys` で突合し diff 表を返す（クロスファクト検算／保存則検算）。
@@ -134,30 +137,32 @@ def cross_fact(
                       （`age3_code`）へ写像し、それを keys に含めて by_age の区分と突合する。
         scope_years … other（や hub 側の対象国籍）が未収録の年。この年は other==0 が期待で
                       status="scope_out"・ok=(other==0)＝スコープ外として許容する。
-        known_diff_years … 定義差で diff!=0 が期待される年（例 age5＝2005 各歳表は「年齢不詳を
-                      除く」ゆえ other = hub − 年齢不詳 ≤ hub）。status="known_diff"・
-                      ok=(diff>=0)＝定義差の向き（other ≤ hub）が保たれる限り許容する。
-        known_diffs … 既知差の**値を pin する**年→期待 Σ|diff|（年内 全キーの絶対差の総和）。
+        known_diff_years … 定義差で diff!=0 が期待される年
+                      （例 age5＝2005 各歳表は「年齢不詳を除く」ゆえ other = hub − 年齢不詳 ≤ hub）。
+                      status="known_diff"・ok=(diff>=0)＝定義差の向き（other ≤ hub）が保たれる限り許容する。
+        allowed_diffs … 既知差の**値を pin する**年→期待 Σ|diff|（年内 全キーの絶対差の総和）。
                       area 保存の `known_pins.KNOWN_DIFFS` と同じく「値を明記して固定＝ずれたら失敗」で、
                       向きだけでなく大きさの回帰も捕捉する（cleaner/transform の取り違えで既知年の差が動けば落ちる）。
                       指定年は known_diff 扱い（known_diff_years と和集合）＋ Σ|diff|==期待 を満たす限り許容。
                       "year" を keys に含む検算のみ有効（Σ|diff| は年で集計する）。
-        mode        … "equality"（既定・diff==0 を期待）／"bound"（上界検算＝other ≤ hub の
-                      部分集合関係のみ保証。status="bound"・ok=(diff>=0 かつ other>0)。
+        mode        … "equality": 既定・diff==0 を期待。
+                      "bound": 上界検算＝other ≤ hub の部分集合関係のみ保証。
+                      status="bound"・ok=(diff>=0 かつ other>0)。
                       hub>0 なのに other==0（スライス欠落）を見逃さないため実在も要求するが、
                       hub==0 の空セル（そもそも住民がいない自治体）は other==0 でも許容する）／
-                      "conservation"（地理保存＝全国 hub と Σ県 other の一致。equality と同じく diff==0 を
-                      期待するが、known_diff_years は**両符号**の集計差を許容する＝旧回の 区未定分/按分/
-                      沖縄扱い 等の原資料集計差を年ごとに文書化して受容する。equality の known_diff は
-                      other≤hub 前提で diff>=0 のみ許容だったのに対し、地理保存は符号が定まらないため緩める）。
+                      "conservation": 地理保存＝全国 hub と Σ県 other の一致。
+                      equality と同じく diff==0 を期待するが、known_diff_years は**両符号**の集計差を許容する
+                      ＝旧回の 区未定分/按分/沖縄扱い 等の原資料集計差を年ごとに文書化して許容する。
+                      equality の known_diff は other≤hub 前提で diff>=0 のみ許容だったのに対し、
+                      地理保存は符号が定まらないため緩める。
 
     列: *keys / hub / other / diff / status / ok。
         status … match（diff==0）／bound／scope_out／known_diff／mismatch。
         ok     … match、scope_out(other==0)、known_diff(diff>=0／conservation は両符号／
-                 known_diffs 指定年は加えて Σ|diff|==期待)、bound(diff>=0 かつ (other>0 または hub==0))。
+                 allowed_diffs 指定年は加えて Σ|diff|==期待)、bound(diff>=0 かつ (other>0 または hub==0))。
     """
-    known_diffs = known_diffs or {}
-    all_known = known_diff_years | frozenset(known_diffs)
+    allowed_diffs = allowed_diffs or {}
+    all_known = known_diff_years | frozenset(allowed_diffs)
     h = hub.with_columns(*hub_with) if hub_with else hub
     h = h.filter(hub_slice) if hub_slice is not None else h
     h = h.group_by(keys).agg(pl.col(value).fill_null(0).sum().alias("hub"))
@@ -185,12 +190,12 @@ def cross_fact(
         status = pl.lit("bound")
     else:
         status = pl.when(pl.col("diff") == 0).then(pl.lit("match")).otherwise(pl.lit("mismatch"))
-    # 地理保存（conservation）は known_diff を両符号で受容。それ以外は other≤hub 前提で diff>=0 のみ。
+    # 地理保存（conservation）は known_diff を両符号で許容。それ以外は other≤hub 前提で diff>=0 のみ。
     known_ok = pl.col("status") == "known_diff"
     if mode != "conservation":
         known_ok = known_ok & (pl.col("diff") >= 0)
-    if known_diffs:  # 値 pin: 指定年は 年内 Σ|diff| が期待と一致する限り許容（ずれたら失敗）
-        expected = pl.col("year").replace_strict(known_diffs, default=None)
+    if allowed_diffs:  # 値 pin: 指定年は 年内 Σ|diff| が期待と一致する限り許容（ずれたら失敗）
+        expected = pl.col("year").replace_strict(allowed_diffs, default=None)
         year_abs = pl.col("diff").abs().sum().over("year")
         known_ok = known_ok & (expected.is_null() | (year_abs == expected))
     return (
