@@ -105,6 +105,13 @@ _MIC_AGE_TO_BAND = {  # age5year_municipality.AGE_CLASS のコード → 同上�
 }
 _C4_PRE1980 = frozenset(range(1920, 1980, 5))  # ミクロ(回次別)未収録＝回次跨マクロのみ（scope_out）
 
+# H: households ミクロは 1985 始まり（1980 以前は各回の「一般/施設」別 世帯数表が無い）。
+# マクロ households_prefecture は 1960/1970/1975/1980 も持つ＝これらはミクロ側 scope_out。
+_HOUSEHOLDS_MACRO_ONLY = frozenset({1960, 1970, 1975, 1980})
+# 世帯人員(household_members)はミクロ各回表が 2015/2020 のみ収録＝それ以外の年は scope_out。
+_HH_MEMBERS_MICRO_ONLY_GAP = frozenset({1985, 1990, 1995, 2000, 2005, 2010})
+_HH_MEMBERS_SCOPE = _HOUSEHOLDS_MACRO_ONLY | _HH_MEMBERS_MICRO_ONLY_GAP
+
 CROSSFACT: dict[str, list[CrossFactSpec]] = {
     "age5year_municipality_timeseries": [
         # C1: age5 の 国籍総数(nat=0)×年齢総数(age_class=100) スライス == population。
@@ -206,6 +213,50 @@ CROSSFACT: dict[str, list[CrossFactSpec]] = {
             },
         ),
     ],
+    # H: households ミクロ(回次別)→県 rollup == households_prefecture（回次跨マクロ）。別 product 間の検算オラクル。
+    # 世帯は悉皆カウント（標本でない）ゆえ、回次別と回次跨が県レベルで一致。
+    # 世帯数・世帯人員の2測度を別 spec で照合。
+    # ミクロは aggregate_to_base（2020境界へ合併畳込）後に県 rollup するため、
+    # 県跨ぎ合併（山口村: 長野→岐阜 2005 等）が旧年（1985-2000）で県間を移動
+    # ＝マクロ（各年境界）と両符号 ±相殺（net=0）＝C4 と同型の境界振替。
+    # → H1 は mode=conservation＋Σ|diff| 値 pin（2005 以降は境界一致で diff=0）。
+    # 県 rollup は area_code 先頭2桁で束ねる。
+    "households_municipality_timeseries": [
+        CrossFactSpec(
+            name="H1 世帯数 ミクロ→県rollup == households_prefecture",
+            keys=["pref_code", "household_type_code", "year"],
+            hub_key="households_prefecture_timeseries",
+            hub_with=[pl.col("area_code").str.slice(0, 2).alias("pref_code")],
+            other_with=[pl.col("area_code").str.slice(0, 2).alias("pref_code")],
+            value="households",
+            mode="conservation",
+            scope_years=_HOUSEHOLDS_MACRO_ONLY,
+            known_diffs=known_pins.CROSSFACT_H1,
+            reasons={
+                **{
+                    y: "回次跨マクロのみ（ミクロは1985始まり＝各回の一般/施設別 世帯数表が無い旧回）"
+                    for y in _HOUSEHOLDS_MACRO_ONLY
+                },
+                **{
+                    y: "県跨ぎ合併の境界振替（山口村 長野→岐阜 2005 等）＝ミクロ2020境界 vs マクロ各年境界・両符号±相殺"
+                    for y in (1985, 1990, 1995, 2000)
+                },
+            },
+        ),
+        CrossFactSpec(
+            name="H2 世帯人員 ミクロ→県rollup == households_prefecture",
+            keys=["pref_code", "household_type_code", "year"],
+            hub_key="households_prefecture_timeseries",
+            hub_with=[pl.col("area_code").str.slice(0, 2).alias("pref_code")],
+            other_with=[pl.col("area_code").str.slice(0, 2).alias("pref_code")],
+            value="household_members",
+            scope_years=_HH_MEMBERS_SCOPE,
+            reasons={
+                **{y: "回次跨マクロのみ（ミクロは1985始まり）" for y in _HOUSEHOLDS_MACRO_ONLY},
+                **{y: "世帯人員はミクロ各回表が 2015/2020 のみ収録＝スコープ外" for y in _HH_MEMBERS_MICRO_ONLY_GAP},
+            },
+        ),
+    ],
     # C5: daynight 夜間(常住地・daynight_code=0) == population（全国＝keys=["year"] で市区町村を合算）。
     # 2010-2020 は厳密 diff=0。1990-2005 は従業地・通学地集計（人口等基本集計とは別系統の集計）の常住地人口が
     # 確定人口を僅かに下回り pop≥night（〜0.1-0.4%・一方向 diff≥0）＝known_diff。
@@ -245,8 +296,9 @@ CROSSFACT: dict[str, list[CrossFactSpec]] = {
 # 地理保存則（G）: 全国/県を別配布に分けた各 family で、全国(_national_timeseries) == Σ都道府県
 # (_prefecture_timeseries) を分類軸×year で検算する（split が値を落とさない/二重化しない保証）。
 # hub=全国・other=県 を area_code を含めない keys で突合＝other 側は自動で47県合算される。
-# scope_years＝県が未収録の旧回（全国のみ・other==0 を許容）。known_diff_years＝原資料の集計差
-# （区未定分/按分・沖縄扱い等）で全国とΣ県が僅かにズレる旧回（両符号を文書化して許容）。
+# scope_years＝県が未収録の旧回（全国のみ・other==0 を許容）。
+# known_diff_years＝原資料の集計差（区未定分/按分・沖縄扱い等）で
+# 全国とΣ県が僅かにズレる旧回（両符号を文書化して許容）。
 def _geo_conservation_spec(
     family: str,
     axes: list[str],

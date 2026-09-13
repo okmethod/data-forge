@@ -133,6 +133,28 @@ def test_age5_municipality_reiwa_tables_override_muni_levels() -> None:
         assert ds.muni_levels == frozenset({4, 6}), f"{key}: 令和型表は muni_levels={{4,6}} 必須"
 
 
+def test_households_municipality_is_stitched_and_overrides_muni_levels() -> None:
+    """世帯ミクロは合併畳込 Stitched（aggregate_to_base）＝回次跨マクロ households と同 family。
+
+    1985-2005 の各回「世帯の種類別」表は令和型 level4/6（市区=level4・町村=level6）だが、
+    グローバル _MUNI_LEVELS[1985..2005]={3}（人口時系列製品向け）ゆえ muni_levels={4,6} を明示上書きしないと
+    extract_atoms が level3（郡/支庁の中間集計）を葉に拾い市区町村フルに達しない（age5 ミクロと同型の不変条件）。
+    2010-2020 はグローバル既定 {4,6} で override 不要（None 可）。
+    """
+    micro = get_dataset("households_municipality_timeseries")
+    assert isinstance(micro, StitchedDataset)
+    assert micro.default_join == "aggregate_to_base"
+    assert micro.grain == ["area_code", "household_type_code", "year"]
+    macro = get_dataset("households_prefecture_timeseries")
+    assert micro.table_name == macro.table_name == "households"
+    for y in (1985, 1990, 1995, 2000, 2005):
+        ds = get_dataset(f"households_municipality_{y}")
+        assert ds.muni_levels == frozenset({4, 6}), f"households_municipality_{y}: 令和型表は muni_levels={{4,6}} 必須"
+    for y in (2010, 2015, 2020):
+        ds = get_dataset(f"households_municipality_{y}")
+        assert ds.muni_levels is None, f"households_municipality_{y}: 既定{{4,6}}で override 不要"
+
+
 # 案A（地理粒度排他）: 全国と県を別配布に分ける family（射影＝別 ID の national/prefecture パーティション）。
 _GEO_SPLIT_PROJECTED = ("age5year", "labor_force", "industry", "occupation_major12", "occupation_major10")
 # 案A: 全国と県を別配布に分ける family（single-ID を cleaner の scope で分離）。

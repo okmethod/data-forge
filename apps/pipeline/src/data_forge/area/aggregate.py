@@ -1,7 +1,8 @@
 """crosswalk / aggregate_to_base: 各年アトム × rollup(base_year) の2ビュー（＝時間軸の合併集約）。
 
 行政階層（都道府県 / 地方ブロック）への上位集約＝直交する空間軸は [spatial_rollup.py] に分離。
-両者は分類軸判別ユーティリティ `_cat_code_cols` を共用する（spatial_rollup が本モジュールを import）。
+両者は fact スキーマ内省ユーティリティ（`cat_code_cols`／`measure_cols`／`sum_measure_expr`）を共用する。
+本モジュールが area 内の共有置き場であり、spatial_rollup が import する。
 
 Design A（実データで人口保存を実証済み）:
     1. fact = 各年のアトム（現行境界の最finest分割。atoms.extract_atoms）。
@@ -30,7 +31,7 @@ from data_forge.area.levels import is_current_expr
 from data_forge.area.mapping import rollup
 
 
-def _cat_code_cols(df: pl.DataFrame) -> list[str]:
+def cat_code_cols(df: pl.DataFrame) -> list[str]:
     """分類軸のコード列（area_code / base_code 以外の `*_code`）を返す。
 
     例: population → `["sex_code"]` ／ population_by_age → `["sex_code", "age_class_code"]`。
@@ -39,6 +40,34 @@ def _cat_code_cols(df: pl.DataFrame) -> list[str]:
     そのまま踏襲するので、population(8列) と population_by_age(10列) を同じコードで畳める。
     """
     return [c for c in df.columns if c.endswith("_code") and c not in ("area_code", "base_code")]
+
+
+# 集約で合算対象にしない列（area/年/来歴などのメタ）。分類軸のコード列と名称列は別途除く。
+_NON_MEASURE_META = frozenset(
+    {"area_code", "base_code", "area_name", "area_level", "year", "is_current", "data_status"}
+)
+
+
+def measure_cols(df: pl.DataFrame) -> list[str]:
+    """合算対象の測度列（メタ・分類軸コード・分類軸名称 以外の数値列）を返す。
+
+    population(1列) だけでなく households / household_members(2列) のように
+    測度が複数ある fact も fact 非依存で畳むための一般化（`cat_code_cols` と対になる）。
+    分類軸の名称列（sex_code↔sex 等）はコード列から導いて除外するので、測度として拾われない。
+    """
+    cat_labels = {c.removesuffix("_code") for c in cat_code_cols(df)}
+    return [c for c in df.columns if c not in _NON_MEASURE_META and not c.endswith("_code") and c not in cat_labels]
+
+
+def sum_measure_expr(col: str) -> pl.Expr:
+    """測度列を group 内で合算する Expr。全 null の群（その年に無い測度）は 0 でなく null を保つ。
+
+    household_members は 2015/2020 のみ実在し他年は null。
+    素の sum は全 null 群を 0 にして「値0」と「未計測」を混同するため、
+    非 null が1つも無い群は null に落とす。
+    population のように常時非 null な測度では素の sum と等価（後方互換）。
+    """
+    return pl.when(pl.col(col).count() == 0).then(None).otherwise(pl.col(col).sum()).alias(col)
 
 
 def _base_year(atom_fact: pl.DataFrame, base_year: int | None) -> int:
@@ -66,7 +95,7 @@ def attach_crosswalk(atom_fact: pl.DataFrame, events: pl.DataFrame, *, base_year
         .select(pl.col("area_code").alias("base_code"), pl.col("area_name").alias("base_name"))
         .unique(subset="base_code")
     )
-    sort_keys = ["area_code", "year", *_cat_code_cols(atom_fact)]
+    sort_keys = ["area_code", "year", *cat_code_cols(atom_fact)]
     return (
         atom_fact.join(roll, left_on="area_code", right_on="code", how="left")
         .with_columns(pl.coalesce("base_code", "area_code").alias("base_code"))
@@ -89,10 +118,10 @@ def aggregate_to_base(atom_fact: pl.DataFrame, events: pl.DataFrame, *, base_yea
     base = _base_year(atom_fact, base_year)
     cw = attach_crosswalk(atom_fact, events, base_year=base)
 
-    cat_codes = _cat_code_cols(atom_fact)
+    cat_codes = cat_code_cols(atom_fact)
     cat_labels = [c.removesuffix("_code") for c in cat_codes]  # sex_code→sex / age_class_code→age_class
     agg = cw.group_by(["base_code", "year", *cat_codes]).agg(
-        pl.col("population").sum().alias("population"),
+        *(sum_measure_expr(m) for m in measure_cols(atom_fact)),
         *(pl.col(lbl).first().alias(lbl) for lbl in cat_labels),
     )
 

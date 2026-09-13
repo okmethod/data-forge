@@ -4,13 +4,13 @@
 市区町村は都道府県を跨がないため events 非依存で、`aggregate_to_base` の前後どちらに適用しても
 結果は同じ（＝県内合計は合併を畳もうが不変。`reconcile.national_conservation` が保証する不変量）。
 
-分類軸（sex / age / daynight）の自動判別は `aggregate._cat_code_cols` を共用する
+分類軸（sex / age / daynight）の自動判別は `aggregate.cat_code_cols` を共用する
 （時間軸・空間軸で同じ「fact のスキーマから分類軸を読む」ユーティリティ）。
 """
 
 import polars as pl
 
-from data_forge.area.aggregate import _cat_code_cols
+from data_forge.area.aggregate import cat_code_cols, measure_cols, sum_measure_expr
 from data_forge.area.levels import always_current_expr
 
 _PREFECTURE_LEVEL = 2  # 都道府県（全国=1 の直下）
@@ -57,10 +57,11 @@ def aggregate_to_admin(atom_fact: pl.DataFrame, *, level: str) -> pl.DataFrame:
                     / "region"（標準8地方区分 `R1`〜`R8`・`area_level`=0）。
 
     出力スキーマは入力 `atom_fact` の列構成をそのまま踏襲（fact 非依存＝population /
-    population_by_age / daynight_population 共用）。分類軸（sex/age/daynight）は
-    `_cat_code_cols` で自動判別して保持する。
+    population_by_age / daynight_population / households 共用）。
+    分類軸（sex/age/daynight/household_type）は `cat_code_cols`、
+    測度列（population 単一・households/household_members 複数）は `measure_cols` で自動判別して保持する。
     """
-    cat_codes = _cat_code_cols(atom_fact)
+    cat_codes = cat_code_cols(atom_fact)
     cat_labels = [c.removesuffix("_code") for c in cat_codes]
     pref2 = pl.col("area_code").str.slice(0, 2)
 
@@ -80,7 +81,7 @@ def aggregate_to_admin(atom_fact: pl.DataFrame, *, level: str) -> pl.DataFrame:
         atom_fact.with_columns(area_code.alias("area_code"), area_name.alias("area_name"))
         .group_by(["area_code", "year", *cat_codes])
         .agg(
-            pl.col("population").sum().alias("population"),
+            *(sum_measure_expr(m) for m in measure_cols(atom_fact)),
             pl.col("area_name").first().alias("area_name"),
             *(pl.col(lbl).first().alias(lbl) for lbl in cat_labels),
         )

@@ -15,6 +15,7 @@ from dataclasses import dataclass
 
 import polars as pl
 
+from data_forge.area.aggregate import measure_cols
 from data_forge.area.mapping import rollup
 
 # 既知の人口保存差分・クロスファクト検算スペックは政策レジストリ data_forge.area.specs が正典。
@@ -49,10 +50,10 @@ def _total_mask(df: pl.DataFrame) -> pl.Expr:
     （さもないと年少+生産+老年+不詳の重複で二重計上になる）。
     `*_code` 列の増減に追従するので fact 非依存。
 
-    ただし age5year は年齢総数コードが "0" でなく "100" のため、
+    ただし age5year（年齢総数="100"）・households（世帯の種類総数="100"）は総数コードが "0" でないため、
     本 mask は 0 行マッチ＝保存則が空振りになる（area-check は空表をガードで検知）。
-    age5year の保存則は crossfact C1（age5 の国籍総数×年齢総数 == population）が hub 経由で担保するため、
-    ここでの直接検査は委譲する。
+    これらの national 保存は crossfact が hub 経由で担保するため、ここでの直接検査は委譲する
+    （age5year=C1〈国籍総数×年齢総数 == population〉／households=H1/H2〈ミクロ→県rollup == マクロ県〉）。
     """
     codes = [c for c in df.columns if c.endswith("_code") and c not in ("area_code", "base_code")]
     return pl.all_horizontal([pl.col(c) == "0" for c in codes])
@@ -80,12 +81,16 @@ def national_conservation(
     `allowed` は「0 でない既知差分を許容した」行のフラグ。
     """
     allowed_diffs = allowed_diffs or {}
+    # 測度列は fact 依存（population / households …）。
+    # primary 測度で総数保存を見る（population 系は従来どおり）。
+    # households 等の総数コードが "0" でない fact は _total_mask が空振り→ crossfact（H1 等）へ委譲する。
+    measure = measure_cols(atom_fact)[0]
     atom_sum = (
         atom_fact.filter(_total_mask(atom_fact))
         .group_by("year")
-        .agg(pl.col("population").fill_null(0).sum().alias("atom_sum"))
+        .agg(pl.col(measure).fill_null(0).sum().alias("atom_sum"))
     )
-    nat = national.filter(_total_mask(national)).select("year", pl.col("population").alias("national"))
+    nat = national.filter(_total_mask(national)).select("year", pl.col(measure).alias("national"))
     return (
         nat.join(atom_sum, on="year", how="left")
         .with_columns((pl.col("national") - pl.col("atom_sum")).alias("diff"))
@@ -118,8 +123,8 @@ def cross_fact(
     """2 スライスを共有軸 `keys` で突合し diff 表を返す（クロスファクト検算／保存則検算）。
 
     方針A「重複軸はハブと一致検証して捨てる」の実体化。`hub` と `other` を各々のスライス述語で
-    絞り keys へ集約して full-join し、共有軸ごとに `value` の差を出す。**full-join ゆえ片側だけに
-    在るキー（カバレッジ差）も diff!=0 として検出する**（level7 差を見落とさない）。
+    絞り keys へ集約して full-join し、共有軸ごとに `value` の差を出す。
+    **full-join ゆえ片側だけに在るキー（カバレッジ差）も diff!=0 として検出する**（level7 差を見落とさない）。
 
     用途は2系統:
       - クロスファクト（別ファクト間）: hub=population・other=age5 など。既定 mode="equality"。
@@ -229,14 +234,17 @@ def orphans(atom_fact: pl.DataFrame, events: pl.DataFrame, *, base_year: int | N
     base_codes = set(atom_fact.filter(pl.col("year") == base).get_column("area_code").to_list())
     roll = rollup(events, base_year=base)
 
-    # 各アトムの最終出現年・その年の総数人口・名称
+    # 各アトムの最終出現年・その年の総数の primary 測度（population 系＝人口／households 系＝世帯数）・名称。
+    # 総数="100" の fact（age5year/households）は _total_mask が空振りし last が空＝孤児検査も空振りになる。
+    # national 保存を crossfact へ委譲するのと同じ帰結。alias 名は既存互換で last_population に据え置く。
+    measure = measure_cols(atom_fact)[0]
     last = (
         atom_fact.filter(_total_mask(atom_fact))
         .sort("year")
         .group_by("area_code")
         .agg(
             pl.col("year").max().alias("last_year"),
-            pl.col("population").last().alias("last_population"),
+            pl.col(measure).last().alias("last_population"),
             pl.col("area_name").last().alias("area_name"),
         )
     )
@@ -254,9 +262,9 @@ def dangling_successors(events: pl.DataFrame, atom_fact: pl.DataFrame) -> pl.Dat
     """後継先が実在コードへ着地しないイベント行を返す（後継コードの指定ミス検出）。
 
     orphans が「消滅アトム側」から未整備を炙り出すのに対し、本検査は overrides/parsed の
-    `successor_code` そのものを突く。合併先を打ち間違えても rollup は黙って通し、孤児として
-    表に出ないことがある（例: 消滅アトムの人口が 0／その年に非登場）。ここで後継先の実在を
-    直接確かめ、指定ミスを取りこぼさない。
+    `successor_code` そのものを突く。合併先を打ち間違えても rollup は黙って通し、
+    孤児として表に出ないことがある（例: 消滅アトムの人口が 0／その年に非登場）。
+    ここで後継先の実在を直接確かめ、指定ミスを取りこぼさない。
 
     実在コードの宇宙 = 全年に登場するアトム area_code ∪ イベントの old_code。後者を含めるのは、
     中間後継（さらに合併される側）が国勢調査の葉として登場しないまま連鎖解決されるため。

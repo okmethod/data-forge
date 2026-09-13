@@ -281,6 +281,35 @@ def test_aggregate_daynight_parallel_axis_folds_independently():
     assert cons["ok"].to_list() == [True]
 
 
+def test_aggregate_multi_measure_folds_each_and_preserves_null_year():
+    # households（2測度＝households/household_members）でも合併集約が測度ごとに独立に合算される。
+    # 世帯人員は 2015/2020 のみ実在（他年 null）＝全 null の fold 群は 0 でなく null を保つ
+    # （sum_measure_expr の null 保持。素の sum なら「未計測」を「値0」に潰す回帰を捕捉）。
+    fact = pl.DataFrame(
+        [
+            # 2000: 旧A・旧B（後に合併）。世帯人員は当時ミクロ表に無く null。
+            {"area_code": "01201", "area_name": "A市", "area_level": 4, "household_type_code": "100",
+             "household_type": "総数", "year": 2000, "households": 100, "household_members": None, "is_current": True},
+            {"area_code": "01202", "area_name": "B市", "area_level": 4, "household_type_code": "100",
+             "household_type": "総数", "year": 2000, "households": 40, "household_members": None, "is_current": True},
+            # 2020: 合併後の A（世帯人員あり）。
+            {"area_code": "01201", "area_name": "A市", "area_level": 4, "household_type_code": "100",
+             "household_type": "総数", "year": 2020, "households": 150, "household_members": 320, "is_current": True},
+        ]
+    )  # fmt: skip
+    ev = pl.DataFrame(
+        {"old_code": ["01202"], "successor_code": ["01201"], "year": [2008], "kind": [None]},
+        schema=events.EVENTS_SCHEMA,
+    )
+    out = aggregate.aggregate_to_base(fact, ev, base_year=2020)
+    assert out.columns == fact.columns  # 2測度とも踏襲
+    a2000 = out.filter((pl.col("area_code") == "01201") & (pl.col("year") == 2000)).row(0, named=True)
+    assert a2000["households"] == 140  # 旧A+旧B を合算
+    assert a2000["household_members"] is None  # 全 null 群は 0 でなく null（未計測を保つ）
+    a2020 = out.filter((pl.col("area_code") == "01201") & (pl.col("year") == 2020)).row(0, named=True)
+    assert a2020["household_members"] == 320  # 実在年はそのまま
+
+
 def test_aggregate_to_admin_prefecture_sums_and_names():
     # 市区町村を県コード先頭2桁で束ね、実 JIS コード XX000・県名・level2・現存 になる。
     fact = _fact(
