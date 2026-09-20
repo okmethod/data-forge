@@ -3,7 +3,7 @@ title: 印西市ケーススタディ
 sidebar_position: 99
 ---
 
-3つのデータセット（[人口](/population)・[年齢構成](/age_3class)・[昼夜間人口](/daynight)）を横断し、**人口増加を続ける街・千葉県印西市**を1つのケースに、人口・世代構成・昼夜間人口の3側面から日本の人口動態を読む。
+4つのデータセット（[人口](/population)・[年齢構成](/age_3class)・[昼夜間人口](/daynight)・[世帯](/households)）を横断し、**人口増加を続ける街・千葉県印西市**を1つのケースに、人口・世代構成・昼夜間人口・世帯の4側面から日本の人口動態を読む。
 （各データセット単体の全国→都道府県の見取り図は各ページを参照）
 
 合併畳み込み済みの市区町村粒度（1980〜2020年・全9回分）だからこそ描ける分析のデモ。
@@ -240,7 +240,49 @@ _※ 国籍「総数」で描く。より細かい国籍別（総数／日本人
 
 ---
 
-## 5. 全国の中の印西市
+## 5. 世帯：人口以上のペースで世帯が増える
+
+人口が増える街では、**世帯はそれ以上のペースで増える**。  
+1985年=100 で並べると、2020年に**人口が287まで（約2.9倍）伸びる間に、一般世帯数は441（約4.4倍）**に達し、両者の差は年を追うごとに開く。  
+この乖離こそが**1世帯あたりの人数の縮小（核家族化・単身化）**の正体で、成長する子育て世帯の街でも例外なく起きている。
+
+```sql inzai_hh_pop_index
+  with hh as (
+    select year, households as v
+    from census_households_municipality.households
+    where household_type_code = '110'
+  ),
+  pop as (
+    select year, population as v
+    from census_population_municipality.population
+    where sex = '総数' and year >= 1985 and year <= 2020
+  ),
+  s as (
+    select '一般世帯数' as series, year, v from hh
+    union all
+    select '人口' as series, year, v from pop
+  )
+  select s.series, s.year, round(s.v * 100.0 / b.v, 1) as idx
+  from s
+  join (select series, v from s where year = 1985) b on s.series = b.series
+  order by s.series, s.year
+```
+
+<LineChart
+  data={inzai_hh_pop_index}
+  x=year
+  y=idx
+  series=series
+  title="印西市 人口・一般世帯数（1985年=100）"
+  yFmt="0"
+  xType=category
+/>
+
+_※ 世帯規模そのもの（平均世帯人員）の全国→都道府県・1960〜2020年の長期トレンドは [世帯](/households) ページを参照。_
+
+---
+
+## 6. 全国の中の印西市
 
 印西市が属する千葉県は、40年スパンで **人口が増えた側**（+32.7%）にある。  
 全国では2010年以降減少に転じたが、長期では増えた地域と減った地域に大きく分かれ、**東京圏（埼玉・神奈川・千葉）と沖縄が伸び、東北・地方が大きく減る**。

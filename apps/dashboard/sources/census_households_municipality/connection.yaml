@@ -1,0 +1,4 @@
+name: census_households_municipality
+type: duckdb
+options:
+  filename: ':memory:'

@@ -34,6 +34,8 @@ select '昼夜間人口', '市区町村', 31, m.* from census_daynight_municipal
 union all
 select '世帯', '都道府県', 40, m.* from census_households.source_meta m
 union all
+select '世帯', '市区町村（合併畳み込み済）', 41, m.* from census_households_municipality.source_meta m
+union all
 select '家族類型', '都道府県', 50, m.* from census_family_type.source_meta m
 union all
 select '労働力', '都道府県', 60, m.* from census_labor_force.source_meta m
