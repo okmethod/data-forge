@@ -112,9 +112,11 @@ _HOUSEHOLDS_MACRO_ONLY = frozenset({1960, 1970, 1975, 1980})
 _HH_MEMBERS_MICRO_ONLY_GAP = frozenset({1985, 1990, 1995, 2000, 2005, 2010})
 _HH_MEMBERS_SCOPE = _HOUSEHOLDS_MACRO_ONLY | _HH_MEMBERS_MICRO_ONLY_GAP
 
-# F: family_type ミクロは 2020 のみ（他年は市区町村版の縫合が未実装）。
-# マクロ family_type_prefecture は 1995-2020 を持つ＝2020 以外はミクロ側 scope_out。
-_FAMILY_TYPE_MACRO_ONLY = frozenset({1995, 2000, 2005, 2010, 2015})
+# F: family_type ミクロは 2005-2020（1995/2000 は市区町村版が旧分類しか無く新分類マクロと非互換ゆえ不採用）。
+# マクロ family_type_prefecture は 1995-2020 を持つ＝1995/2000 はミクロ側 scope_out。
+_FAMILY_TYPE_MACRO_ONLY = frozenset({1995, 2000})
+_FT_OLDCLASS_REASON = "回次跨マクロのみ（市区町村版は旧分類＝新分類マクロと非互換で不採用）"
+_FT_MEMBERS_GAP_REASON = "世帯人員はミクロ軽量表（2015=0003148560/2020=0003445080）が一般世帯数のみ収録＝スコープ外"
 
 CROSSFACT: dict[str, list[CrossFactSpec]] = {
     "age5year_municipality_timeseries": [
@@ -263,8 +265,9 @@ CROSSFACT: dict[str, list[CrossFactSpec]] = {
     ],
     # F: family_type ミクロ(回次別)→県 rollup == family_type_prefecture（回次跨マクロ）。別 product 間の検算オラクル。
     # 世帯は悉皆カウント（標本でない）ゆえ、回次別と回次跨が県レベルで一致（H1 と同型）。
-    # ミクロは 2020 のみ収録＝2020 は 2020 境界どうしで合併振替が無く diff=0（known_diff pin 不要）。
-    # 他年（1995-2015）はミクロ未実装＝scope_out。県 rollup は area_code 先頭2桁で束ねる。
+    # ミクロは 2005-2020（すべて新分類）＝各年 diff=0（2020境界どうしで合併振替も無く known_diff pin 不要）。
+    # 1995/2000 は市区町村版が旧分類しか無く新分類マクロと非互換ゆえミクロ不採用＝scope_out。
+    # 県 rollup は area_code 先頭2桁で束ねる。世帯数(F1)・世帯人員(F2)を別 spec で照合。
     "family_type_municipality_timeseries": [
         CrossFactSpec(
             name="F1 世帯数 ミクロ→県rollup == family_type_prefecture",
@@ -275,8 +278,20 @@ CROSSFACT: dict[str, list[CrossFactSpec]] = {
             value="households",
             mode="conservation",
             scope_years=_FAMILY_TYPE_MACRO_ONLY,
+            reasons={y: _FT_OLDCLASS_REASON for y in _FAMILY_TYPE_MACRO_ONLY},
+        ),
+        CrossFactSpec(
+            name="F2 世帯人員 ミクロ→県rollup == family_type_prefecture",
+            keys=["pref_code", "family_type_code", "year"],
+            hub_key="family_type_prefecture_timeseries",
+            hub_with=[pl.col("area_code").str.slice(0, 2).alias("pref_code")],
+            other_with=[pl.col("area_code").str.slice(0, 2).alias("pref_code")],
+            value="household_members",
+            mode="conservation",
+            scope_years=_FAMILY_TYPE_MACRO_ONLY | frozenset({2015, 2020}),
             reasons={
-                y: "回次跨マクロのみ（市区町村版ミクロの縫合が当年未実装）" for y in _FAMILY_TYPE_MACRO_ONLY
+                **{y: _FT_OLDCLASS_REASON for y in _FAMILY_TYPE_MACRO_ONLY},
+                **{y: _FT_MEMBERS_GAP_REASON for y in (2015, 2020)},
             },
         ),
     ],
