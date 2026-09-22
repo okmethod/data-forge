@@ -38,6 +38,8 @@ select '世帯', '市区町村（合併畳み込み済）', 41, m.* from census_
 union all
 select '家族類型', '都道府県', 50, m.* from census_family_type.source_meta m
 union all
+select '家族類型', '市区町村（合併畳み込み済）', 51, m.* from census_family_type_municipality.source_meta m
+union all
 select '労働力', '都道府県', 60, m.* from census_labor_force.source_meta m
 union all
 select '産業', '都道府県', 70, m.* from census_industry.source_meta m

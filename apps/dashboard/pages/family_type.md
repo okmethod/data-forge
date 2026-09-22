@@ -3,11 +3,10 @@ title: 家族類型
 sidebar_position: 6
 ---
 
-データセット: **世帯の家族類型（16区分）別 一般世帯数・世帯人員** - 1995〜2020年（6回）・全国＋都道府県
+データセット: **世帯の家族類型（16区分）別 一般世帯数・世帯人員** - 都道府県は1995〜2020年（6回）、市区町村は2005〜2020年（合併畳み込み済み）
 
-[世帯](/households)ページが**世帯の大きさ**（平均世帯人員）を見たのに対し、このページでは**世帯の中身＝家族構成**を、全国 → 都道府県のスケールで見ていく。  
-主役は **単独世帯割合（＝単独世帯 ÷ 総世帯）**で、その上昇が**単身化**を表す。  
-（市区町村粒度は持たないため、印西市を軸にした横断は扱わない）
+[世帯](/households)ページが**世帯の大きさ**（平均世帯人員）を見たのに対し、このページでは**世帯の中身＝家族構成**を、全国 → 都道府県 → 市区町村のスケールで見ていく。  
+主役は **単独世帯割合（＝単独世帯 ÷ 総世帯）**で、その上昇が**単身化**を表す。
 
 ---
 
@@ -151,6 +150,41 @@ _※ 大区分（親族のみ 110／非親族 280／単独 290／不詳 999）�
   yMin=0
   xType=category
 />
+
+---
+
+## 市区町村ミクロ：印西市も単身化は進むが、全国より大幅に低い
+
+市区町村粒度でしか描けないミクロの一例。
+子育て世帯が流入し続ける**千葉県印西市**でも、単独世帯割合は **2005 年の 15.5% → 2020 年の 20.1%** へと上昇している。
+ただし全国（2020 年 約38%）を大きく下回り、家族世帯（親族のみ）が主体の街であることが読める。
+
+```sql ft_inzai_trend
+  select
+    total.year,
+    round(single.households * 100.0 / total.households, 1) as tandoku_pct
+  from (
+    select year, households from census_family_type_municipality.family_type
+    where family_type_code = '100'
+  ) total
+  join (
+    select year, households from census_family_type_municipality.family_type
+    where family_type_code = '290'
+  ) single using (year)
+  order by total.year
+```
+
+<LineChart
+  data={ft_inzai_trend}
+  x=year
+  y=tandoku_pct
+  title="印西市 単独世帯割合（単独世帯 ÷ 総世帯・%・合併畳み込み済み）"
+  yFmt="0.0"
+  yMin=0
+  xType=category
+/>
+
+_※ 市区町村ミクロは 2005〜2020 年（新分類の遡及集計が 2005 始まり）。人口・世帯の増加とあわせた横断は [印西市ケーススタディ](/inzai) を参照。_
 
 ---
 

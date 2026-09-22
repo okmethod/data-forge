@@ -3,7 +3,7 @@ title: 印西市ケーススタディ
 sidebar_position: 99
 ---
 
-4つのデータセット（[人口](/population)・[年齢構成](/age_3class)・[昼夜間人口](/daynight)・[世帯](/households)）を横断し、**人口増加を続ける街・千葉県印西市**を1つのケースに、人口・世代構成・昼夜間人口・世帯の4側面から日本の人口動態を読む。
+5つのデータセット（[人口](/population)・[年齢構成](/age_3class)・[昼夜間人口](/daynight)・[世帯](/households)・[家族類型](/family_type)）を横断し、**人口増加を続ける街・千葉県印西市**を1つのケースに、人口・世代構成・昼夜間人口・世帯・家族構成の側面から日本の人口動態を読む。
 （各データセット単体の全国→都道府県の見取り図は各ページを参照）
 
 合併畳み込み済みの市区町村粒度（1980〜2020年・全9回分）だからこそ描ける分析のデモ。
@@ -279,6 +279,36 @@ _※ 国籍「総数」で描く。より細かい国籍別（総数／日本人
 />
 
 _※ 世帯規模そのもの（平均世帯人員）の全国→都道府県・1960〜2020年の長期トレンドは [世帯](/households) ページを参照。_
+
+世帯が小さくなる中身を家族類型で見ると、印西市の**単独世帯割合は 2005年の15.5% → 2020年の20.1%**へ上昇している。
+子育て世帯の街でも単身化は進むが、全国（2020年 約38%）は大きく下回り、**家族世帯が主体**である点は保たれている。
+
+```sql inzai_ft_tandoku
+  select
+    total.year,
+    round(single.households * 100.0 / total.households, 1) as tandoku_pct
+  from (
+    select year, households from census_family_type_municipality.family_type
+    where family_type_code = '100'
+  ) total
+  join (
+    select year, households from census_family_type_municipality.family_type
+    where family_type_code = '290'
+  ) single using (year)
+  order by total.year
+```
+
+<LineChart
+  data={inzai_ft_tandoku}
+  x=year
+  y=tandoku_pct
+  title="印西市 単独世帯割合（単独世帯 ÷ 総世帯・%）"
+  yFmt="0.0"
+  yMin=0
+  xType=category
+/>
+
+_※ 家族類型の市区町村ミクロは 2005〜2020 年（新分類の遡及集計が 2005 始まり）。全国→都道府県の単身化は [家族類型](/family_type) ページを参照。_
 
 ---
 
