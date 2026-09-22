@@ -280,32 +280,95 @@ _※ 国籍「総数」で描く。より細かい国籍別（総数／日本人
 
 _※ 世帯規模そのもの（平均世帯人員）の全国→都道府県・1960〜2020年の長期トレンドは [世帯](/households) ページを参照。_
 
-世帯が小さくなる中身を家族類型で見ると、印西市の**単独世帯割合は 2005年の15.5% → 2020年の20.1%**へ上昇している。
-子育て世帯の街でも単身化は進むが、全国（2020年 約38%）は大きく下回り、**家族世帯が主体**である点は保たれている。
+世帯の中身を家族類型で見ると、**割合と実数で見え方が逆転**している。
+構成比では夫婦と子供のシェアが下がる（[家族類型](/family_type)ページ）が、**実数ではほぼ全類型が増えている**（唯一の例外は三世代同居を含むその他の親族世帯）。
+2005年=100でそろえると、**夫婦のみ218・単独192**が最も速く伸び、**夫婦と子供も131**と増加が続く（新しい子育て世帯の流入）。
+初期入居世代が子育てを終えて夫婦のみ・単身へ移る**空の巣化**と、新たな家族の流入が同時に進んでいる。
+第3節の**若者のくびれ（進学・就職での転出）**と重ねると、子が育つと家を離れる一方で街は若い家族を集め続ける、成熟しつつ若さを保つニュータウンの姿が読める。
 
-```sql inzai_ft_tandoku
-  select
-    total.year,
-    round(single.households * 100.0 / total.households, 1) as tandoku_pct
-  from (
-    select year, households from census_family_type_municipality.family_type
+上の**構成比（シェア）**では夫婦と子供の帯が薄くなるが、下の**実数（2005年=100）**では夫婦と子供もしっかり伸びている——同じデータの2つの見方を並べると、この「逆転」がそのまま読める。
+
+```sql inzai_ft_composition
+  with tot as (
+    select year, households as total
+    from census_family_type_municipality.family_type
     where family_type_code = '100'
-  ) total
-  join (
-    select year, households from census_family_type_municipality.family_type
-    where family_type_code = '290'
-  ) single using (year)
-  order by total.year
+  ),
+  cat as (
+    select
+      year,
+      case family_type_code
+        when '290' then '単独世帯'
+        when '130' then '夫婦のみ'
+        when '140' then '夫婦と子供'
+        when '150' then 'ひとり親と子供'
+        when '160' then 'ひとり親と子供'
+        when '170' then 'その他の親族世帯'
+        when '280' then '非親族を含む世帯'
+        when '999' then '不詳'
+      end as category,
+      households
+    from census_family_type_municipality.family_type
+    where family_type_code in ('290', '130', '140', '150', '160', '170', '280', '999')
+  )
+  select c.year, c.category, round(sum(c.households) * 100.0 / t.total, 1) as pct
+  from cat c
+  join tot t using (year)
+  group by c.year, c.category, t.total
+  order by c.year, c.category
 ```
 
-<LineChart
-  data={inzai_ft_tandoku}
+```sql inzai_ft_index
+  with cat as (
+    select
+      year,
+      case family_type_code
+        when '290' then '単独世帯'
+        when '130' then '夫婦のみ'
+        when '140' then '夫婦と子供'
+        when '150' then 'ひとり親と子供'
+        when '160' then 'ひとり親と子供'
+        when '170' then 'その他の親族世帯'
+      end as category,
+      households
+    from census_family_type_municipality.family_type
+    where family_type_code in ('290', '130', '140', '150', '160', '170')
+  ),
+  agg as (
+    select year, category, sum(households) as hh from cat group by year, category
+  )
+  select a.category, a.year, round(a.hh * 100.0 / b.hh, 0) as idx
+  from agg a
+  join (select category, hh from agg where year = 2005) b using (category)
+  order by a.category, a.year
+```
+
+<!-- prettier-ignore -->
+<BarChart
+  data={inzai_ft_composition}
   x=year
-  y=tandoku_pct
-  title="印西市 単独世帯割合（単独世帯 ÷ 総世帯・%）"
+  y=pct
+  series=category
+  title="印西市 家族類型の構成比（シェア・%）"
   yFmt="0.0"
-  yMin=0
   xType=category
+  type=stacked
+  sort=false
+  seriesOrder={['夫婦と子供','夫婦のみ','ひとり親と子供','その他の親族世帯','単独世帯','非親族を含む世帯','不詳']}
+  seriesColors={{'夫婦と子供':'#4e79a7','夫婦のみ':'#59a14f','ひとり親と子供':'#edc948','その他の親族世帯':'#b07aa1','単独世帯':'#f28e2b','非親族を含む世帯':'#76b7b2','不詳':'#bab0ac'}}
+/>
+
+<!-- prettier-ignore -->
+<LineChart
+  data={inzai_ft_index}
+  x=year
+  y=idx
+  series=category
+  title="印西市 家族類型別 一般世帯数（実数・2005年=100）"
+  yFmt="0"
+  xType=category
+  seriesOrder={['夫婦と子供','夫婦のみ','ひとり親と子供','その他の親族世帯','単独世帯']}
+  seriesColors={{'夫婦と子供':'#4e79a7','夫婦のみ':'#59a14f','ひとり親と子供':'#edc948','その他の親族世帯':'#b07aa1','単独世帯':'#f28e2b'}}
 />
 
 _※ 家族類型の市区町村ミクロは 2005〜2020 年（新分類の遡及集計が 2005 始まり）。全国→都道府県の単身化は [家族類型](/family_type) ページを参照。_

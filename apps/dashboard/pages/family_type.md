@@ -6,73 +6,65 @@ sidebar_position: 6
 データセット: **世帯の家族類型（16区分）別 一般世帯数・世帯人員** - 都道府県は1995〜2020年（6回）、市区町村は2005〜2020年（合併畳み込み済み）
 
 [世帯](/households)ページが**世帯の大きさ**（平均世帯人員）を見たのに対し、このページでは**世帯の中身＝家族構成**を、全国 → 都道府県 → 市区町村のスケールで見ていく。  
-主役は **単独世帯割合（＝単独世帯 ÷ 総世帯）**で、その上昇が**単身化**を表す。
+見せ方は2つ——**1地域の経年変化は全類型の構成比（%）**で単身化や夫婦世帯と子育て世帯を読み、**多数地域の横断比較は単独世帯割合（＝単独世帯 ÷ 総世帯・単身化の代表指標）**で見る。
 
 ---
 
-## 全国：単独世帯割合の上昇（単身化）
+## 全国：家族類型の構成比の変化（%）
 
-一人暮らし（単独世帯）が全世帯に占める割合は、**1995 年の約 26% → 2020 年の約 38%** へと四半世紀で大きく伸びた。
-核家族化のさらに先にある**単身化**の進行を示す。
-
-```sql ft_tandoku_national
-  select
-    total.year,
-    round(single.households * 100.0 / total.households, 1) as tandoku_pct
-  from (
-    select year, households from census_family_type.family_type
-    where area_code = '00000' and family_type_code = '100'
-  ) total
-  join (
-    select year, households from census_family_type.family_type
-    where area_code = '00000' and family_type_code = '290'
-  ) single using (year)
-  order by total.year
-```
-
-<LineChart
-  data={ft_tandoku_national}
-  x=year
-  y=tandoku_pct
-  title="全国 単独世帯割合（単独世帯 ÷ 総世帯・%）"
-  yFmt="0.0"
-  yMin=0
-  xType=category
-/>
-
-_※ 分母の総世帯（総数）には家族類型不詳を含む（総数ベース）。_
-
----
-
-## 全国：家族類型の構成（親族のみ／単独／非親族／不詳）
-
-世帯を家族構成の大区分で分けると、**親族のみの世帯**がほぼ横ばい（2010 年をピークに微減）にとどまる一方で、**単独世帯**が一貫して伸び続ける。
+単独世帯だけでなく全類型の割合を並べると、四半世紀の**世帯構造の変化**がまとめて読める。
+かつて最大だった**夫婦と子供の世帯が 34.2%（1995）→ 25.0%（2020）**へ縮み、**単独世帯が 25.6% → 38.0%**へ最大区分に躍り出た。
+三世代同居を含む**その他の親族世帯も 15.4% → 6.8%**へ半減し、**夫婦のみ・ひとり親と子供**は微増。世帯の小型化が全類型の割合として現れている。
 
 ```sql ft_composition_national
-  select
-    year,
-    family_type,
-    households
-  from census_family_type.family_type
-  where area_code = '00000'
-    and family_type_code in ('110', '290', '280', '999')
-  order by year, family_type_code
+  with base as (
+    select year, family_type_code, households
+    from census_family_type.family_type
+    where area_code = '00000'
+  ),
+  tot as (
+    select year, households as total from base where family_type_code = '100'
+  ),
+  cat as (
+    select
+      year,
+      case family_type_code
+        when '290' then '単独世帯'
+        when '130' then '夫婦のみ'
+        when '140' then '夫婦と子供'
+        when '150' then 'ひとり親と子供'
+        when '160' then 'ひとり親と子供'
+        when '170' then 'その他の親族世帯'
+        when '280' then '非親族を含む世帯'
+        when '999' then '不詳'
+      end as category,
+      households
+    from base
+    where family_type_code in ('290', '130', '140', '150', '160', '170', '280', '999')
+  )
+  select c.year, c.category, round(sum(c.households) * 100.0 / t.total, 1) as pct
+  from cat c
+  join tot t using (year)
+  group by c.year, c.category, t.total
+  order by c.year, c.category
 ```
 
 <!-- prettier-ignore -->
 <BarChart
   data={ft_composition_national}
   x=year
-  y=households
-  series=family_type
-  title="全国 家族類型別 一般世帯数（大区分・積み上げ）"
-  yFmt="#,##0"
+  y=pct
+  series=category
+  title="全国 家族類型の構成比（%・100%積み上げ）"
+  yFmt="0.0"
   xType=category
+  type=stacked
   sort=false
-  seriesColors={{'親族のみの世帯':'#4e79a7','単独世帯':'#f28e2b','非親族を含む世帯':'#76b7b2','家族類型不詳':'#bab0ac'}}
+  seriesOrder={['夫婦と子供','夫婦のみ','ひとり親と子供','その他の親族世帯','単独世帯','非親族を含む世帯','不詳']}
+  seriesColors={{'夫婦と子供':'#4e79a7','夫婦のみ':'#59a14f','ひとり親と子供':'#edc948','その他の親族世帯':'#b07aa1','単独世帯':'#f28e2b','非親族を含む世帯':'#76b7b2','不詳':'#bab0ac'}}
 />
 
-_※ 大区分（親族のみ 110／非親族 280／単独 290／不詳 999）は総数（100）に一致する。核家族（120）等は「親族のみ」の内訳（再掲）のため積み上げには含めない。_
+_※ 7 区分は総数（100）に一致する相互排他の分割（核家族＝夫婦のみ＋夫婦と子供＋ひとり親と子供／その他の親族世帯＝三世代等）。各年の合計が 100% になるよう構成比で示す。_
 
 ---
 
@@ -109,7 +101,7 @@ _※ 大区分（親族のみ 110／非親族 280／単独 290／不詳 999）�
 
 ---
 
-## 都道府県ドリルダウン：都道府県別 単独世帯割合の推移
+## 都道府県ドリルダウン：都道府県別 家族類型の構成比の推移
 
 <Dropdown
   data={ft_pref_list}
@@ -126,62 +118,105 @@ _※ 大区分（親族のみ 110／非親族 280／単独 290／不詳 999）�
   order by area_code
 ```
 
-```sql ft_pref_trend
-  select
-    total.year,
-    round(single.households * 100.0 / total.households, 1) as tandoku_pct
-  from (
-    select year, households from census_family_type.family_type
+```sql ft_pref_composition
+  with tot as (
+    select year, households as total
+    from census_family_type.family_type
     where area_name = '${inputs.pref.value}' and family_type_code = '100'
-  ) total
-  join (
-    select year, households from census_family_type.family_type
-    where area_name = '${inputs.pref.value}' and family_type_code = '290'
-  ) single using (year)
-  order by total.year
+  ),
+  cat as (
+    select
+      year,
+      case family_type_code
+        when '290' then '単独世帯'
+        when '130' then '夫婦のみ'
+        when '140' then '夫婦と子供'
+        when '150' then 'ひとり親と子供'
+        when '160' then 'ひとり親と子供'
+        when '170' then 'その他の親族世帯'
+        when '280' then '非親族を含む世帯'
+        when '999' then '不詳'
+      end as category,
+      households
+    from census_family_type.family_type
+    where area_name = '${inputs.pref.value}'
+      and family_type_code in ('290', '130', '140', '150', '160', '170', '280', '999')
+  )
+  select c.year, c.category, round(sum(c.households) * 100.0 / t.total, 1) as pct
+  from cat c
+  join tot t using (year)
+  group by c.year, c.category, t.total
+  order by c.year, c.category
 ```
 
-<LineChart
-  data={ft_pref_trend}
+<!-- prettier-ignore -->
+<BarChart
+  data={ft_pref_composition}
   x=year
-  y=tandoku_pct
-  title="{inputs.pref.value} 単独世帯割合（%）"
+  y=pct
+  series=category
+  title="{inputs.pref.value} 家族類型の構成比（%・100%積み上げ）"
   yFmt="0.0"
-  yMin=0
   xType=category
+  type=stacked
+  sort=false
+  seriesOrder={['夫婦と子供','夫婦のみ','ひとり親と子供','その他の親族世帯','単独世帯','非親族を含む世帯','不詳']}
+  seriesColors={{'夫婦と子供':'#4e79a7','夫婦のみ':'#59a14f','ひとり親と子供':'#edc948','その他の親族世帯':'#b07aa1','単独世帯':'#f28e2b','非親族を含む世帯':'#76b7b2','不詳':'#bab0ac'}}
 />
 
 ---
 
-## 市区町村ミクロ：印西市も単身化は進むが、全国より大幅に低い
+## 市区町村ミクロ：印西市は「夫婦と子供」が主体の子育て世帯の街
 
 市区町村粒度でしか描けないミクロの一例。
-子育て世帯が流入し続ける**千葉県印西市**でも、単独世帯割合は **2005 年の 15.5% → 2020 年の 20.1%** へと上昇している。
-ただし全国（2020 年 約38%）を大きく下回り、家族世帯（親族のみ）が主体の街であることが読める。
+全類型の構成比で見ると、**千葉県印西市**は**夫婦と子供の世帯が 2020 年でも 39.8%**（全国 25.0%）と突出して高く、子育て世帯の街であることが数字に表れる。
+一方で **単独世帯は 15.5%（2005）→ 20.1%（2020）**、**夫婦のみは 17.1% → 25.0%** と上昇し、三世代等の**その他の親族世帯は 14.5% → 6.4%** へ半減——初期入居世代の高齢化に沿って街の中でも小型化が進む。
+ただしこれは**シェア（割合）**の話で、実数では夫婦と子供も含めほぼ全類型が増えている（減ったのは三世代等のみ）。
+割合と実数で逆転するこの読みは [印西市ケーススタディ](/inzai) を参照。
 
-```sql ft_inzai_trend
-  select
-    total.year,
-    round(single.households * 100.0 / total.households, 1) as tandoku_pct
-  from (
-    select year, households from census_family_type_municipality.family_type
+```sql ft_inzai_composition
+  with tot as (
+    select year, households as total
+    from census_family_type_municipality.family_type
     where family_type_code = '100'
-  ) total
-  join (
-    select year, households from census_family_type_municipality.family_type
-    where family_type_code = '290'
-  ) single using (year)
-  order by total.year
+  ),
+  cat as (
+    select
+      year,
+      case family_type_code
+        when '290' then '単独世帯'
+        when '130' then '夫婦のみ'
+        when '140' then '夫婦と子供'
+        when '150' then 'ひとり親と子供'
+        when '160' then 'ひとり親と子供'
+        when '170' then 'その他の親族世帯'
+        when '280' then '非親族を含む世帯'
+        when '999' then '不詳'
+      end as category,
+      households
+    from census_family_type_municipality.family_type
+    where family_type_code in ('290', '130', '140', '150', '160', '170', '280', '999')
+  )
+  select c.year, c.category, round(sum(c.households) * 100.0 / t.total, 1) as pct
+  from cat c
+  join tot t using (year)
+  group by c.year, c.category, t.total
+  order by c.year, c.category
 ```
 
-<LineChart
-  data={ft_inzai_trend}
+<!-- prettier-ignore -->
+<BarChart
+  data={ft_inzai_composition}
   x=year
-  y=tandoku_pct
-  title="印西市 単独世帯割合（単独世帯 ÷ 総世帯・%・合併畳み込み済み）"
+  y=pct
+  series=category
+  title="印西市 家族類型の構成比（%・100%積み上げ・合併畳み込み済み）"
   yFmt="0.0"
-  yMin=0
   xType=category
+  type=stacked
+  sort=false
+  seriesOrder={['夫婦と子供','夫婦のみ','ひとり親と子供','その他の親族世帯','単独世帯','非親族を含む世帯','不詳']}
+  seriesColors={{'夫婦と子供':'#4e79a7','夫婦のみ':'#59a14f','ひとり親と子供':'#edc948','その他の親族世帯':'#b07aa1','単独世帯':'#f28e2b','非親族を含む世帯':'#76b7b2','不詳':'#bab0ac'}}
 />
 
 _※ 市区町村ミクロは 2005〜2020 年（新分類の遡及集計が 2005 始まり）。人口・世帯の増加とあわせた横断は [印西市ケーススタディ](/inzai) を参照。_
