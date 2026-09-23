@@ -58,17 +58,19 @@ e-Stat の不詳（未回答・不明）の扱いは全 fact で 2 つの規約�
 別ソース・別系統から同じ総人口へ到達することを相互照合し、「重複軸はハブと一致検証したうえで捨てる」という方針をテストで実体化する。  
 ハブ（正典）は総人口をアトム粒度まで完全に持つ **population**。系統は A＝各回基本集計 / B＝派生表。期待は全て **diff=0**。
 
-| #      | 恒等式                                                 | 粒度              | 系統 |
-| ------ | ------------------------------------------------------ | ----------------- | ---- |
-| **C1** | age5(nat=0・年齢総数) == population                    | 市区町村×year×sex | A×A  |
-| **C2** | age5(nat=0)を3区分へ畳込 == age3class                  | 市区町村×year×sex | A×B  |
-| **C3** | age3class(年齢総数) == population                      | 市区町村×year×sex | B×A  |
-| **C4** | age5→県rollup == age5year_prefecture                   | 県×year           | A×B  |
-| **C5** | daynight(夜間) == population                           | 全国              | −×A  |
-| **H1** | households(世帯数)→県rollup == households_prefecture   | 県×year×種類      | A×B  |
-| **H2** | households(世帯人員)→県rollup == households_prefecture | 県×year×種類      | A×B  |
+| #      | 恒等式                                                   | 粒度              | 系統 |
+| ------ | -------------------------------------------------------- | ----------------- | ---- |
+| **C1** | age5(nat=0・年齢総数) == population                      | 市区町村×year×sex | A×A  |
+| **C2** | age5(nat=0)を3区分へ畳込 == age3class                    | 市区町村×year×sex | A×B  |
+| **C3** | age3class(年齢総数) == population                        | 市区町村×year×sex | B×A  |
+| **C4** | age5→県rollup == age5year_prefecture                     | 県×year           | A×B  |
+| **C5** | daynight(夜間) == population                             | 全国              | −×A  |
+| **H1** | households(世帯数)→県rollup == households_prefecture     | 県×year×種類      | A×B  |
+| **H2** | households(世帯人員)→県rollup == households_prefecture   | 県×year×種類      | A×B  |
+| **F1** | family_type(世帯数)→県rollup == family_type_prefecture   | 県×year×家族類型  | A×B  |
+| **F2** | family_type(世帯人員)→県rollup == family_type_prefecture | 県×year×家族類型  | A×B  |
 
-> C1〜C5 は person（総人口）の三角測量。**H1/H2 は世帯（household） universe** に同じ「ミクロ回次別→県 rollup == マクロ回次跨」オラクルを広げたもの（総人口ではなく世帯数／世帯人員を突合軸にする）。
+> C1〜C5 は person（総人口）の三角測量。**H1/H2・F1/F2 は世帯（household） universe** に同じ「ミクロ回次別→県 rollup == マクロ回次跨」オラクルを広げたもの（総人口ではなく世帯数／世帯人員を突合軸にする）。
 
 - **C1 が最も堅い**: population も age5 も同じ各回基本集計（回次別・同一調査母集団）ゆえ厳密 diff=0 が期待できる。実測ステータスは「検証手段の索引」の crossfact 検証で得る。
   - **粒度指定の落とし穴**（C1 が顕在化させた知見）: 一部の各歳表は市区町村を持つのに、既定の粒度指定のままだと中間集計（郡／支庁）を葉に拾って粒度が非対称になる。該当年は粒度指定を明示上書きして市区町村フルへ揃える（具体年は age5year / estat-census-catalog の各 doc が正典）。
@@ -79,6 +81,7 @@ e-Stat の不詳（未回答・不明）の扱いは全 fact で 2 つの規約�
   - **C4**（age5 ミクロ→県 rollup == age5year_prefecture マクロ）: 回次別ミクロは 1980 始まり＝**1920〜1975 は scope_out**。**1980〜2000** は回次別ミクロと回次跨マクロの県レベル集計差（秘匿／境界振替）が**両符号で年内 ±相殺**するため `mode="conservation"` の known_diff。**2005** はミクロ各歳表が年齢不詳を除く一方向差（C1/C2 の 2005 と同因・diff≥0）。県×sex×5歳階級の per-age 突合ゆえ、県総数が保存してもバンド間誤配分を捕捉する（コード体系が別＝マクロ `age5year.AGE5`／ミクロ `age5year_municipality.AGE_CLASS` を 5歳バンド下限年齢で共通化し、マクロ終端 85歳以上へミクロ 85+ 細分を畳む）。
   - **C5**（daynight 夜間＝常住地 == population・全国）: daynight は 1990 始まり＝**1980/1985/2025 は scope_out**。**1990〜2005** は従業地・通学地集計の常住地人口（夜間人口）が別系統の集計で人口等基本集計の確定人口を僅かに下回り pop≥night（〜0.1〜0.4%・一方向 diff≥0）＝known_diff。2010 調査から従業地・通学地集計が全数集計へ統一され解消（diff=0）＝集計系統／母集団定義の違いに由来する（詳細は §「既知の逸脱値レジストリ ②」）。全国では昼間人口総数＝夜間人口総数（通勤は国内内部）となるのを併せて確認できる。
 - **H1/H2**（households ミクロ回次別→県 rollup == households_prefecture マクロ回次跨）も同様に常時回す。世帯は悉皆カウント（標本でない）ゆえ 2005〜2020 は厳密 diff=0（C4 の age5 と違い known_diff すら少ない）。**H1**（世帯数）は回次別ミクロが 1985 始まり＝**1960/1970/1975/1980 は scope_out**、**1985〜2000** は県跨ぎ合併の境界振替（山口村 長野→岐阜 中津川市 2005 等でミクロは 2020 境界へ畳込・マクロは各年境界）が**両符号で年内 ±相殺**するため `mode="conservation"` の known_diff（値 pin＝`CROSSFACT_H1`）。**H2**（世帯人員）はミクロ各回表が 2015/2020 のみ収録ゆえ **1960〜2010 は scope_out**・2015/2020 は diff=0。
+- **F1/F2**（family_type ミクロ回次別→県 rollup == family_type_prefecture マクロ回次跨）も同型。世帯は悉皆カウントゆえ **2005〜2020 は全年 diff=0**（すべて新分類＝境界振替も無く known_diff pin すら不要）。**F1**（世帯数）はミクロが 2005 始まり＝**1995/2000 は scope_out**（市区町村版が旧分類（A親族/B非親族/C単独）しか無く新分類マクロと非互換＝写像不能。occupation major10/12 と同じ分類改訂断層）。**F2**（世帯人員）は tab に世帯数と並ぶ 2005/2010 のみ収録ゆえ **2015/2020 は scope_out**（軽量表は一般世帯数のみ収録＝H2 と収録年が逆）。
 - **C2 は age3class の唯一の区分レベル検証**: C1（age5 総数）と C3（age3class 総数）は総数しか照合しないため、区分の割当ミスや境界ズレ（総数は保存するバグ）を素通りさせる。C2 だけが age3class（別ソースの3区分表）の内訳を age5 の 5歳階級畳込と区分ごとに突合する。実装は cross_fact の `other_with` で 5歳階級コード→3区分コード（`age3_code`）へ写像し keys に含めて突合（境界 15/65 は 5歳バンド端で割れ straddle 無し。コード体系は市区町村版 `age5year_municipality.AGE_CLASS`＝140=15〜19歳・240=65〜69歳で、県版 `age5year.AGE5` とは別体系。総数100・不詳999 を fold から除く）。
   - **許容カテゴリ**: 2005 は各歳表の「埋め込み不詳」（5歳バンド Σ ≤ 総数＝未分類残差が老年帯に残る）で老年帯のみ age3class ≥ age5 fold となり known_diff（C1 の 2005 と同因・同向 diff≥0）。2025 は age5 未収録＝scope_out。実測ステータスは crossfact 検証で得る。
 - **日本人スライスの検算（J1〜J3）**: age5 ミクロ系列は国籍軸（総数=0 / 日本人=1・外国人コード無し）を持つため、日本人(=1)は総人口ハブと**等値にならない**（diff=外国人≠0）。よって別立てで検算する（`crossfact-check` が C1/C3 と同時に駆動）。
@@ -127,7 +130,7 @@ grain 列の組で重複がないことを保証し、静かに通さず reject 
 - `schema-check`: 「入口ガード」の軸構成版を実データで駆動する **exit 1 ゲート**。軸ドリフト（軸の増減・軸名変更・分類コードの増減）と未スナップショットの表で失敗（`--update` でスナップショットを意図的に固定）。
 - `area-check`: 「保存則」（人口保存）＋「孤児=0」を **exit 1 で止めるブロッキングゲート**（`crossfact-check` 同格。保存則の未知差分／空振り／未整備の孤児アトムで失敗）。後継先の実在（`dangling_successors`）と時制（`stale_successors`）は advisory 警告として併記（exit には影響しない）。
 - `area-orphans`: 孤児アトム棚卸しの支援（消滅アトムを人口降順で一覧し overrides 追記候補を提示。ゲート判定自体は `area-check`）。
-- `crossfact-check`: 「クロスファクト検算」＋日本人スライスの上界/保存則＋地理保存を実データで走らせ年別 status に分類（自動化済みは C1 / C2 / C3 / C4 / C5 / H1 / H2 / J1〜J3／G＝全国==Σ県）。
+- `crossfact-check`: 「クロスファクト検算」＋日本人スライスの上界/保存則＋地理保存を実データで走らせ年別 status に分類（自動化済みは C1 / C2 / C3 / C4 / C5 / H1 / H2 / F1 / F2 / J1〜J3／G＝全国==Σ県）。
 - `sanity-check`: 「値サニティ」＝配布ファクトの測定量が非負かを実データで検証する **exit 1 ゲート**。保存則・クロスファクトは総数一致を見るため、導出注入した不詳（総数−Σ内訳）が負に振れても自明化して見逃す。ここで測定量の値域（≥ 0）を直接突き穴を塞ぐ（`area-check` が市区町村ミクロ系列専用なのに対し、本ゲートは area 非依存で射影ファクト＝households/family_type/labor_force/industry/occupation を含む全ファクトに効く）。null 混入は advisory 併記。
 
 ---
