@@ -13,10 +13,11 @@ from data_forge.datasets._types import (
     Dataset,
     DatasetEntry,
     ProjectedDataset,
+    StitchedDataset,
 )
-from data_forge.sources.estat import labor_force
+from data_forge.sources.estat import labor_force, labor_force_municipality
 
-DATASETS: dict[str, DatasetEntry] = {
+_LABOR_FORCE: dict[str, DatasetEntry] = {
     "labor_force_national": Dataset(
         key="labor_force_national",
         source="estat",
@@ -61,3 +62,35 @@ DATASETS: dict[str, DatasetEntry] = {
         grain=["area_code", "sex_code", "labor_status_code", "year"],
     ),
 }
+
+
+# --- 市区町村＝ミクロ（回次別）: 各回別 statsDataId・市区町村まで。取れる年を year 軸で縫合。--------------
+# 合併畳込あり＝StitchedDataset。着手＝2015（軽量2次元 marginal・不詳は直接コードあり＝導出注入なし）。
+# muni_levels は令和型既定 {4,6}。★2020/2010/1995-2005 は着手順に追加。
+_LABOR_FORCE_MUNI_GRAIN = ["area_code", "sex_code", "labor_status_code", "year"]
+_LABOR_FORCE_MUNI: dict[str, DatasetEntry] = {
+    "labor_force_municipality_2015": Dataset(
+        key="labor_force_municipality_2015",
+        source="estat",
+        source_params={"stats_data_id": "0003174622"},
+        cleaner=labor_force_municipality.clean_2015,
+        stem="census_labor_force_municipality_2015",
+        table_name="labor_force",
+        universe="population",
+        index_columns=_LABOR_FORCE_MUNI_GRAIN,
+    ),
+    "labor_force_municipality_timeseries": StitchedDataset(
+        key="labor_force_municipality_timeseries",
+        upstreams=["labor_force_municipality_2015"],
+        title="国勢調査 労働力状態×男女別人口 市区町村別時系列（2015年・合併補正済み）",
+        stem="census_labor_force_municipality_timeseries",
+        table_name="labor_force",
+        universe="population",
+        index_columns=_LABOR_FORCE_MUNI_GRAIN,
+        grain=_LABOR_FORCE_MUNI_GRAIN,
+        default_join="aggregate_to_base",
+    ),
+}
+
+
+DATASETS: dict[str, DatasetEntry] = {**_LABOR_FORCE, **_LABOR_FORCE_MUNI}

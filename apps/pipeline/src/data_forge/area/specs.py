@@ -118,6 +118,15 @@ _FAMILY_TYPE_MACRO_ONLY = frozenset({1995, 2000})
 _FT_OLDCLASS_REASON = "回次跨マクロのみ（市区町村版は旧分類＝新分類マクロと非互換で不採用）"
 _FT_MEMBERS_GAP_REASON = "世帯人員はミクロ軽量表（2015=0003148560/2020=0003445080）が一般世帯数のみ収録＝スコープ外"
 
+# I/O/L: 就業系ミクロ(産業/職業/労働力)は 2015 のみ着手（唯一「男女×大分類×市区町村」の軽量2次元 marginal が
+# 揃う年）。県跨マクロ(_prefecture_timeseries)が持つ他年はミクロ未収録＝scope_out
+# （着手順 2020→2010→1995-2005 で順次外す）。悉皆カウントゆえ 2015 は県レベルで一致（F1/H1 と同型）。
+_EMPLOYED_MUNI_YEARS = frozenset({2015})
+_INDUSTRY_PREF_YEARS = frozenset({2005, 2010, 2015, 2020})  # industry_prefecture_timeseries の収録年
+_OCCUPATION_PREF_YEARS = frozenset({2005, 2010, 2015, 2020})  # occupation_major12_prefecture_timeseries の収録年
+_LABOR_FORCE_PREF_YEARS = frozenset(range(1950, 2021, 5))  # labor_force_prefecture_timeseries の収録年（5年間隔）
+_EMPLOYED_MUNI_ONLY_REASON = "就業系ミクロは2015のみ着手＝他年は未収録（着手順 2020→2010→1995-2005 で順次追加）"
+
 CROSSFACT: dict[str, list[CrossFactSpec]] = {
     "age5year_municipality_timeseries": [
         # C1: age5 の 国籍総数(nat=0)×年齢総数(age_class=100) スライス == population。
@@ -293,6 +302,48 @@ CROSSFACT: dict[str, list[CrossFactSpec]] = {
                 **{y: _FT_OLDCLASS_REASON for y in _FAMILY_TYPE_MACRO_ONLY},
                 **{y: _FT_MEMBERS_GAP_REASON for y in (2015, 2020)},
             },
+        ),
+    ],
+    # I/O/L: 就業系ミクロ(回次別)→県 rollup == _prefecture_timeseries（回次跨マクロ）。別 product 間の検算オラクル。
+    # 就業状態等基本集計の大分類は悉皆カウント（標本でない）ゆえ、回次別と回次跨が県レベルで一致（F1/H1 と同型）。
+    # 県 rollup は area_code 先頭2桁で束ねる。ミクロは 2015 のみ＝他の県収録年は scope_out。
+    "industry_municipality_timeseries": [
+        CrossFactSpec(
+            name="I1 就業者数 ミクロ→県rollup == industry_prefecture",
+            keys=["pref_code", "industry_code", "year"],
+            hub_key="industry_prefecture_timeseries",
+            hub_with=[pl.col("area_code").str.slice(0, 2).alias("pref_code")],
+            other_with=[pl.col("area_code").str.slice(0, 2).alias("pref_code")],
+            value="workers",
+            mode="conservation",
+            scope_years=_INDUSTRY_PREF_YEARS - _EMPLOYED_MUNI_YEARS,
+            reasons={y: _EMPLOYED_MUNI_ONLY_REASON for y in _INDUSTRY_PREF_YEARS - _EMPLOYED_MUNI_YEARS},
+        ),
+    ],
+    "occupation_major12_municipality_timeseries": [
+        CrossFactSpec(
+            name="O1 就業者数 ミクロ→県rollup == occupation_major12_prefecture",
+            keys=["pref_code", "occupation_code", "year"],
+            hub_key="occupation_major12_prefecture_timeseries",
+            hub_with=[pl.col("area_code").str.slice(0, 2).alias("pref_code")],
+            other_with=[pl.col("area_code").str.slice(0, 2).alias("pref_code")],
+            value="workers",
+            mode="conservation",
+            scope_years=_OCCUPATION_PREF_YEARS - _EMPLOYED_MUNI_YEARS,
+            reasons={y: _EMPLOYED_MUNI_ONLY_REASON for y in _OCCUPATION_PREF_YEARS - _EMPLOYED_MUNI_YEARS},
+        ),
+    ],
+    "labor_force_municipality_timeseries": [
+        CrossFactSpec(
+            name="L1 15歳以上人口 ミクロ→県rollup == labor_force_prefecture",
+            keys=["pref_code", "labor_status_code", "year"],
+            hub_key="labor_force_prefecture_timeseries",
+            hub_with=[pl.col("area_code").str.slice(0, 2).alias("pref_code")],
+            other_with=[pl.col("area_code").str.slice(0, 2).alias("pref_code")],
+            value="population",
+            mode="conservation",
+            scope_years=_LABOR_FORCE_PREF_YEARS - _EMPLOYED_MUNI_YEARS,
+            reasons={y: _EMPLOYED_MUNI_ONLY_REASON for y in _LABOR_FORCE_PREF_YEARS - _EMPLOYED_MUNI_YEARS},
         ),
     ],
     # C5: daynight 夜間(常住地・daynight_code=0) == population（全国＝keys=["year"] で市区町村を合算）。

@@ -14,8 +14,9 @@ from data_forge.datasets._types import (
     Dataset,
     DatasetEntry,
     ProjectedDataset,
+    StitchedDataset,
 )
-from data_forge.sources.estat import occupation
+from data_forge.sources.estat import occupation, occupation_municipality
 
 # --- major12（職業大分類・12区分）---
 _OCCUPATION_MAJOR12: dict[str, DatasetEntry] = {
@@ -113,4 +114,33 @@ _OCCUPATION_MAJOR10: dict[str, DatasetEntry] = {
 }
 
 
-DATASETS: dict[str, DatasetEntry] = {**_OCCUPATION_MAJOR12, **_OCCUPATION_MAJOR10}
+# --- 市区町村＝ミクロ（回次別）: major12 に同居（2015 は 12区分で major12 と同ツリー）。----------------
+# 合併畳込あり＝StitchedDataset。着手＝2015（軽量2次元 marginal）。muni_levels は令和型既定 {4,6}。
+# ★2020/2010 は着手順に追加。1995-2005 は major10（旧10区分）ゆえ別 family（major10 側）へ。
+_OCCUPATION_MUNI_GRAIN = ["area_code", "sex_code", "occupation_code", "year"]
+_OCCUPATION_MUNI: dict[str, DatasetEntry] = {
+    "occupation_major12_municipality_2015": Dataset(
+        key="occupation_major12_municipality_2015",
+        source="estat",
+        source_params={"stats_data_id": "0003176482"},
+        cleaner=occupation_municipality.clean_2015,
+        stem="census_occupation_major12_municipality_2015",
+        table_name="occupation_major12",
+        universe="employed",
+        index_columns=_OCCUPATION_MUNI_GRAIN,
+    ),
+    "occupation_major12_municipality_timeseries": StitchedDataset(
+        key="occupation_major12_municipality_timeseries",
+        upstreams=["occupation_major12_municipality_2015"],
+        title="国勢調査 職業大分類(12区分)×男女別就業者数 市区町村別時系列（2015年・合併補正済み）",
+        stem="census_occupation_major12_municipality_timeseries",
+        table_name="occupation_major12",
+        universe="employed",
+        index_columns=_OCCUPATION_MUNI_GRAIN,
+        grain=_OCCUPATION_MUNI_GRAIN,
+        default_join="aggregate_to_base",
+    ),
+}
+
+
+DATASETS: dict[str, DatasetEntry] = {**_OCCUPATION_MAJOR12, **_OCCUPATION_MAJOR10, **_OCCUPATION_MUNI}

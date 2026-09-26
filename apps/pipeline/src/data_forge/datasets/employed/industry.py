@@ -13,10 +13,11 @@ from data_forge.datasets._types import (
     Dataset,
     DatasetEntry,
     ProjectedDataset,
+    StitchedDataset,
 )
-from data_forge.sources.estat import industry
+from data_forge.sources.estat import industry, industry_municipality
 
-DATASETS: dict[str, DatasetEntry] = {
+_INDUSTRY: dict[str, DatasetEntry] = {
     "industry_national": Dataset(
         key="industry_national",
         source="estat",
@@ -61,3 +62,37 @@ DATASETS: dict[str, DatasetEntry] = {
         grain=["area_code", "sex_code", "industry_code", "year"],
     ),
 }
+
+
+# --- 市区町村＝ミクロ（回次別）: 各回別 statsDataId・市区町村まで。取れる年を year 軸で縫合。--------------
+# 合併畳込あり＝StitchedDataset（aggregate_to_base）。着手＝2015（軽量2次元 marginal・20区分A-T）。
+# muni_levels: 2015 は令和型 level4/6 でグローバル既定と一致＝上書き不要。
+# ★2020/2010/1995-2005 は着手順に追加（2020=純カウント marginal 廃止で復元要・2010=多次元のみ・
+#   1995-2005=15/19区分の分類断層で別マップ／別セグメント判断）。
+_INDUSTRY_MUNI_GRAIN = ["area_code", "sex_code", "industry_code", "year"]
+_INDUSTRY_MUNI: dict[str, DatasetEntry] = {
+    "industry_municipality_2015": Dataset(
+        key="industry_municipality_2015",
+        source="estat",
+        source_params={"stats_data_id": "0003175084"},
+        cleaner=industry_municipality.clean_2015,
+        stem="census_industry_municipality_2015",
+        table_name="industry",
+        universe="employed",
+        index_columns=_INDUSTRY_MUNI_GRAIN,
+    ),
+    "industry_municipality_timeseries": StitchedDataset(
+        key="industry_municipality_timeseries",
+        upstreams=["industry_municipality_2015"],
+        title="国勢調査 産業大分類×男女別就業者数 市区町村別時系列（2015年・合併補正済み）",
+        stem="census_industry_municipality_timeseries",
+        table_name="industry",
+        universe="employed",
+        index_columns=_INDUSTRY_MUNI_GRAIN,
+        grain=_INDUSTRY_MUNI_GRAIN,
+        default_join="aggregate_to_base",
+    ),
+}
+
+
+DATASETS: dict[str, DatasetEntry] = {**_INDUSTRY, **_INDUSTRY_MUNI}
