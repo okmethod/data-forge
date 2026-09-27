@@ -11,6 +11,8 @@ lv2 中分類（うち農業）・再掲第1/2/3次・割合(%)行の除外と�
 2010（0003052127）は産業×従業上の地位クロス表で、地位総数（cat03='000'）スライス
 ＋DID全域（cat01='00710'）で産業marginalを復元する。
 産業は cat02・数字コード、男女は cat04・3桁体系。
+2005（0003010959）は 2015 同型の軽量2次元 marginal（新産業分類特別集計＝20区分 A-T に組み替え済み）。
+産業は cat02・連番コード（003-022）、男女は cat01・3桁体系（2010 と共用）。
 
 検証項目（関数名 ⇄ 何を確かめるか）:
     test_shares_schema_with_macro … macro industry と同一の10列・同一 dtype を出す（縦積み前提）。
@@ -23,6 +25,8 @@ lv2 中分類（うち農業）・再掲第1/2/3次・割合(%)行の除外と�
     test_2010_maps_and_marginalizes … cat02(数字)をマクロコードへ写像し、男女(cat04 3桁)を写像し、
         地位総数(cat03='000')・DID全域(cat01='00710')以外を落として産業marginalを復元し、中間/再掲を除外する。
     test_2010_conservation … 2010 も「分類不能(T=330)」含む大分類で 総数 == Σ大分類 が閉じる。
+    test_2005_maps_and_conserves … cat02(連番)をマクロコードへ写像し、男女(cat01 3桁)を写像し、
+        総数 == Σ大分類（分類不能含む）が閉じる（軽量marginal＝落とす行なし）。
 """
 
 import polars as pl
@@ -64,6 +68,13 @@ def _base_2010(**kw) -> dict:
         "cat03_code": "000",  # 従業上の地位 総数
         "time_code": "2010000000",
     }
+    row.update(kw)
+    return row
+
+
+def _base_2005(**kw) -> dict:
+    """2005 産業（新大分類）×男女 市区町村の行（tab=1・cat01=男女3桁・cat02=産業連番）。"""
+    row = {"area_code": "01100", "area_name": "市A", "area_level": "4", "tab_code": "1", "time_code": "2005000000"}
     row.update(kw)
     return row
 
@@ -207,5 +218,27 @@ def test_2010_conservation() -> None:
     df = industry_municipality.clean_2010(tidy)
     total = df.filter(pl.col("industry_code") == "100")["workers"][0]
     parts = df.filter(pl.col("industry_code") != "100")["workers"].sum()
+    assert total == parts == 100
+    assert "999" not in set(df["industry_code"])
+
+
+def test_2005_maps_and_conserves() -> None:
+    """cat02(連番)写像・cat01(3桁)写像・総数==Σ大分類（分類不能含む・落とす行なしの軽量marginal）。"""
+    tidy = pl.DataFrame(
+        [
+            _base_2005(cat01_code="000", cat02_code="000", value="100"),  # 総数 → 100
+            _base_2005(cat01_code="000", cat02_code="003", value="60"),  # A農業林業 → 120
+            _base_2005(cat01_code="000", cat02_code="004", value="34"),  # B漁業 → 130
+            _base_2005(cat01_code="000", cat02_code="022", value="6"),  # T分類不能 → 330
+            _base_2005(cat01_code="001", cat02_code="000", value="55"),  # 男×総数
+        ]
+    )
+    df = industry_municipality.clean_2005(tidy)
+    by = {(r["sex_code"], r["industry_code"]): r for r in df.iter_rows(named=True)}
+    assert by[("0", "120")]["workers"] == 60 and by[("0", "120")]["industry"] == "Ａ農業，林業"
+    assert by[("1", "100")]["workers"] == 55 and by[("1", "100")]["sex"] == "男"
+    assert df["year"][0] == 2005
+    total = df.filter((pl.col("sex_code") == "0") & (pl.col("industry_code") == "100"))["workers"][0]
+    parts = df.filter((pl.col("sex_code") == "0") & (pl.col("industry_code") != "100"))["workers"].sum()
     assert total == parts == 100
     assert "999" not in set(df["industry_code"])

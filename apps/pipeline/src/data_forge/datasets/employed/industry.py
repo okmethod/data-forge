@@ -66,13 +66,28 @@ _INDUSTRY: dict[str, DatasetEntry] = {
 
 # --- 市区町村＝ミクロ（回次別）: 各回別 statsDataId・市区町村まで。取れる年を year 軸で縫合。--------------
 # 合併畳込あり＝StitchedDataset（aggregate_to_base）。着手＝2015（軽量2次元 marginal・20区分A-T）。
-# muni_levels: 2010/2015/2020 は 20区分A-T で level4/6（2010 は旧市町村 level7 も）＝グローバル既定と一致。
+# muni_levels: 2010/2015/2020 は level4/6（2010 は旧市町村 level7 も）＝グローバル既定と一致。
+#   2005 のみグローバル既定 {3} が当たらず level4/6 を明示上書き（下記 Dataset 参照）。
 # 純カウントの軽量2次元表は 2010/2020 に無く、多次元クロス表の総数スライスで産業marginalを復元する:
 #   2020=産業×職業(0003450542)の職業総数(cdCat03='0')・2010=産業×従業上の地位(0003052127)の地位総数
 #   (cdCat03='000')＋DID全域(cdCat01='00710')。2020 表は産業総数スライスで occupation 2020 にも使える。
-# ★1995-2005 は着手順に追加（2005=19区分A-S・1995/2000=15区分の分類断層で別マップ／別セグメント判断）。
+# 2005（0003010959）は 2015 同型の軽量2次元 marginal＝新産業分類特別集計で 20区分に組み替え済み。
+# ★1995/2000（15区分）は着手順に追加（分類断層で別マップ／別セグメント判断）。
 _INDUSTRY_MUNI_GRAIN = ["area_code", "sex_code", "industry_code", "year"]
 _INDUSTRY_MUNI: dict[str, DatasetEntry] = {
+    "industry_municipality_2005": Dataset(
+        key="industry_municipality_2005",
+        source="estat",
+        source_params={"stats_data_id": "0003010959"},  # 軽量2次元 marginal＝絞り不要
+        cleaner=industry_municipality.clean_2005,
+        stem="census_industry_municipality_2005",
+        table_name="industry",
+        universe="employed",
+        index_columns=_INDUSTRY_MUNI_GRAIN,
+        # この表は令和型 level4/6（市/特別区=4・町村=6）だがグローバル既定 {3}（人口時系列製品向け）が
+        # 当たらず、明示上書きしないと東京23区以外が葉に採られず縫合で全滅する（family_type 2005 と同じ理由）。
+        muni_levels=frozenset({4, 6}),
+    ),
     "industry_municipality_2010": Dataset(
         key="industry_municipality_2010",
         source="estat",
@@ -107,8 +122,13 @@ _INDUSTRY_MUNI: dict[str, DatasetEntry] = {
     ),
     "industry_municipality_timeseries": StitchedDataset(
         key="industry_municipality_timeseries",
-        upstreams=["industry_municipality_2010", "industry_municipality_2015", "industry_municipality_2020"],
-        title="国勢調査 産業大分類×男女別就業者数 市区町村別時系列（2010・2015・2020年・合併補正済み）",
+        upstreams=[
+            "industry_municipality_2005",
+            "industry_municipality_2010",
+            "industry_municipality_2015",
+            "industry_municipality_2020",
+        ],
+        title="国勢調査 産業大分類×男女別就業者数 市区町村別時系列（2005・2010・2015・2020年・合併補正済み）",
         stem="census_industry_municipality_timeseries",
         table_name="industry",
         universe="employed",
