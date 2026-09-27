@@ -121,10 +121,10 @@ _FT_MEMBERS_GAP_REASON = "世帯人員はミクロ軽量表（2015=0003148560/20
 # I/O/L: 就業系ミクロ(産業/職業/労働力)。
 # 県跨マクロ(_prefecture_timeseries)が持つ他年はミクロ未収録＝ scope_out。
 # 悉皆カウントゆえ着手済み年は県レベルで一致（F1/H1 と同型）。
-# 産業は 2015・2020 着手（2020=産業×職業クロスの marginal 復元）。
+# 産業は 2010・2015・2020 着手（2020=産業×職業／2010=産業×従業上の地位クロスの marginal 復元）。
 # 職業/労働力は 2015 のみ（着手順で順次追加）。
 _EMPLOYED_MUNI_YEARS = frozenset({2015})  # occupation/labor_force ミクロの着手済み年
-_INDUSTRY_MUNI_YEARS = frozenset({2015, 2020})  # industry ミクロの着手済み年（2020 追加済み）
+_INDUSTRY_MUNI_YEARS = frozenset({2010, 2015, 2020})  # industry ミクロの着手済み年（2010/2020 追加済み）
 _INDUSTRY_PREF_YEARS = frozenset({2005, 2010, 2015, 2020})  # industry_prefecture_timeseries の収録年
 _OCCUPATION_PREF_YEARS = frozenset({2005, 2010, 2015, 2020})  # occupation_major12_prefecture_timeseries の収録年
 _LABOR_FORCE_PREF_YEARS = frozenset(range(1950, 2021, 5))  # labor_force_prefecture_timeseries の収録年（5年間隔）

@@ -8,6 +8,9 @@ lv2 中分類（うち農業）・再掲第1/2/3次・割合(%)行の除外と�
 2020（0003450542）は産業×職業クロス表で、純カウントの軽量2次元表が廃止されたため
 職業総数（cat03='0'）スライスで産業marginalを復元する。
 産業は cat02・令和型 A〜T の英字直接、男女は cat01・1桁体系（0/1/2）で 2015 と別体系。
+2010（0003052127）は産業×従業上の地位クロス表で、地位総数（cat03='000'）スライス
+＋DID全域（cat01='00710'）で産業marginalを復元する。
+産業は cat02・数字コード、男女は cat04・3桁体系。
 
 検証項目（関数名 ⇄ 何を確かめるか）:
     test_shares_schema_with_macro … macro industry と同一の10列・同一 dtype を出す（縦積み前提）。
@@ -17,6 +20,9 @@ lv2 中分類（うち農業）・再掲第1/2/3次・割合(%)行の除外と�
     test_2020_maps_and_marginalizes … cat02(A〜T)をマクロコードへ写像し、男女(cat01 1桁)を写像し、
         職業総数(cat03='0')以外の職業別行を落として産業marginalを復元し、中間集計/再掲を除外する。
     test_2020_conservation … 2020 も「分類不能(T=330)」含む大分類で 総数 == Σ大分類 が閉じる。
+    test_2010_maps_and_marginalizes … cat02(数字)をマクロコードへ写像し、男女(cat04 3桁)を写像し、
+        地位総数(cat03='000')・DID全域(cat01='00710')以外を落として産業marginalを復元し、中間/再掲を除外する。
+    test_2010_conservation … 2010 も「分類不能(T=330)」含む大分類で 総数 == Σ大分類 が閉じる。
 """
 
 import polars as pl
@@ -39,6 +45,24 @@ def _base_2020(**kw) -> dict:
         "tab_code": "2020_05",
         "cat03_code": "0",  # 職業総数（既定＝産業marginal）
         "time_code": "2020000000",
+    }
+    row.update(kw)
+    return row
+
+
+def _base_2010(**kw) -> dict:
+    """2010 産業×従業上の地位クロス表の行（tab=340・cat01=DID・cat03=地位・cat04=男女）。
+
+    既定は DID全域(cat01='00710')・地位総数(cat03='000')＝産業marginal。
+    """
+    row = {
+        "area_code": "01100",
+        "area_name": "市A",
+        "area_level": "4",
+        "tab_code": "340",
+        "cat01_code": "00710",  # DID 全域（人口集中地区 00711 は落とす）
+        "cat03_code": "000",  # 従業上の地位 総数
+        "time_code": "2010000000",
     }
     row.update(kw)
     return row
@@ -140,6 +164,47 @@ def test_2020_conservation() -> None:
         ]
     )
     df = industry_municipality.clean_2020(tidy)
+    total = df.filter(pl.col("industry_code") == "100")["workers"][0]
+    parts = df.filter(pl.col("industry_code") != "100")["workers"].sum()
+    assert total == parts == 100
+    assert "999" not in set(df["industry_code"])
+
+
+def test_2010_maps_and_marginalizes() -> None:
+    """cat02(数字)写像・cat04(3桁)写像・DID(cat01≠全域)/地位別(cat03≠'000')の脱落・中間/再掲の除外。"""
+    tidy = pl.DataFrame(
+        [
+            _base_2010(cat04_code="000", cat02_code="000", value="100"),  # 総数×地位総数 → 100
+            _base_2010(cat04_code="000", cat02_code="001", value="40"),  # A農業林業 → 120
+            _base_2010(cat04_code="000", cat02_code="002", value="9"),  # 中間集計 うち農業＝落とす
+            _base_2010(cat04_code="000", cat02_code="400", value="49"),  # 再掲第1次＝落とす
+            _base_2010(cat04_code="000", cat02_code="353", value="6"),  # T分類不能 → 330
+            _base_2010(cat04_code="001", cat02_code="000", value="55"),  # 男×総数
+            # 地位別（cat03≠'000'）は marginal 復元で落とす。
+            _base_2010(cat04_code="000", cat02_code="001", cat03_code="001", value="999"),
+            # DID（人口集中地区 00711）は全域でないので落とす。
+            _base_2010(cat04_code="000", cat02_code="001", cat01_code="00711", value="888"),
+        ]
+    )
+    df = industry_municipality.clean_2010(tidy)
+    by = {(r["sex_code"], r["industry_code"]): r for r in df.iter_rows(named=True)}
+    assert {k[1] for k in by} == {"100", "120", "330"}  # 中間集計・再掲は不採用
+    assert by[("0", "120")]["workers"] == 40 and by[("0", "120")]["industry"] == "Ａ農業，林業"
+    assert by[("1", "100")]["workers"] == 55 and by[("1", "100")]["sex"] == "男"
+    assert df["year"][0] == 2010
+
+
+def test_2010_conservation() -> None:
+    """2010 も 総数 == Σ大分類（分類不能を含む・不詳導出注入しない）。"""
+    tidy = pl.DataFrame(
+        [
+            _base_2010(cat04_code="000", cat02_code="000", value="100"),  # 総数
+            _base_2010(cat04_code="000", cat02_code="001", value="60"),  # A → 120
+            _base_2010(cat04_code="000", cat02_code="007", value="34"),  # B → 130
+            _base_2010(cat04_code="000", cat02_code="353", value="6"),  # T分類不能 → 330
+        ]
+    )
+    df = industry_municipality.clean_2010(tidy)
     total = df.filter(pl.col("industry_code") == "100")["workers"][0]
     parts = df.filter(pl.col("industry_code") != "100")["workers"].sum()
     assert total == parts == 100
