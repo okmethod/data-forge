@@ -118,14 +118,17 @@ _FAMILY_TYPE_MACRO_ONLY = frozenset({1995, 2000})
 _FT_OLDCLASS_REASON = "回次跨マクロのみ（市区町村版は旧分類＝新分類マクロと非互換で不採用）"
 _FT_MEMBERS_GAP_REASON = "世帯人員はミクロ軽量表（2015=0003148560/2020=0003445080）が一般世帯数のみ収録＝スコープ外"
 
-# I/O/L: 就業系ミクロ(産業/職業/労働力)は 2015 のみ着手（唯一「男女×大分類×市区町村」の軽量2次元 marginal が
-# 揃う年）。県跨マクロ(_prefecture_timeseries)が持つ他年はミクロ未収録＝scope_out
-# （着手順 2020→2010→1995-2005 で順次外す）。悉皆カウントゆえ 2015 は県レベルで一致（F1/H1 と同型）。
-_EMPLOYED_MUNI_YEARS = frozenset({2015})
+# I/O/L: 就業系ミクロ(産業/職業/労働力)。
+# 県跨マクロ(_prefecture_timeseries)が持つ他年はミクロ未収録＝ scope_out。
+# 悉皆カウントゆえ着手済み年は県レベルで一致（F1/H1 と同型）。
+# 産業は 2015・2020 着手（2020=産業×職業クロスの marginal 復元）。
+# 職業/労働力は 2015 のみ（着手順で順次追加）。
+_EMPLOYED_MUNI_YEARS = frozenset({2015})  # occupation/labor_force ミクロの着手済み年
+_INDUSTRY_MUNI_YEARS = frozenset({2015, 2020})  # industry ミクロの着手済み年（2020 追加済み）
 _INDUSTRY_PREF_YEARS = frozenset({2005, 2010, 2015, 2020})  # industry_prefecture_timeseries の収録年
 _OCCUPATION_PREF_YEARS = frozenset({2005, 2010, 2015, 2020})  # occupation_major12_prefecture_timeseries の収録年
 _LABOR_FORCE_PREF_YEARS = frozenset(range(1950, 2021, 5))  # labor_force_prefecture_timeseries の収録年（5年間隔）
-_EMPLOYED_MUNI_ONLY_REASON = "就業系ミクロは2015のみ着手＝他年は未収録（着手順 2020→2010→1995-2005 で順次追加）"
+_EMPLOYED_MUNI_ONLY_REASON = "就業系ミクロは未収録年（着手順で順次追加）"
 
 CROSSFACT: dict[str, list[CrossFactSpec]] = {
     "age5year_municipality_timeseries": [
@@ -316,8 +319,8 @@ CROSSFACT: dict[str, list[CrossFactSpec]] = {
             other_with=[pl.col("area_code").str.slice(0, 2).alias("pref_code")],
             value="workers",
             mode="conservation",
-            scope_years=_INDUSTRY_PREF_YEARS - _EMPLOYED_MUNI_YEARS,
-            reasons={y: _EMPLOYED_MUNI_ONLY_REASON for y in _INDUSTRY_PREF_YEARS - _EMPLOYED_MUNI_YEARS},
+            scope_years=_INDUSTRY_PREF_YEARS - _INDUSTRY_MUNI_YEARS,
+            reasons={y: _EMPLOYED_MUNI_ONLY_REASON for y in _INDUSTRY_PREF_YEARS - _INDUSTRY_MUNI_YEARS},
         ),
     ],
     "occupation_major12_municipality_timeseries": [

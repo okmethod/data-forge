@@ -66,9 +66,10 @@ _INDUSTRY: dict[str, DatasetEntry] = {
 
 # --- 市区町村＝ミクロ（回次別）: 各回別 statsDataId・市区町村まで。取れる年を year 軸で縫合。--------------
 # 合併畳込あり＝StitchedDataset（aggregate_to_base）。着手＝2015（軽量2次元 marginal・20区分A-T）。
-# muni_levels: 2015 は令和型 level4/6 でグローバル既定と一致＝上書き不要。
-# ★2020/2010/1995-2005 は着手順に追加（2020=純カウント marginal 廃止で復元要・2010=多次元のみ・
-#   1995-2005=15/19区分の分類断層で別マップ／別セグメント判断）。
+# muni_levels: 2015/2020 は令和型 level4/6 でグローバル既定と一致＝上書き不要。
+# 2020: 純カウントの軽量2次元表が廃止されたため、産業×職業クロス表（0003450542）の職業総数
+#   (cdCat03='0') スライスで産業marginalを復元する（同表は産業総数スライスで occupation 2020 にも使える）。
+# ★2010/1995-2005 は着手順に追加（2010=多次元のみ・1995-2005=15/19区分の分類断層で別マップ／別セグメント判断）。
 _INDUSTRY_MUNI_GRAIN = ["area_code", "sex_code", "industry_code", "year"]
 _INDUSTRY_MUNI: dict[str, DatasetEntry] = {
     "industry_municipality_2015": Dataset(
@@ -81,10 +82,21 @@ _INDUSTRY_MUNI: dict[str, DatasetEntry] = {
         universe="employed",
         index_columns=_INDUSTRY_MUNI_GRAIN,
     ),
+    "industry_municipality_2020": Dataset(
+        key="industry_municipality_2020",
+        source="estat",
+        # 産業×職業クロス表。職業総数(cdCat03='0')に絞って産業marginalだけ取得する（巨大表の転送抑制）。
+        source_params={"stats_data_id": "0003450542", "filters": {"cdCat03": "0"}},
+        cleaner=industry_municipality.clean_2020,
+        stem="census_industry_municipality_2020",
+        table_name="industry",
+        universe="employed",
+        index_columns=_INDUSTRY_MUNI_GRAIN,
+    ),
     "industry_municipality_timeseries": StitchedDataset(
         key="industry_municipality_timeseries",
-        upstreams=["industry_municipality_2015"],
-        title="国勢調査 産業大分類×男女別就業者数 市区町村別時系列（2015年・合併補正済み）",
+        upstreams=["industry_municipality_2015", "industry_municipality_2020"],
+        title="国勢調査 産業大分類×男女別就業者数 市区町村別時系列（2015・2020年・合併補正済み）",
         stem="census_industry_municipality_timeseries",
         table_name="industry",
         universe="employed",

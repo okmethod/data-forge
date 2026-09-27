@@ -3,6 +3,7 @@
 各回の就業状態等基本集計（回次別）の市区町村「産業（大分類）」表。同じ table_name "industry" に
 同居する全国／都道府県の回次跨マクロ（単一 ID・industry.py）と対をなし、市区町村まで下りる。
 着手＝2015（0003175084・唯一「男女×産業大分類×市区町村」の軽量2次元 marginal が揃う年）。
+2020（0003450542）は軽量2次元表が廃止されたため産業×職業クロスの職業総数スライスで marginal を復元する。
 
 **帳票の事実は docs/sources/estat-census-catalog.md「産業（大分類）」節が正典**
 （ここには再掲しない＝ドリフト防止）＝年別 statsDataId・軸割当/コード体系・分類区分数の断層・muni_levels。
@@ -12,8 +13,14 @@ Note（実装判断のみ）:
   （100〜330＝industry.INDUSTRY の鍵）と別体系。
   年別マップでマクロコードへ写像して縫合する（family_type ミクロと同型。コードは getStatsData の実コードで確定する）。
 - **分類は3体系**: 15区分(1995/2000) → 19区分A-S(2005) → 20区分A-T(2010-2020)。
-  2015 は 20区分A-T でマクロ（現行20区分）と同ツリー＝写像は1:1。
+  2015/2020 は 20区分A-T でマクロ（現行20区分）と同ツリー＝写像は1:1。
+  2020 は令和型で軸コードが変わり、産業=cat02（A〜T の英字直接）
+  ・男女=cat01（1桁 SEX_MUNI_2020）＝2015（cat05・4桁）と別マップ。
   旧体系年（〜2005）は着手時に別マップ／別セグメント判断。
+- **2020 の marginal 復元**: 純カウントの「男女×産業×市区町村」軽量表が令和2年で廃止され、
+  産業×職業クロス表（0003450542）しか市区町村まで下りない。
+  職業総数（cat03='0'）スライスで産業marginalを復元する（同表は産業総数スライスで occupation 2020 にも使える）。
+  取得は filters cdCat03='0' で絞る。
 - **周辺のみ・不詳注入なし**: 「分類不能の産業(T)」が実カテゴリゆえ 総数==Σ大分類 が閉じる
   （industry マクロと同じ。lv2 中分類「うち農業」・再掲第1/2/3次・割合(%)行はマップ非収載＝自動除外）。
 - **合併畳込（aggregate_to_base）は共有インフラに委ね**、clean は全 area level を素直に出す。
@@ -27,6 +34,7 @@ from data_forge.area.levels import is_current_expr
 from data_forge.sources.estat.industry import INDUSTRY
 from data_forge.sources.estat.transform import (
     SEX_MUNI,
+    SEX_MUNI_2020,
     area_passthrough_cols,
     code_name_cols,
     exclude_imputed_version_expr,
@@ -34,8 +42,9 @@ from data_forge.sources.estat.transform import (
     year_from_time_code_expr,
 )
 
-# 表章項目(tab): "1"=15歳以上就業者数（2015 市区町村版は単一 tab）。
+# 表章項目(tab): "1"=15歳以上就業者数（2015 市区町村版は単一 tab）。2020 は "2020_05"（就業者数）。
 _TAB_WORKERS = "1"
+_TAB_WORKERS_2020 = "2020_05"
 
 # 産業分類_2015（cat05・大分類 lv1）→ マクロ industry.INDUSTRY の鍵（100〜330）。
 # lv2 中分類（0020「うち農業」等）・再掲第1/2/3次(3570-3590)・割合(%)(3600〜)はマップ非収載＝自動除外。
@@ -64,15 +73,54 @@ _IND_2015 = {
 }
 
 
-def _finalize(df: pl.DataFrame, *, ind_col: str, ind_map: dict[str, str], sex_col: str) -> pl.DataFrame:
-    """産業分類コード（ソース）を持つ tidy を配布用10列へ写像する（年別マップ差し替えで共用）。"""
+# 産業分類_2020（cat02・大分類 lv1）→ マクロ industry.INDUSTRY の鍵（100〜330）。
+# 2020 市区町村版は令和型で 2015（cat05・4桁）と別体系＝大分類が A〜T の英字直接。
+# マクロコードの割当はアルファ順で _IND_2015 の value 列と 1:1（同じ 20区分 A-T ツリー）。
+# 中間集計「うち農業」(01)・再掲第1/2/3次(R1/R2/R3)はマップ非収載＝自動除外。
+_IND_2020 = {
+    "0": "100",  # 総数
+    "A": "120",  # 農業，林業
+    "B": "130",  # 漁業
+    "C": "150",  # 鉱業，採石業，砂利採取業
+    "D": "160",  # 建設業
+    "E": "170",  # 製造業
+    "F": "190",  # 電気・ガス・熱供給・水道業
+    "G": "200",  # 情報通信業
+    "H": "210",  # 運輸業，郵便業
+    "I": "220",  # 卸売業，小売業
+    "J": "230",  # 金融業，保険業
+    "K": "240",  # 不動産業，物品賃貸業
+    "L": "250",  # 学術研究，専門・技術サービス業
+    "M": "260",  # 宿泊業，飲食サービス業
+    "N": "270",  # 生活関連サービス業，娯楽業
+    "O": "280",  # 教育，学習支援業
+    "P": "290",  # 医療，福祉
+    "Q": "300",  # 複合サービス事業
+    "R": "310",  # サービス業（他に分類されないもの）
+    "S": "320",  # 公務（他に分類されるものを除く）
+    "T": "330",  # 分類不能の産業
+}
+
+
+def _finalize(
+    df: pl.DataFrame,
+    *,
+    ind_col: str,
+    ind_map: dict[str, str],
+    sex_col: str,
+    sex_map: dict[str, tuple[str, str]] = SEX_MUNI,
+) -> pl.DataFrame:
+    """産業分類コード（ソース）を持つ tidy を配布用10列へ写像する（年別マップ差し替えで共用）。
+
+    男女コードは年で体系が違う（2015=4桁 SEX_MUNI／2020=1桁 SEX_MUNI_2020）ため sex_map で差し替える。
+    """
     return (
         df.filter(pl.col(ind_col).is_in(list(ind_map)))
-        .filter(pl.col(sex_col).is_in(list(SEX_MUNI)))
+        .filter(pl.col(sex_col).is_in(list(sex_map)))
         .filter(exclude_imputed_version_expr())
         .select(
             *area_passthrough_cols(),
-            *code_name_cols(sex_col, SEX_MUNI, "sex"),
+            *code_name_cols(sex_col, sex_map, "sex"),
             pl.col(ind_col).replace_strict(ind_map).alias("industry_code"),
             pl.col(ind_col).replace_strict(ind_map).replace_strict(INDUSTRY).alias("industry"),
             year_from_time_code_expr(),
@@ -90,4 +138,20 @@ def clean_2015(tidy: pl.DataFrame) -> pl.DataFrame:
         ind_col="cat05_code",
         ind_map=_IND_2015,
         sex_col="cat01_code",
+    )
+
+
+def clean_2020(tidy: pl.DataFrame) -> pl.DataFrame:
+    """2020（0003450542・産業×職業クロス）用。職業総数(cat03='0')で絞り産業marginalを復元。
+
+    純カウントの軽量2次元表が令和2年で廃止されたため、産業×職業クロスの職業総数スライスを採る。
+    産業=cat02（令和型 A〜T）・男女=cat01（1桁 SEX_MUNI_2020）・tab=2020_05（就業者数）・area=level4/6。
+    取得は filters cdCat03='0' で職業総数に絞り込む（source_params 側）。
+    """
+    return _finalize(
+        tidy.filter(pl.col("tab_code") == _TAB_WORKERS_2020).filter(pl.col("cat03_code") == "0"),
+        ind_col="cat02_code",
+        ind_map=_IND_2020,
+        sex_col="cat01_code",
+        sex_map=SEX_MUNI_2020,
     )
