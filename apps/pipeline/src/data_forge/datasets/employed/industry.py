@@ -72,7 +72,8 @@ _INDUSTRY: dict[str, DatasetEntry] = {
 #   2020=産業×職業(0003450542)の職業総数(cdCat03='0')・2010=産業×従業上の地位(0003052127)の地位総数
 #   (cdCat03='000')＋DID全域(cdCat01='00710')。2020 表は産業総数スライスで occupation 2020 にも使える。
 # 2005（0003010959）は 2015 同型の軽量2次元 marginal＝新産業分類特別集計で 20区分に組み替え済み。
-# ★1995/2000（15区分）は着手順に追加（分類断層で別マップ／別セグメント判断）。
+# 1995/2000 は不採用（1995=15区分・2000=19区分で現行20区分と非互換＋県マクロ 2005- のみ＝検算オラクル無し。
+# family_type 1995/2000 と同じ分類改訂断層。根拠は catalog「産業」節）。ミクロは 2005 始まり。
 _INDUSTRY_MUNI_GRAIN = ["area_code", "sex_code", "industry_code", "year"]
 _INDUSTRY_MUNI: dict[str, DatasetEntry] = {
     "industry_municipality_2005": Dataset(
