@@ -114,11 +114,39 @@ _OCCUPATION_MAJOR10: dict[str, DatasetEntry] = {
 }
 
 
-# --- 市区町村＝ミクロ（回次別）: major12 に同居（2015 は 12区分で major12 と同ツリー）。----------------
+# --- 市区町村＝ミクロ（回次別）: major12 に同居（2010/2015/2020 は 12区分で major12 と同ツリー）。----------
 # 合併畳込あり＝StitchedDataset。着手＝2015（軽量2次元 marginal）。muni_levels は令和型既定 {4,6}。
-# ★2020/2010 は着手順に追加。1995-2005 は major10（旧10区分）ゆえ別 family（major10 側）へ。
+# 2020/2010 は多次元クロス表の総数スライスで職業marginalを復元する（industry 市区町村と同手法）:
+#   2020=産業×職業(0003450542・industry 2020 と同一表)の産業総数(cdCat02='0')スライス
+#   2010=産業×職業×従業上の地位(0003067223)の産業総数(cdCat04='000')×地位総数(cdCat02='000')スライス
+# 2005 は職業新分類の軽量2次元 marginal(0003024287)で、新分類は 12区分＝マクロ major12 と同ツリー
+# （旧大分類 major10 は参考表 0003410412 のみ＝市区町村版は無い）。ミクロ major12 は 2005 始まり。
 _OCCUPATION_MUNI_GRAIN = ["area_code", "sex_code", "occupation_code", "year"]
 _OCCUPATION_MUNI: dict[str, DatasetEntry] = {
+    "occupation_major12_municipality_2005": Dataset(
+        key="occupation_major12_municipality_2005",
+        source="estat",
+        source_params={"stats_data_id": "0003024287"},  # 職業新分類×男女 市区町村＝軽量2次元 marginal
+        cleaner=occupation_municipality.clean_2005,
+        stem="census_occupation_major12_municipality_2005",
+        table_name="occupation_major12",
+        universe="employed",
+        index_columns=_OCCUPATION_MUNI_GRAIN,
+        # 2005 のグローバル既定 leaf {3}（人口時系列製品向け）が当たらず、明示上書きしないと東京23区以外が
+        # 葉に採られず縫合で全滅する（industry_municipality_2005 と同じ理由）。
+        muni_levels=frozenset({4, 6}),
+    ),
+    "occupation_major12_municipality_2010": Dataset(
+        key="occupation_major12_municipality_2010",
+        source="estat",
+        # 産業×職業×従業上の地位クロス。産業総数×地位総数に絞って職業marginalだけ取得する。
+        source_params={"stats_data_id": "0003067223", "filters": {"cdCat04": "000", "cdCat02": "000"}},
+        cleaner=occupation_municipality.clean_2010,
+        stem="census_occupation_major12_municipality_2010",
+        table_name="occupation_major12",
+        universe="employed",
+        index_columns=_OCCUPATION_MUNI_GRAIN,
+    ),
     "occupation_major12_municipality_2015": Dataset(
         key="occupation_major12_municipality_2015",
         source="estat",
@@ -129,10 +157,26 @@ _OCCUPATION_MUNI: dict[str, DatasetEntry] = {
         universe="employed",
         index_columns=_OCCUPATION_MUNI_GRAIN,
     ),
+    "occupation_major12_municipality_2020": Dataset(
+        key="occupation_major12_municipality_2020",
+        source="estat",
+        # 産業×職業クロス（industry 2020 と同一表）。職業marginalは産業総数(cat02='0')スライスで復元。
+        source_params={"stats_data_id": "0003450542", "filters": {"cdCat02": "0"}},
+        cleaner=occupation_municipality.clean_2020,
+        stem="census_occupation_major12_municipality_2020",
+        table_name="occupation_major12",
+        universe="employed",
+        index_columns=_OCCUPATION_MUNI_GRAIN,
+    ),
     "occupation_major12_municipality_timeseries": StitchedDataset(
         key="occupation_major12_municipality_timeseries",
-        upstreams=["occupation_major12_municipality_2015"],
-        title="国勢調査 職業大分類(12区分)×男女別就業者数 市区町村別時系列（2015年・合併補正済み）",
+        upstreams=[
+            "occupation_major12_municipality_2005",
+            "occupation_major12_municipality_2010",
+            "occupation_major12_municipality_2015",
+            "occupation_major12_municipality_2020",
+        ],
+        title="国勢調査 職業大分類(12区分)×男女別就業者数 市区町村別時系列（2005・2010・2015・2020年・合併補正済み）",
         stem="census_occupation_major12_municipality_timeseries",
         table_name="occupation_major12",
         universe="employed",

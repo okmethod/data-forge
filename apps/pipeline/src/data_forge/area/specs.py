@@ -122,8 +122,13 @@ _FT_MEMBERS_GAP_REASON = "世帯人員はミクロ軽量表（2015=0003148560/20
 # 県跨マクロ(_prefecture_timeseries)が持つ他年はミクロ未収録＝ scope_out。
 # 悉皆カウントゆえ着手済み年は県レベルで一致（F1/H1 と同型）。
 # 産業は 2005-2020 全年着手（2020=産業×職業／2010=産業×従業上の地位クロスの marginal 復元、
-# 2005=新産業分類特別集計の軽量 marginal で 20区分に組み替え済み）。職業/労働力は 2015 のみ（着手順で順次追加）。
-_EMPLOYED_MUNI_YEARS = frozenset({2015})  # occupation/labor_force ミクロの着手済み年
+# 2005=新産業分類特別集計の軽量 marginal で 20区分に組み替え済み）。
+# 職業 major12 は 2005-2020 全年着手（2005=職業新分類の軽量 marginal／2020=産業×職業／
+# 2010=産業×職業×従業上の地位クロスの marginal 復元）。
+# 労働力は 2005-2020 全年着手（2020/2010=労働力状態×年齢クロスの年齢総数スライス／
+# 2005=配偶関係×年齢×労働力状態クロスの総数スライス＋不詳 999 導出注入）。
+_OCCUPATION_MUNI_YEARS = frozenset({2005, 2010, 2015, 2020})  # occupation major12 ミクロの着手済み年
+_LABOR_FORCE_MUNI_YEARS = frozenset({2005, 2010, 2015, 2020})  # labor_force ミクロの着手済み年
 _INDUSTRY_MUNI_YEARS = frozenset({2005, 2010, 2015, 2020})  # industry ミクロの着手済み年（県収録の全年）
 _INDUSTRY_PREF_YEARS = frozenset({2005, 2010, 2015, 2020})  # industry_prefecture_timeseries の収録年
 _OCCUPATION_PREF_YEARS = frozenset({2005, 2010, 2015, 2020})  # occupation_major12_prefecture_timeseries の収録年
@@ -332,8 +337,8 @@ CROSSFACT: dict[str, list[CrossFactSpec]] = {
             other_with=[pl.col("area_code").str.slice(0, 2).alias("pref_code")],
             value="workers",
             mode="conservation",
-            scope_years=_OCCUPATION_PREF_YEARS - _EMPLOYED_MUNI_YEARS,
-            reasons={y: _EMPLOYED_MUNI_ONLY_REASON for y in _OCCUPATION_PREF_YEARS - _EMPLOYED_MUNI_YEARS},
+            scope_years=_OCCUPATION_PREF_YEARS - _OCCUPATION_MUNI_YEARS,
+            reasons={y: _EMPLOYED_MUNI_ONLY_REASON for y in _OCCUPATION_PREF_YEARS - _OCCUPATION_MUNI_YEARS},
         ),
     ],
     "labor_force_municipality_timeseries": [
@@ -345,8 +350,8 @@ CROSSFACT: dict[str, list[CrossFactSpec]] = {
             other_with=[pl.col("area_code").str.slice(0, 2).alias("pref_code")],
             value="population",
             mode="conservation",
-            scope_years=_LABOR_FORCE_PREF_YEARS - _EMPLOYED_MUNI_YEARS,
-            reasons={y: _EMPLOYED_MUNI_ONLY_REASON for y in _LABOR_FORCE_PREF_YEARS - _EMPLOYED_MUNI_YEARS},
+            scope_years=_LABOR_FORCE_PREF_YEARS - _LABOR_FORCE_MUNI_YEARS,
+            reasons={y: _EMPLOYED_MUNI_ONLY_REASON for y in _LABOR_FORCE_PREF_YEARS - _LABOR_FORCE_MUNI_YEARS},
         ),
     ],
     # C5: daynight 夜間(常住地・daynight_code=0) == population（全国＝keys=["year"] で市区町村を合算）。
